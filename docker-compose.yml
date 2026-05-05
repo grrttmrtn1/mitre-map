@@ -1,0 +1,37 @@
+services:
+  mitremap:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: mitremap:latest
+    container_name: mitremap
+    restart: unless-stopped
+
+    ports:
+      - "${MITREMAP_PORT:-8080}:4000"
+
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+
+    volumes:
+      # Persist SQLite database across restarts/upgrades
+      - mitremap-data:/app/server/data
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mitremap-data:
+    driver: local
