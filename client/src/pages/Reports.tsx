@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { ExecutiveReport, CoverageSnapshot } from '../types';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import CoverageBar from '../components/CoverageBar';
+import ReportBuilder from '../components/ReportBuilder';
 
 export default function Reports() {
   const [report, setReport] = useState<ExecutiveReport | null>(null);
@@ -11,7 +12,7 @@ export default function Reports() {
   const [threatReport, setThreatReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [snapping, setSnapping] = useState(false);
-  const [activeTab, setActiveTab] = useState<'executive' | 'trends' | 'threats' | 'gaps'>('executive');
+  const [activeTab, setActiveTab] = useState<'executive' | 'trends' | 'threats' | 'gaps' | 'builder'>('executive');
 
   useEffect(() => {
     Promise.all([
@@ -41,15 +42,44 @@ export default function Reports() {
     setSnapshots(prev => prev.filter(s => s.id !== id));
   };
 
-  if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Generating reports...</div>;
-  if (!report) return null;
-
   const TABS = [
     { id: 'executive', label: 'Executive Summary' },
     { id: 'trends', label: 'Coverage Trends' },
     { id: 'threats', label: 'Threat Landscape' },
     { id: 'gaps', label: 'Prioritized Gaps' },
+    { id: 'builder', label: 'Custom Reports' },
   ] as const;
+
+  const tabBar = (
+    <div className="flex gap-1 mt-4">
+      {TABS.map(tab => (
+        <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+          className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTab === tab.id ? 'bg-blue-600/20 text-blue-400 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (activeTab === 'builder') {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-100">Reports &amp; Exports</h1>
+            <p className="text-sm text-slate-400 mt-0.5">Build and save custom reports from any data source</p>
+          </div>
+          {tabBar}
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <ReportBuilder />
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Generating reports...</div>;
+  if (!report) return null;
 
   const trendData = snapshots.map(s => ({
     date: new Date(s.taken_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -93,14 +123,7 @@ export default function Reports() {
           </div>
         </div>
 
-        <div className="flex gap-1 mt-4">
-          {TABS.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTab === tab.id ? 'bg-blue-600/20 text-blue-400 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {tabBar}
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
