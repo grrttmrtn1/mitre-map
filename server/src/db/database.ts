@@ -210,6 +210,18 @@ export function initSchema(db: Database.Database): void {
       FOREIGN KEY (group_id) REFERENCES threat_groups(id)
     );
 
+    -- API Keys
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      masked_key TEXT NOT NULL,
+      scopes TEXT NOT NULL DEFAULT '["read"]',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at TEXT,
+      expires_at TEXT
+    );
+
     -- Compliance
     CREATE TABLE IF NOT EXISTS compliance_frameworks (
       id TEXT PRIMARY KEY,

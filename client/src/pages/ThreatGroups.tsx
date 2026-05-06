@@ -1,21 +1,31 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import type { ThreatGroup } from '../types';
+import type { ThreatGroup, Technique } from '../types';
 
 const MOTIVATION_COLOR: Record<string, string> = {
   Espionage: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
   Financial: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
   'Espionage, Financial': 'text-purple-400 bg-purple-500/10 border-purple-500/20',
   'Destructive, Espionage': 'text-red-400 bg-red-500/10 border-red-500/20',
+  Destructive: 'text-red-400 bg-red-500/10 border-red-500/20',
 };
 
 const COUNTRY_FLAG: Record<string, string> = {
   Russia: '🇷🇺', China: '🇨🇳', 'North Korea': '🇰🇵', Iran: '🇮🇷', Vietnam: '🇻🇳',
 };
 
+const BLANK_FORM = {
+  id: '', name: '', country: '', motivation: '', description: '', url: '', aliases: '',
+};
+
 interface GroupDetail {
   techniques: any[];
   coverage: { total: number; covered: number; pct: number; details: any[] };
+}
+
+interface GroupFormData {
+  id: string; name: string; country: string; motivation: string;
+  description: string; url: string; aliases: string;
 }
 
 export default function ThreatGroups() {
@@ -28,9 +38,21 @@ export default function ThreatGroups() {
   const [filterCountry, setFilterCountry] = useState('');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    api.getThreatGroups().then(setGroups).finally(() => setLoading(false));
-  }, []);
+  const [showModal, setShowModal] = useState(false);
+  const [editGroup, setEditGroup] = useState<ThreatGroup | null>(null);
+  const [form, setForm] = useState<GroupFormData>(BLANK_FORM);
+  const [techSearch, setTechSearch] = useState('');
+  const [allTechniques, setAllTechniques] = useState<Technique[]>([]);
+  const [selectedTechIds, setSelectedTechIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<ThreatGroup | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadGroups = () => api.getThreatGroups().then(setGroups).finally(() => setLoading(false));
+
+  useEffect(() => { loadGroups(); }, []);
+  useEffect(() => { api.getTechniques().then(setAllTechniques); }, []);
 
   const loadDetail = async (id: string) => {
     if (selected === id) { setSelected(null); setDetail(null); return; }
@@ -40,6 +62,80 @@ export default function ThreatGroups() {
       const d = await api.getThreatGroup(id);
       setDetail(d as any);
     } finally { setDetailLoading(false); }
+  };
+
+  const openCreate = () => {
+    setEditGroup(null);
+    setForm(BLANK_FORM);
+    setSelectedTechIds(new Set());
+    setError('');
+    setShowModal(true);
+  };
+
+  const openEdit = (g: ThreatGroup) => {
+    setEditGroup(g);
+    setForm({
+      id: g.id,
+      name: g.name,
+      country: g.country ?? '',
+      motivation: g.motivation ?? '',
+      description: g.description ?? '',
+      url: g.url ?? '',
+      aliases: g.aliases.join(', '),
+    });
+    api.getThreatGroup(g.id).then(d => {
+      setSelectedTechIds(new Set((d as any).techniques?.map((t: any) => t.id) ?? []));
+    });
+    setError('');
+    setShowModal(true);
+  };
+
+  const saveGroup = async () => {
+    if (!form.id.trim() || !form.name.trim()) { setError('ID and Name are required'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const payload = {
+        id: form.id.trim().toUpperCase(),
+        name: form.name.trim(),
+        country: form.country.trim() || null,
+        motivation: form.motivation.trim() || null,
+        description: form.description.trim() || null,
+        url: form.url.trim() || null,
+        aliases: form.aliases.split(',').map(a => a.trim()).filter(Boolean),
+        technique_ids: Array.from(selectedTechIds),
+      };
+      if (editGroup) {
+        await api.updateThreatGroup(editGroup.id, payload);
+      } else {
+        await api.createThreatGroup(payload);
+      }
+      setShowModal(false);
+      setSelected(null);
+      setDetail(null);
+      await loadGroups();
+    } catch (e: any) {
+      setError(e.message ?? 'Save failed');
+    } finally { setSaving(false); }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleting(true);
+    try {
+      await api.deleteThreatGroup(deleteConfirm.id);
+      setDeleteConfirm(null);
+      if (selected === deleteConfirm.id) { setSelected(null); setDetail(null); }
+      await loadGroups();
+    } finally { setDeleting(false); }
+  };
+
+  const toggleTech = (id: string) => {
+    setSelectedTechIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
   const motivations = [...new Set(groups.map(g => g.motivation).filter(Boolean))] as string[];
@@ -55,6 +151,10 @@ export default function ThreatGroups() {
     return true;
   });
 
+  const filteredTechs = allTechniques.filter(t =>
+    !techSearch || t.id.toLowerCase().includes(techSearch.toLowerCase()) || t.name.toLowerCase().includes(techSearch.toLowerCase())
+  );
+
   if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Loading threat groups...</div>;
 
   return (
@@ -66,6 +166,10 @@ export default function ThreatGroups() {
               <h1 className="text-xl font-semibold text-slate-100">Threat Groups</h1>
               <p className="text-sm text-slate-400 mt-0.5">{groups.length} tracked APT and cybercriminal groups with detection coverage</p>
             </div>
+            <button onClick={openCreate}
+              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 flex items-center gap-1.5">
+              + Add Group
+            </button>
           </div>
           <div className="flex gap-3 mt-3">
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search groups, aliases..."
@@ -88,7 +192,7 @@ export default function ThreatGroups() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10 bg-slate-900 border-b border-slate-800">
                 <tr>
-                  {['Group', 'Aliases', 'Origin', 'Motivation', 'Coverage', ''].map(h => (
+                  {['Group', 'Aliases', 'Origin', 'Motivation', ''].map(h => (
                     <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-slate-400">{h}</th>
                   ))}
                 </tr>
@@ -120,10 +224,20 @@ export default function ThreatGroups() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">—</td>
-                    <td className="px-4 py-3 text-xs text-blue-400">{selected === g.id ? '▶' : '›'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => openEdit(g)}
+                          className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded hover:bg-slate-700">Edit</button>
+                        <button onClick={() => setDeleteConfirm(g)}
+                          className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10">Delete</button>
+                        <span className="text-xs text-blue-400">{selected === g.id ? '▶' : '›'}</span>
+                      </div>
+                    </td>
                   </tr>
                 ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">No groups match filters.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -137,17 +251,154 @@ export default function ThreatGroups() {
                   group={groups.find(g => g.id === selected)!}
                   detail={detail}
                   onClose={() => { setSelected(null); setDetail(null); }}
+                  onEdit={() => openEdit(groups.find(g => g.id === selected)!)}
                 />
               ) : null}
             </div>
           )}
         </div>
       </div>
+
+      {showModal && (
+        <GroupModal
+          form={form}
+          setForm={setForm}
+          isEdit={!!editGroup}
+          saving={saving}
+          error={error}
+          techSearch={techSearch}
+          setTechSearch={setTechSearch}
+          filteredTechs={filteredTechs}
+          selectedTechIds={selectedTechIds}
+          toggleTech={toggleTech}
+          onSave={saveGroup}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="text-base font-semibold text-slate-100 mb-2">Delete Threat Group</h2>
+            <p className="text-sm text-slate-400 mb-4">
+              Delete <span className="font-medium text-slate-200">{deleteConfirm.name}</span>? This will remove all technique associations.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDeleteConfirm(null)}
+                className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+              <button onClick={confirmDelete} disabled={deleting}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50">
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function GroupDetailPane({ group, detail, onClose }: { group: ThreatGroup; detail: GroupDetail; onClose: () => void }) {
+function GroupModal({
+  form, setForm, isEdit, saving, error, techSearch, setTechSearch,
+  filteredTechs, selectedTechIds, toggleTech, onSave, onClose,
+}: {
+  form: any; setForm: any; isEdit: boolean; saving: boolean; error: string;
+  techSearch: string; setTechSearch: (v: string) => void;
+  filteredTechs: Technique[]; selectedTechIds: Set<string>;
+  toggleTech: (id: string) => void; onSave: () => void; onClose: () => void;
+}) {
+  const f = (field: string, val: string) => setForm((p: any) => ({ ...p, [field]: val }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+          <h2 className="text-base font-semibold text-slate-100">{isEdit ? 'Edit Threat Group' : 'Add Threat Group'}</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {error && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</div>}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Group ID <span className="text-red-400">*</span></label>
+              <input value={form.id} onChange={e => f('id', e.target.value)} placeholder="e.g. G0016"
+                disabled={isEdit}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono focus:outline-none focus:border-blue-500 disabled:opacity-50" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Name <span className="text-red-400">*</span></label>
+              <input value={form.name} onChange={e => f('name', e.target.value)} placeholder="e.g. APT29"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Country / Origin</label>
+              <input value={form.country} onChange={e => f('country', e.target.value)} placeholder="e.g. Russia"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Motivation</label>
+              <input value={form.motivation} onChange={e => f('motivation', e.target.value)} placeholder="e.g. Espionage"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-slate-400 block mb-1">Aliases <span className="text-slate-600">(comma-separated)</span></label>
+              <input value={form.aliases} onChange={e => f('aliases', e.target.value)} placeholder="Cozy Bear, Midnight Blizzard"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-slate-400 block mb-1">MITRE ATT&CK URL</label>
+              <input value={form.url} onChange={e => f('url', e.target.value)} placeholder="https://attack.mitre.org/groups/G0016/"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-slate-400 block mb-1">Description</label>
+              <textarea value={form.description} onChange={e => f('description', e.target.value)} rows={2}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-slate-300">
+                Associated Techniques <span className="text-slate-500">({selectedTechIds.size} selected)</span>
+              </label>
+            </div>
+            <input value={techSearch} onChange={e => setTechSearch(e.target.value)} placeholder="Search by ID or name..."
+              className="w-full px-3 py-1.5 mb-2 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500" />
+            <div className="border border-slate-700 rounded-lg overflow-y-auto max-h-44 bg-slate-800/50">
+              {filteredTechs.slice(0, 200).map(t => (
+                <label key={t.id}
+                  className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-slate-700/50 ${selectedTechIds.has(t.id) ? 'bg-blue-600/10' : ''}`}>
+                  <input type="checkbox" checked={selectedTechIds.has(t.id)} onChange={() => toggleTech(t.id)}
+                    className="accent-blue-500" />
+                  <span className="font-mono text-xs text-slate-400 w-14 flex-shrink-0">{t.id}</span>
+                  <span className="text-xs text-slate-300 truncate">{t.name}</span>
+                </label>
+              ))}
+              {filteredTechs.length === 0 && (
+                <div className="px-3 py-4 text-xs text-slate-500 text-center">No techniques match.</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end px-5 py-4 border-t border-slate-800">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+          <button onClick={onSave} disabled={saving}
+            className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
+            {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Group'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GroupDetailPane({ group, detail, onClose, onEdit }: {
+  group: ThreatGroup; detail: GroupDetail; onClose: () => void; onEdit: () => void;
+}) {
   const { coverage } = detail;
   const exposed = coverage.details.filter(t => !t.detected);
 
@@ -158,7 +409,11 @@ function GroupDetailPane({ group, detail, onClose }: { group: ThreatGroup; detai
           <h2 className="text-base font-semibold text-slate-100">{group.name}</h2>
           <div className="text-xs text-slate-400 mt-0.5">{group.id} · {group.country} · {group.motivation}</div>
         </div>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-lg">×</button>
+        <div className="flex items-center gap-2">
+          <button onClick={onEdit}
+            className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-500/10">Edit</button>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-lg">×</button>
+        </div>
       </div>
 
       {group.description && <p className="text-xs text-slate-400 leading-relaxed">{group.description}</p>}

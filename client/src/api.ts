@@ -1,5 +1,5 @@
 import type {
-  Assignment, AuditLogEntry, Comment, ComplianceFramework, CoverageSnapshot, CoverageStats,
+  ApiKey, Assignment, AuditLogEntry, Comment, ComplianceFramework, CoverageSnapshot, CoverageStats,
   Detection, D3FendTechnique, ExecutiveReport, GapTechnique, MatrixColumn, Mitigation,
   RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup,
   ThreatGroupDetail, Tool, ToolDetail,
@@ -43,12 +43,15 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-async function del(path: string, body?: unknown): Promise<void> {
+async function del(path: string, body?: unknown): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'DELETE',
     ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
   });
   if (!res.ok && res.status !== 204) throw new Error(`${res.status} ${res.statusText}`);
+  if (res.status === 204) return;
+  const ct = res.headers.get('content-type') ?? '';
+  return ct.includes('application/json') ? res.json() : undefined;
 }
 
 export const api = {
@@ -145,6 +148,11 @@ export const api = {
   getThreatGroups: () => get<ThreatGroup[]>('/threat-groups'),
   getThreatGroup: (id: string) => get<ThreatGroupDetail>(`/threat-groups/${id}`),
   getThreatGroupExposure: (id: string) => get<{ group_id: string; techniques: any[]; exposed_count: number; total: number }>(`/threat-groups/${id}/exposure`),
+  createThreatGroup: (data: Partial<ThreatGroup> & { technique_ids?: string[] }) => post<ThreatGroup>('/threat-groups', data),
+  updateThreatGroup: (id: string, data: Partial<ThreatGroup> & { technique_ids?: string[] }) => put<ThreatGroup>(`/threat-groups/${id}`, data),
+  deleteThreatGroup: (id: string) => del(`/threat-groups/${id}`),
+  addGroupTechniques: (id: string, technique_ids: string[]) => post<{ group_id: string; total_techniques: number }>(`/threat-groups/${id}/techniques`, { technique_ids }),
+  removeGroupTechniques: (id: string, technique_ids: string[]) => del(`/threat-groups/${id}/techniques`, { technique_ids }),
 
   // Compliance
   getComplianceFrameworks: () => get<ComplianceFramework[]>('/compliance/frameworks'),
@@ -170,4 +178,17 @@ export const api = {
   getRiskScore: () => get<RiskScore>('/risk/score'),
   getRiskByTactic: () => get<RiskByTactic[]>('/risk/by-tactic'),
   getRiskByTechnique: () => get<any[]>('/risk/by-technique'),
+
+  // API Keys
+  getApiKeys: () => get<ApiKey[]>('/api-keys'),
+  createApiKey: (data: { name: string; scopes?: string[]; expires_at?: string }) =>
+    post<ApiKey & { key: string; message: string }>('/api-keys', data),
+  updateApiKey: (id: number, data: Partial<{ name: string; scopes: string[]; expires_at: string }>) =>
+    patch<ApiKey>(`/api-keys/${id}`, data),
+  deleteApiKey: (id: number) => del(`/api-keys/${id}`),
+
+  // Admin / Purge
+  getPurgeableDatasets: () => get<{ datasets: Array<{ key: string; label: string; count: number }> }>('/admin/purgeable'),
+  purgeDataset: (dataset: string) => del(`/admin/purge/${dataset}`) as Promise<any>,
+  purgeAll: () => del('/admin/purge-all') as Promise<any>,
 };

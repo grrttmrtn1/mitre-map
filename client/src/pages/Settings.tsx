@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import type { Tag, AuditLogEntry } from '../types';
+import type { Tag, AuditLogEntry, ApiKey } from '../types';
+
+type TabId = 'tags' | 'risk' | 'audit' | 'api_keys' | 'data';
+
+const SCOPES = ['read', 'write', 'admin'];
+const BLANK_KEY_FORM = { name: '', scopes: ['read'] as string[], expires_at: '' };
 
 export default function Settings() {
   const [tags, setTags] = useState<Tag[]>([]);
@@ -8,27 +13,45 @@ export default function Settings() {
   const [auditTotal, setAuditTotal] = useState(0);
   const [riskScore, setRiskScore] = useState<any>(null);
   const [riskByTactic, setRiskByTactic] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'tags' | 'risk' | 'audit'>('tags');
+  const [activeTab, setActiveTab] = useState<TabId>('tags');
 
+  // Tags state
   const [tagForm, setTagForm] = useState({ name: '', color: '#6366f1', description: '' });
   const [editTagId, setEditTagId] = useState<number | null>(null);
   const [savingTag, setSavingTag] = useState(false);
 
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [keyForm, setKeyForm] = useState(BLANK_KEY_FORM);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
+  const [deletingKeyId, setDeletingKeyId] = useState<number | null>(null);
+
+  // Data management state
+  const [datasets, setDatasets] = useState<Array<{ key: string; label: string; count: number }>>([]);
+  const [purgeConfirm, setPurgeConfirm] = useState<string | null>(null);
+  const [purgeAllConfirm, setPurgeAllConfirm] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<string | null>(null);
+
   const loadTags = () => api.getTags().then(setTags);
   const loadAudit = () => api.getAuditLog({ limit: 100 }).then(r => { setAuditRows(r.rows); setAuditTotal(r.total); });
   const loadRisk = () => Promise.all([api.getRiskScore(), api.getRiskByTactic()]).then(([s, t]) => { setRiskScore(s); setRiskByTactic(t); });
+  const loadApiKeys = () => api.getApiKeys().then(setApiKeys);
+  const loadDatasets = () => api.getPurgeableDatasets().then(r => setDatasets(r.datasets));
 
-  useEffect(() => { loadTags(); loadAudit(); loadRisk(); }, []);
+  useEffect(() => {
+    loadTags(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets();
+  }, []);
 
+  // ── Tag actions ─────────────────────────────────────────────────────────────
   const saveTag = async () => {
     if (!tagForm.name.trim()) return;
     setSavingTag(true);
     try {
-      if (editTagId !== null) {
-        await api.updateTag(editTagId, tagForm);
-      } else {
-        await api.createTag(tagForm);
-      }
+      if (editTagId !== null) await api.updateTag(editTagId, tagForm);
+      else await api.createTag(tagForm);
       setTagForm({ name: '', color: '#6366f1', description: '' });
       setEditTagId(null);
       loadTags();
@@ -41,16 +64,82 @@ export default function Settings() {
     loadTags();
   };
 
-  const startEdit = (tag: Tag) => {
+  const startEditTag = (tag: Tag) => {
     setEditTagId(tag.id);
     setTagForm({ name: tag.name, color: tag.color, description: tag.description ?? '' });
   };
 
-  const TABS = [
+  // ── API Key actions ──────────────────────────────────────────────────────────
+  const createKey = async () => {
+    if (!keyForm.name.trim()) return;
+    setSavingKey(true);
+    try {
+      const res = await api.createApiKey({
+        name: keyForm.name.trim(),
+        scopes: keyForm.scopes,
+        expires_at: keyForm.expires_at || undefined,
+      });
+      setNewKey((res as any).key);
+      setKeyForm(BLANK_KEY_FORM);
+      loadApiKeys();
+    } finally { setSavingKey(false); }
+  };
+
+  const deleteKey = async (id: number) => {
+    setDeletingKeyId(id);
+    try {
+      await api.deleteApiKey(id);
+      loadApiKeys();
+    } finally { setDeletingKeyId(null); }
+  };
+
+  const copyKey = () => {
+    if (!newKey) return;
+    navigator.clipboard.writeText(newKey);
+    setKeyCopied(true);
+    setTimeout(() => setKeyCopied(false), 2000);
+  };
+
+  const toggleScope = (scope: string) => {
+    setKeyForm(f => ({
+      ...f,
+      scopes: f.scopes.includes(scope) ? f.scopes.filter(s => s !== scope) : [...f.scopes, scope],
+    }));
+  };
+
+  // ── Purge actions ────────────────────────────────────────────────────────────
+  const doPurge = async (dataset: string) => {
+    setPurging(true);
+    setPurgeResult(null);
+    try {
+      const res = await api.purgeDataset(dataset);
+      setPurgeResult(`Purged "${dataset}" — ${res.rows_deleted} rows deleted.`);
+      setPurgeConfirm(null);
+      loadDatasets();
+      if (dataset === 'audit') loadAudit();
+    } finally { setPurging(false); }
+  };
+
+  const doPurgeAll = async () => {
+    setPurging(true);
+    setPurgeResult(null);
+    try {
+      const res = await api.purgeAll();
+      setPurgeResult(`Full purge complete — ${res.rows_deleted} rows deleted.`);
+      setPurgeAllConfirm(false);
+      loadDatasets();
+      loadTags();
+      loadAudit();
+    } finally { setPurging(false); }
+  };
+
+  const TABS: { id: TabId; label: string }[] = [
     { id: 'tags', label: 'Tag Management' },
     { id: 'risk', label: 'Risk Dashboard' },
     { id: 'audit', label: 'Audit Log' },
-  ] as const;
+    { id: 'api_keys', label: 'API Keys' },
+    { id: 'data', label: 'Data Management' },
+  ];
 
   const riskLevelColor: Record<string, string> = {
     critical: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-emerald-400',
@@ -60,7 +149,7 @@ export default function Settings() {
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
         <h1 className="text-xl font-semibold text-slate-100">Settings &amp; Administration</h1>
-        <div className="flex gap-1 mt-4">
+        <div className="flex gap-1 mt-4 flex-wrap">
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTab === tab.id ? 'bg-blue-600/20 text-blue-400 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
@@ -71,6 +160,8 @@ export default function Settings() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
+
+        {/* ── Tag Management ── */}
         {activeTab === 'tags' && (
           <div className="max-w-2xl space-y-6">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -109,7 +200,6 @@ export default function Settings() {
                 </div>
               </div>
             </div>
-
             <div className="space-y-2">
               {tags.map(tag => (
                 <div key={tag.id} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl">
@@ -117,7 +207,7 @@ export default function Settings() {
                   <span className="text-sm font-medium text-slate-200 flex-1">{tag.name}</span>
                   {tag.description && <span className="text-xs text-slate-500 flex-1 truncate">{tag.description}</span>}
                   <span className="font-mono text-xs" style={{ color: tag.color }}>{tag.color}</span>
-                  <button onClick={() => startEdit(tag)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>
+                  <button onClick={() => startEditTag(tag)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>
                   <button onClick={() => deleteTag(tag.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
                 </div>
               ))}
@@ -126,6 +216,7 @@ export default function Settings() {
           </div>
         )}
 
+        {/* ── Risk Dashboard ── */}
         {activeTab === 'risk' && riskScore && (
           <div className="space-y-6 max-w-3xl">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
@@ -157,7 +248,6 @@ export default function Settings() {
                 </div>
               </div>
             </div>
-
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <h2 className="text-sm font-medium text-slate-300 mb-3">Risk by Tactic</h2>
               <div className="space-y-2">
@@ -180,6 +270,7 @@ export default function Settings() {
           </div>
         )}
 
+        {/* ── Audit Log ── */}
         {activeTab === 'audit' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -196,7 +287,7 @@ export default function Settings() {
                       <span className="text-xs font-mono text-blue-400">{entry.entity_type}</span>
                       <span className="text-xs text-slate-500">#{entry.entity_id}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        entry.action.includes('delete') ? 'bg-red-500/10 text-red-400' :
+                        entry.action.includes('delete') || entry.action.includes('purge') ? 'bg-red-500/10 text-red-400' :
                         entry.action.includes('create') || entry.action.includes('import') ? 'bg-emerald-500/10 text-emerald-400' :
                         'bg-slate-800 text-slate-400'
                       }`}>{entry.action}</span>
@@ -214,7 +305,189 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {/* ── API Keys ── */}
+        {activeTab === 'api_keys' && (
+          <div className="max-w-2xl space-y-6">
+            <div className="text-xs text-slate-500">
+              API keys allow programmatic access to the MitreMap API. Keys are shown only once at creation — store them securely.
+            </div>
+
+            {newKey && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+                <div className="text-xs font-medium text-emerald-400 mb-2">New API Key Created — copy it now</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs font-mono text-emerald-300 bg-slate-900 px-3 py-2 rounded-lg break-all">{newKey}</code>
+                  <button onClick={copyKey}
+                    className={`px-3 py-2 text-xs rounded-lg border transition-colors ${keyCopied ? 'border-emerald-500 text-emerald-400' : 'border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'}`}>
+                    {keyCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <button onClick={() => setNewKey(null)} className="mt-2 text-xs text-slate-500 hover:text-slate-300">Dismiss</button>
+              </div>
+            )}
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-4">Create API Key</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Key Name</label>
+                  <input value={keyForm.name} onChange={e => setKeyForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. CI Pipeline, SIEM Integration"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Scopes</label>
+                  <div className="flex gap-2">
+                    {SCOPES.map(scope => (
+                      <label key={scope} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-xs transition-colors ${
+                        keyForm.scopes.includes(scope)
+                          ? 'border-blue-500/50 bg-blue-500/10 text-blue-300'
+                          : 'border-slate-700 text-slate-400 hover:border-slate-600'
+                      }`}>
+                        <input type="checkbox" checked={keyForm.scopes.includes(scope)} onChange={() => toggleScope(scope)} className="sr-only" />
+                        {scope}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Expiry <span className="text-slate-600">(optional)</span></label>
+                  <input type="date" value={keyForm.expires_at} onChange={e => setKeyForm(f => ({ ...f, expires_at: e.target.value }))}
+                    className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <button onClick={createKey} disabled={savingKey || !keyForm.name.trim()}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
+                  {savingKey ? 'Creating...' : 'Create Key'}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-sm font-medium text-slate-300">Active Keys ({apiKeys.length})</h2>
+              {apiKeys.map(key => {
+                const scopes = Array.isArray(key.scopes) ? key.scopes : JSON.parse(key.scopes as any);
+                const expired = key.expires_at && new Date(key.expires_at) < new Date();
+                return (
+                  <div key={key.id} className={`px-4 py-3 bg-slate-900 border rounded-xl flex items-start gap-3 ${expired ? 'border-red-500/30' : 'border-slate-800'}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-200">{key.name}</span>
+                        {expired && <span className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded">Expired</span>}
+                      </div>
+                      <div className="text-xs font-mono text-slate-500 mt-0.5">{key.masked_key}</div>
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
+                        <span>Created {new Date(key.created_at).toLocaleDateString()}</span>
+                        {key.last_used_at && <span>Last used {new Date(key.last_used_at).toLocaleDateString()}</span>}
+                        {key.expires_at && <span className={expired ? 'text-red-400' : ''}>Expires {new Date(key.expires_at).toLocaleDateString()}</span>}
+                        <div className="flex gap-1">
+                          {scopes.map((s: string) => (
+                            <span key={s} className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => deleteKey(key.id)} disabled={deletingKeyId === key.id}
+                      className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10 disabled:opacity-50 flex-shrink-0">
+                      {deletingKeyId === key.id ? '...' : 'Revoke'}
+                    </button>
+                  </div>
+                );
+              })}
+              {apiKeys.length === 0 && <div className="text-sm text-slate-500 text-center py-6">No API keys. Create one above.</div>}
+            </div>
+          </div>
+        )}
+
+        {/* ── Data Management ── */}
+        {activeTab === 'data' && (
+          <div className="max-w-2xl space-y-6">
+            <div className="text-xs text-slate-500">
+              Purge staged, imported, or seeded data from the database. These operations are permanent and cannot be undone.
+            </div>
+
+            {purgeResult && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3 text-sm text-emerald-400 flex items-center justify-between">
+                <span>{purgeResult}</span>
+                <button onClick={() => setPurgeResult(null)} className="text-emerald-600 hover:text-emerald-400 ml-3">×</button>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {datasets.map(ds => (
+                <div key={ds.key} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl">
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-slate-200">{ds.label}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{ds.count.toLocaleString()} rows</div>
+                  </div>
+                  <button
+                    onClick={() => setPurgeConfirm(ds.key)}
+                    disabled={ds.count === 0}
+                    className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                    Purge
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="border border-red-500/20 bg-red-500/5 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-red-400 mb-1">Danger Zone</h3>
+              <p className="text-xs text-slate-400 mb-3">
+                Purge all datasets at once. This will clear detections, tools, threat groups, tags, comments, assignments, snapshots, and audit logs.
+              </p>
+              <button onClick={() => setPurgeAllConfirm(true)}
+                className="px-4 py-2 text-sm text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/10 hover:border-red-500/60 transition-colors">
+                Purge All Data
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Purge single dataset confirm */}
+      {purgeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="text-base font-semibold text-slate-100 mb-2">Confirm Purge</h2>
+            <p className="text-sm text-slate-400 mb-4">
+              Permanently delete all <span className="text-slate-200 font-medium">{datasets.find(d => d.key === purgeConfirm)?.label}</span> data?
+              This cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPurgeConfirm(null)} className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+              <button onClick={() => doPurge(purgeConfirm!)} disabled={purging}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50">
+                {purging ? 'Purging...' : 'Purge'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Purge all confirm */}
+      {purgeAllConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-slate-900 border border-red-500/30 rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="text-base font-semibold text-red-400 mb-2">Purge All Data</h2>
+            <p className="text-sm text-slate-400 mb-1">This will permanently delete:</p>
+            <ul className="text-xs text-slate-500 mb-4 space-y-0.5 ml-3 list-disc">
+              <li>All detections</li>
+              <li>All tools</li>
+              <li>All threat groups</li>
+              <li>All tags and associations</li>
+              <li>All comments and assignments</li>
+              <li>All coverage snapshots and audit logs</li>
+            </ul>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPurgeAllConfirm(false)} className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+              <button onClick={doPurgeAll} disabled={purging}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50">
+                {purging ? 'Purging...' : 'Purge Everything'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

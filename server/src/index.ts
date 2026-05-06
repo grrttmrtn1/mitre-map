@@ -21,6 +21,8 @@ import sigmaRouter from './routes/sigma';
 import exportsRouter from './routes/exports';
 import reportsRouter from './routes/reports';
 import riskRouter from './routes/risk';
+import apiKeysRouter from './routes/api-keys';
+import adminRouter from './routes/admin';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -49,6 +51,8 @@ app.use('/api/sigma', sigmaRouter);
 app.use('/api/exports', exportsRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/risk', riskRouter);
+app.use('/api/api-keys', apiKeysRouter);
+app.use('/api/admin', adminRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

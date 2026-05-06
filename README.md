@@ -28,6 +28,7 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 
 ### Threat Intelligence
 - **18 tracked threat groups** — APT29, APT28, Lazarus, APT41, FIN7, Sandworm, Turla, Scattered Spider, Wizard Spider, and more
+- **Full CRUD** — create, edit, and delete threat groups; assign any subset of ATT&CK techniques with an inline searchable picker
 - Per-group detection coverage with technique-level status (detected / exposed)
 - Exposure percentage and risk level per group
 - Split-panel detail view with full technique breakdown
@@ -57,7 +58,11 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **Tags** — color-coded labels applied to any entity (detections, techniques, tools, gaps)
 - **Comments** — threaded analyst notes on any entity
 - **Assignments** — assign gaps or detections to analysts with priority, due date, and status tracking
-- **Audit log** — every create / update / delete / import event logged with actor and change diff
+- **Audit log** — every create / update / delete / import / purge event logged with actor and change diff
+
+### Administration
+- **API Keys** — create scoped API keys (`read` / `write` / `admin`) with optional expiry; keys are SHA-256 hashed at rest and shown only once at creation
+- **Data Management** — per-dataset purge with live row counts (detections, tools, threat groups, tags, comments, assignments, snapshots, audit log); full wipe available in the Danger Zone
 
 ---
 
@@ -89,7 +94,9 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  ├── /api/sigma          SIGMA rule import          │
 │  ├── /api/exports        Navigator / CSV / JSON     │
 │  ├── /api/reports        Pre-computed reports       │
-│  └── /api/risk           Risk scoring               │
+│  ├── /api/risk           Risk scoring               │
+│  ├── /api/api-keys       API key management         │
+│  └── /api/admin          Data purge / admin ops     │
 │                                                     │
 │  better-sqlite3 (synchronous WAL-mode SQLite)       │
 └──────────────┬──────────────────────────────────────┘
@@ -106,6 +113,7 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  coverage_snapshots · threat_groups                 │
 │  compliance_frameworks · compliance_controls        │
 │  technique_compliance · group_techniques            │
+│  api_keys                                           │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -237,8 +245,32 @@ All endpoints are under `/api`. Responses are JSON unless noted.
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/threat-groups` | List all groups |
-| `GET` | `/api/threat-groups/:id` | Detail with techniques and coverage |
-| `GET` | `/api/threat-groups/:id/exposure` | Per-technique exposed/detected breakdown |
+| `POST` | `/api/threat-groups` | Create group `{ id, name, aliases, country, motivation, url, description, technique_ids }` |
+| `GET` | `/api/threat-groups/:id` | Detail with techniques and detection coverage |
+| `PUT` | `/api/threat-groups/:id` | Update group fields and technique assignments |
+| `DELETE` | `/api/threat-groups/:id` | Delete group and cascade technique associations |
+| `POST` | `/api/threat-groups/:id/techniques` | Add techniques `{ technique_ids }` |
+| `DELETE` | `/api/threat-groups/:id/techniques` | Remove techniques `{ technique_ids }` (empty = remove all) |
+| `GET` | `/api/threat-groups/:id/exposure` | Per-technique exposed/detected/mitigated breakdown |
+
+### API Keys
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/api-keys` | List keys (masked — raw key never returned after creation) |
+| `POST` | `/api/api-keys` | Create key `{ name, scopes, expires_at? }` — returns raw key once |
+| `PATCH` | `/api/api-keys/:id` | Update name / scopes / expiry |
+| `DELETE` | `/api/api-keys/:id` | Revoke key |
+
+**Scopes:** `read`, `write`, `admin`. Keys are SHA-256 hashed at rest; the `masked_key` field shows the first 8 and last 4 characters.
+
+### Admin / Data Management
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/admin/purgeable` | Live row counts per purgeable dataset |
+| `DELETE` | `/api/admin/purge/:dataset` | Purge one dataset: `detections`, `audit`, `snapshots`, `comments`, `assignments`, `threat_groups`, `tags`, `tools` |
+| `DELETE` | `/api/admin/purge-all` | Wipe all mutable data (FK-safe ordering) |
 
 ### Compliance
 
@@ -304,7 +336,10 @@ mitremap/
 │       │   ├── threat-groups.ts
 │       │   ├── compliance.ts   # NIST CSF 2.0, CIS Controls v8
 │       │   └── demo.ts         # Demo tools and detections
-│       └── routes/             # One file per resource
+│       └── routes/             # One file per resource group
+│           ├── threat-groups.ts  # Full CRUD + technique assignment
+│           ├── api-keys.ts       # API key lifecycle (hash, mask, revoke)
+│           └── admin.ts          # Data purge endpoints
 ├── client/
 │   └── src/
 │       ├── api.ts              # Typed fetch wrappers for every endpoint

@@ -245,6 +245,16 @@ export interface SigmaParseResult {
   raw_tags: string[];
 }
 
+export interface ApiKey {
+  id: number;
+  name: string;
+  masked_key: string;
+  scopes: string[];
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+}
+
 export interface ExecutiveReport {
   generated_at: string;
   summary: {
