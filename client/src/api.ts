@@ -6,9 +6,33 @@ import type {
 } from './types';
 
 const BASE = '/api';
+const STORAGE_KEY = 'mitremap_api_key';
+
+export function getStoredApiKey(): string | null {
+  return localStorage.getItem(STORAGE_KEY);
+}
+export function setStoredApiKey(key: string): void {
+  localStorage.setItem(STORAGE_KEY, key);
+}
+export function clearStoredApiKey(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+let _authErrorHandler: (() => void) | null = null;
+export function onAuthError(fn: () => void) { _authErrorHandler = fn; }
+
+function authHeaders(): Record<string, string> {
+  const key = getStoredApiKey();
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
+function handleUnauth(status: number) {
+  if (status === 401) _authErrorHandler?.();
+}
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
+  handleUnauth(res.status);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -16,9 +40,10 @@ async function get<T>(path: string): Promise<T> {
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
+  handleUnauth(res.status);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -26,9 +51,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 async function put<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
+  handleUnauth(res.status);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -36,9 +62,10 @@ async function put<T>(path: string, body: unknown): Promise<T> {
 async function patch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
+  handleUnauth(res.status);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -46,8 +73,10 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
 async function del(path: string, body?: unknown): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'DELETE',
-    ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+    headers: { ...authHeaders(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
+  handleUnauth(res.status);
   if (!res.ok && res.status !== 204) throw new Error(`${res.status} ${res.statusText}`);
   if (res.status === 204) return;
   const ct = res.headers.get('content-type') ?? '';

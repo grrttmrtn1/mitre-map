@@ -23,6 +23,7 @@ import reportsRouter from './routes/reports';
 import riskRouter from './routes/risk';
 import apiKeysRouter from './routes/api-keys';
 import adminRouter from './routes/admin';
+import { requireApiKey } from './middleware/auth';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -30,6 +31,7 @@ const PORT = process.env.PORT ?? 4000;
 app.use(cors());
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
+app.use('/api', requireApiKey);
 
 const db = getDb();
 initSchema(db);

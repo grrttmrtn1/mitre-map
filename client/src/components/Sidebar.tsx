@@ -10,6 +10,7 @@ const NAV = [
   { to: '/threats', label: 'Threat Groups', icon: '◈' },
   { to: '/reports', label: 'Reports & Exports', icon: '▦' },
   { to: '/settings', label: 'Settings', icon: '⚛' },
+  { to: '/api', label: 'API Playground', icon: '⚡' },
 ];
 
 export default function Sidebar() {

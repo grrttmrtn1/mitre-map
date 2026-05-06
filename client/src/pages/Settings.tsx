@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api';
+import { api, getStoredApiKey, setStoredApiKey, clearStoredApiKey } from '../api';
 import type { Tag, AuditLogEntry, ApiKey } from '../types';
 
 type TabId = 'tags' | 'risk' | 'audit' | 'api_keys' | 'data';
@@ -27,6 +27,10 @@ export default function Settings() {
   const [keyCopied, setKeyCopied] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
   const [deletingKeyId, setDeletingKeyId] = useState<number | null>(null);
+
+  // App authentication state
+  const [appKeyInput, setAppKeyInput] = useState('');
+  const [activeAppKey, setActiveAppKey] = useState<string | null>(getStoredApiKey);
 
   // Data management state
   const [datasets, setDatasets] = useState<Array<{ key: string; label: string; count: number }>>([]);
@@ -313,6 +317,49 @@ export default function Settings() {
               API keys allow programmatic access to the MitreMap API. Keys are shown only once at creation — store them securely.
             </div>
 
+            {/* App authentication */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-1">App Authentication</h2>
+              <p className="text-xs text-slate-500 mb-4">
+                The key stored here is sent automatically by the web app on every request.
+              </p>
+              {activeAppKey ? (
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex-1 px-3 py-2 bg-slate-800 border border-emerald-500/30 rounded-lg flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                    <code className="text-xs font-mono text-emerald-300 truncate">
+                      {activeAppKey.slice(0, 10)}{'•'.repeat(20)}{activeAppKey.slice(-4)}
+                    </code>
+                  </div>
+                  <button
+                    onClick={() => { clearStoredApiKey(); setActiveAppKey(null); }}
+                    className="px-3 py-2 text-xs text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded-lg hover:bg-red-500/10 transition-colors">
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg mb-3 text-xs text-amber-400">
+                  <span>No app key configured.</span>
+                  {apiKeys.length === 0 && <span className="text-amber-500/70">Create a key below, then click "Use as app key".</span>}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={appKeyInput}
+                  onChange={e => setAppKeyInput(e.target.value)}
+                  placeholder="Paste an existing key (mm_...)"
+                  className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  disabled={!appKeyInput.trim()}
+                  onClick={() => { setStoredApiKey(appKeyInput.trim()); setActiveAppKey(appKeyInput.trim()); setAppKeyInput(''); }}
+                  className="px-3 py-2 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-40 transition-colors">
+                  Save
+                </button>
+              </div>
+            </div>
+
             {newKey && (
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
                 <div className="text-xs font-medium text-emerald-400 mb-2">New API Key Created — copy it now</div>
@@ -321,6 +368,11 @@ export default function Settings() {
                   <button onClick={copyKey}
                     className={`px-3 py-2 text-xs rounded-lg border transition-colors ${keyCopied ? 'border-emerald-500 text-emerald-400' : 'border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'}`}>
                     {keyCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={() => { setStoredApiKey(newKey); setActiveAppKey(newKey); setAppKeyInput(''); }}
+                    className="px-3 py-2 text-xs rounded-lg border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 transition-colors whitespace-nowrap">
+                    Use as app key
                   </button>
                 </div>
                 <button onClick={() => setNewKey(null)} className="mt-2 text-xs text-slate-500 hover:text-slate-300">Dismiss</button>
