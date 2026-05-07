@@ -4,6 +4,10 @@
 
 MitreMap maps your SIEM detections and security tooling against the full MITRE ATT&CK Enterprise framework, correlates them to MITRE D3FEND countermeasures and ATT&CK mitigations, scores your risk exposure against tracked threat groups, and surfaces prioritized gaps — all in a single dark-mode dashboard.
 
+<img width="1493" height="812" alt="image" src="https://github.com/user-attachments/assets/99fe0db7-4def-4387-b6b1-c42074432ffd" />
+<img width="1483" height="812" alt="image" src="https://github.com/user-attachments/assets/da7ec4a5-0860-44db-b541-09fdf487a0a4" />
+<img width="1502" height="812" alt="image" src="https://github.com/user-attachments/assets/c760508a-624c-4114-8ffd-81e59d4fe14f" />
+
 ---
 
 ## Features
