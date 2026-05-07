@@ -28,7 +28,7 @@ router.post('/', (req, res) => {
     VALUES (?, ?, ?, ?, ?)
   `).run(name.trim(), hash, masked, JSON.stringify(scopes), expires_at ?? null) as any;
 
-  logAudit(db, 'api_key', String(result.lastInsertRowid), 'create', 'user', { name, scopes });
+  logAudit(db, 'api_key', String(result.lastInsertRowid), 'create', (req as any).actor ?? 'user', { name, scopes }, (req as any).sourceIp);
   res.status(201).json({
     id: result.lastInsertRowid,
     name: name.trim(),
@@ -45,7 +45,7 @@ router.delete('/:id', (req, res) => {
   const key = db.prepare('SELECT id, name FROM api_keys WHERE id = ?').get(req.params.id) as any;
   if (!key) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM api_keys WHERE id = ?').run(req.params.id);
-  logAudit(db, 'api_key', req.params.id, 'delete', 'user', { name: key.name });
+  logAudit(db, 'api_key', req.params.id, 'delete', (req as any).actor ?? 'user', { name: key.name }, (req as any).sourceIp);
   res.status(204).end();
 });
 
@@ -61,7 +61,7 @@ router.patch('/:id', (req, res) => {
       expires_at = COALESCE(?, expires_at)
     WHERE id = ?
   `).run(name ?? null, scopes ? JSON.stringify(scopes) : null, expires_at ?? null, req.params.id);
-  logAudit(db, 'api_key', req.params.id, 'update', 'user', req.body);
+  logAudit(db, 'api_key', req.params.id, 'update', (req as any).actor ?? 'user', req.body, (req as any).sourceIp);
   const updated = db.prepare('SELECT id, name, masked_key, created_at, last_used_at, expires_at, scopes FROM api_keys WHERE id = ?').get(req.params.id);
   res.json(updated);
 });

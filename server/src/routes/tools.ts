@@ -60,7 +60,7 @@ router.post('/', (req, res) => {
   }
 
   const created = db.prepare('SELECT * FROM tools WHERE id = ?').get(toolId);
-  logAudit(db, 'tool', String(toolId), 'created', 'user', { name });
+  logAudit(db, 'tool', String(toolId), 'created', (req as any).actor ?? 'user', { name }, (req as any).sourceIp);
   res.status(201).json(created);
 });
 
@@ -88,7 +88,7 @@ router.put('/:id', (req, res) => {
   }
 
   const updated = db.prepare('SELECT * FROM tools WHERE id = ?').get(req.params.id);
-  logAudit(db, 'tool', req.params.id, 'updated', 'user', { name, status });
+  logAudit(db, 'tool', req.params.id, 'updated', (req as any).actor ?? 'user', { name, status }, (req as any).sourceIp);
   res.json(updated);
 });
 
@@ -96,7 +96,7 @@ router.delete('/:id', (req, res) => {
   const db = getDb();
   const existing = db.prepare('SELECT * FROM tools WHERE id = ?').get(req.params.id) as any;
   if (!existing) return res.status(404).json({ error: 'Not found' });
-  logAudit(db, 'tool', req.params.id, 'deleted', 'user', { name: existing.name });
+  logAudit(db, 'tool', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: existing.name }, (req as any).sourceIp);
   db.prepare('DELETE FROM tools WHERE id = ?').run(req.params.id);
   res.status(204).send();
 });

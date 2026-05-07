@@ -25,7 +25,7 @@ router.post('/', (req, res) => {
       'INSERT OR IGNORE INTO group_techniques (group_id, technique_id) VALUES (?, ?)'
     );
     for (const tid of technique_ids) insertTech.run(id, tid);
-    logAudit(db, 'threat_group', id, 'create', 'user', { name, country, motivation });
+    logAudit(db, 'threat_group', id, 'create', (req as any).actor ?? 'user', { name, country, motivation }, (req as any).sourceIp);
   });
   insert();
   const group = db.prepare('SELECT * FROM threat_groups WHERE id = ?').get(id) as any;
@@ -99,7 +99,7 @@ router.put('/:id', (req, res) => {
       );
       for (const tid of technique_ids) insertTech.run(req.params.id, tid);
     }
-    logAudit(db, 'threat_group', req.params.id, 'update', 'user', req.body);
+    logAudit(db, 'threat_group', req.params.id, 'update', (req as any).actor ?? 'user', req.body, (req as any).sourceIp);
   });
   update();
   const updated = db.prepare('SELECT * FROM threat_groups WHERE id = ?').get(req.params.id) as any;
@@ -114,7 +114,7 @@ router.delete('/:id', (req, res) => {
   db.transaction(() => {
     db.prepare('DELETE FROM group_techniques WHERE group_id = ?').run(req.params.id);
     db.prepare('DELETE FROM threat_groups WHERE id = ?').run(req.params.id);
-    logAudit(db, 'threat_group', req.params.id, 'delete', 'user');
+    logAudit(db, 'threat_group', req.params.id, 'delete', (req as any).actor ?? 'user', undefined, (req as any).sourceIp);
   })();
   res.status(204).end();
 });
@@ -143,6 +143,60 @@ router.delete('/:id/techniques', (req, res) => {
     const del = db.prepare('DELETE FROM group_techniques WHERE group_id = ? AND technique_id = ?');
     for (const tid of technique_ids) del.run(req.params.id, tid);
   }
+  res.status(204).end();
+});
+
+router.get('/:id/procedures', (req, res) => {
+  const db = getDb();
+  if (!db.prepare('SELECT id FROM threat_groups WHERE id = ?').get(req.params.id)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  const procs = db.prepare(
+    'SELECT * FROM group_technique_procedures WHERE group_id = ? ORDER BY technique_id, created_at'
+  ).all(req.params.id);
+  res.json(procs);
+});
+
+router.post('/:id/techniques/:technique_id/procedures', (req, res) => {
+  const db = getDb();
+  if (!db.prepare('SELECT id FROM threat_groups WHERE id = ?').get(req.params.id)) {
+    return res.status(404).json({ error: 'Group not found' });
+  }
+  const { type = 'command', content, source } = req.body;
+  if (!content?.trim()) return res.status(400).json({ error: 'content is required' });
+  const result = db.prepare(
+    'INSERT INTO group_technique_procedures (group_id, technique_id, type, content, source) VALUES (?, ?, ?, ?, ?)'
+  ).run(req.params.id, req.params.technique_id, type, content.trim(), source?.trim() ?? null);
+  const proc = db.prepare('SELECT * FROM group_technique_procedures WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(proc);
+});
+
+router.put('/:id/procedures/:proc_id', (req, res) => {
+  const db = getDb();
+  const proc = db.prepare(
+    'SELECT * FROM group_technique_procedures WHERE id = ? AND group_id = ?'
+  ).get(req.params.proc_id, req.params.id) as any;
+  if (!proc) return res.status(404).json({ error: 'Procedure not found' });
+  const { type, content, source } = req.body;
+  if (content !== undefined && !content?.trim()) return res.status(400).json({ error: 'content cannot be empty' });
+  db.prepare(`
+    UPDATE group_technique_procedures SET
+      type = COALESCE(?, type),
+      content = COALESCE(?, content),
+      source = ?,
+      updated_at = datetime('now')
+    WHERE id = ?
+  `).run(type ?? null, content?.trim() ?? null, source !== undefined ? (source?.trim() || null) : proc.source, req.params.proc_id);
+  const updated = db.prepare('SELECT * FROM group_technique_procedures WHERE id = ?').get(req.params.proc_id);
+  res.json(updated);
+});
+
+router.delete('/:id/procedures/:proc_id', (req, res) => {
+  const db = getDb();
+  const result = db.prepare(
+    'DELETE FROM group_technique_procedures WHERE id = ? AND group_id = ?'
+  ).run(req.params.proc_id, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'Procedure not found' });
   res.status(204).end();
 });
 

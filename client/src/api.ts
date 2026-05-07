@@ -1,8 +1,8 @@
 import type {
   ApiKey, Assignment, AuditLogEntry, Comment, ComplianceFramework, CoverageSnapshot, CoverageStats,
-  Detection, D3FendTechnique, ExecutiveReport, GapTechnique, MatrixColumn, Mitigation,
-  RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup,
-  ThreatGroupDetail, Tool, ToolDetail,
+  Country, Detection, D3FendTechnique, ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation,
+  Procedure, ProcedureType, RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique,
+  ThreatGroup, ThreatGroupDetail, Tool, ToolDetail,
 } from './types';
 
 const BASE = '/api';
@@ -182,6 +182,12 @@ export const api = {
   deleteThreatGroup: (id: string) => del(`/threat-groups/${id}`),
   addGroupTechniques: (id: string, technique_ids: string[]) => post<{ group_id: string; total_techniques: number }>(`/threat-groups/${id}/techniques`, { technique_ids }),
   removeGroupTechniques: (id: string, technique_ids: string[]) => del(`/threat-groups/${id}/techniques`, { technique_ids }),
+  getGroupProcedures: (id: string) => get<Procedure[]>(`/threat-groups/${id}/procedures`),
+  createProcedure: (id: string, technique_id: string, data: { type: ProcedureType; content: string; source?: string }) =>
+    post<Procedure>(`/threat-groups/${id}/techniques/${technique_id}/procedures`, data),
+  updateProcedure: (id: string, proc_id: number, data: { type?: ProcedureType; content?: string; source?: string }) =>
+    put<Procedure>(`/threat-groups/${id}/procedures/${proc_id}`, data),
+  deleteProcedure: (id: string, proc_id: number) => del(`/threat-groups/${id}/procedures/${proc_id}`),
 
   // Compliance
   getComplianceFrameworks: () => get<ComplianceFramework[]>('/compliance/frameworks'),
@@ -215,6 +221,18 @@ export const api = {
   updateApiKey: (id: number, data: Partial<{ name: string; scopes: string[]; expires_at: string }>) =>
     patch<ApiKey>(`/api-keys/${id}`, data),
   deleteApiKey: (id: number) => del(`/api-keys/${id}`),
+
+  // Motivations
+  getMotivations: () => get<Motivation[]>('/motivations'),
+  createMotivation: (data: { name: string; color?: string; description?: string }) => post<Motivation>('/motivations', data),
+  updateMotivation: (id: number, data: { name?: string; color?: string; description?: string }) => put<Motivation>(`/motivations/${id}`, data),
+  deleteMotivation: (id: number) => del(`/motivations/${id}`),
+
+  // Countries
+  getCountries: () => get<Country[]>('/countries'),
+  createCountry: (data: { name: string; color?: string; flag?: string }) => post<Country>('/countries', data),
+  updateCountry: (id: number, data: { name?: string; color?: string; flag?: string }) => put<Country>(`/countries/${id}`, data),
+  deleteCountry: (id: number) => del(`/countries/${id}`),
 
   // Admin / Purge
   getPurgeableDatasets: () => get<{ datasets: Array<{ key: string; label: string; count: number }> }>('/admin/purgeable'),

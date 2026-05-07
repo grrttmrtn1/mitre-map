@@ -18,7 +18,7 @@ router.post('/:entityType/:entityId', (req, res) => {
     'INSERT INTO comments (entity_type, entity_id, author, body) VALUES (?, ?, ?, ?)'
   ).run(req.params.entityType, req.params.entityId, author ?? 'analyst', body.trim());
   const created = db.prepare('SELECT * FROM comments WHERE id = ?').get(result.lastInsertRowid);
-  logAudit(db, req.params.entityType, req.params.entityId, 'commented', author ?? 'analyst');
+  logAudit(db, req.params.entityType, req.params.entityId, 'commented', (req as any).actor ?? author ?? 'analyst', undefined, (req as any).sourceIp);
   res.status(201).json(created);
 });
 
@@ -37,7 +37,7 @@ router.delete('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM comments WHERE id = ?').get(req.params.id) as any;
   if (!existing) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM comments WHERE id = ?').run(req.params.id);
-  logAudit(db, existing.entity_type, existing.entity_id, 'comment_deleted', 'user');
+  logAudit(db, existing.entity_type, existing.entity_id, 'comment_deleted', (req as any).actor ?? 'user', undefined, (req as any).sourceIp);
   res.status(204).send();
 });
 

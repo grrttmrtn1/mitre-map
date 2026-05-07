@@ -23,6 +23,8 @@ import reportsRouter from './routes/reports';
 import riskRouter from './routes/risk';
 import apiKeysRouter from './routes/api-keys';
 import adminRouter from './routes/admin';
+import motivationsRouter from './routes/motivations';
+import countriesRouter from './routes/countries';
 import { requireApiKey } from './middleware/auth';
 
 const app = express();
@@ -55,6 +57,8 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/risk', riskRouter);
 app.use('/api/api-keys', apiKeysRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/motivations', motivationsRouter);
+app.use('/api/countries', countriesRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

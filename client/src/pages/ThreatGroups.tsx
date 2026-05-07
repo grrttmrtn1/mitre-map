@@ -1,18 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import type { ThreatGroup, Technique } from '../types';
-
-const MOTIVATION_COLOR: Record<string, string> = {
-  Espionage: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-  Financial: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-  'Espionage, Financial': 'text-purple-400 bg-purple-500/10 border-purple-500/20',
-  'Destructive, Espionage': 'text-red-400 bg-red-500/10 border-red-500/20',
-  Destructive: 'text-red-400 bg-red-500/10 border-red-500/20',
-};
-
-const COUNTRY_FLAG: Record<string, string> = {
-  Russia: '🇷🇺', China: '🇨🇳', 'North Korea': '🇰🇵', Iran: '🇮🇷', Vietnam: '🇻🇳',
-};
+import type { Country, Motivation, Procedure, ProcedureType, ThreatGroup, Technique } from '../types';
 
 const BLANK_FORM = {
   id: '', name: '', country: '', motivation: '', description: '', url: '', aliases: '',
@@ -49,10 +37,18 @@ export default function ThreatGroups() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
+  const [motivationOptions, setMotivationOptions] = useState<Motivation[]>([]);
+  const [countryOptions, setCountryOptions] = useState<Country[]>([]);
+  const [existingProcedures, setExistingProcedures] = useState<Procedure[]>([]);
+  const [pendingProcedures, setPendingProcedures] = useState<Array<{technique_id: string; type: ProcedureType; content: string; source: string}>>([]);
+  const [deletedProcedureIds, setDeletedProcedureIds] = useState<number[]>([]);
+
   const loadGroups = () => api.getThreatGroups().then(setGroups).finally(() => setLoading(false));
 
   useEffect(() => { loadGroups(); }, []);
   useEffect(() => { api.getTechniques().then(setAllTechniques); }, []);
+  useEffect(() => { api.getMotivations().then(setMotivationOptions); }, []);
+  useEffect(() => { api.getCountries().then(setCountryOptions); }, []);
 
   const loadDetail = async (id: string) => {
     if (selected === id) { setSelected(null); setDetail(null); return; }
@@ -68,6 +64,9 @@ export default function ThreatGroups() {
     setEditGroup(null);
     setForm(BLANK_FORM);
     setSelectedTechIds(new Set());
+    setExistingProcedures([]);
+    setPendingProcedures([]);
+    setDeletedProcedureIds([]);
     setError('');
     setShowModal(true);
   };
@@ -86,6 +85,9 @@ export default function ThreatGroups() {
     api.getThreatGroup(g.id).then(d => {
       setSelectedTechIds(new Set((d as any).techniques?.map((t: any) => t.id) ?? []));
     });
+    api.getGroupProcedures(g.id).then(setExistingProcedures).catch(() => setExistingProcedures([]));
+    setPendingProcedures([]);
+    setDeletedProcedureIds([]);
     setError('');
     setShowModal(true);
   };
@@ -95,8 +97,9 @@ export default function ThreatGroups() {
     setSaving(true);
     setError('');
     try {
+      const savedId = form.id.trim().toUpperCase();
       const payload = {
-        id: form.id.trim().toUpperCase(),
+        id: savedId,
         name: form.name.trim(),
         country: form.country.trim() || null,
         motivation: form.motivation.trim() || null,
@@ -107,8 +110,14 @@ export default function ThreatGroups() {
       };
       if (editGroup) {
         await api.updateThreatGroup(editGroup.id, payload);
+        for (const id of deletedProcedureIds) {
+          await api.deleteProcedure(editGroup.id, id).catch(() => {});
+        }
       } else {
         await api.createThreatGroup(payload);
+      }
+      for (const p of pendingProcedures) {
+        await api.createProcedure(savedId, p.technique_id, { type: p.type, content: p.content, source: p.source || undefined }).catch(() => {});
       }
       setShowModal(false);
       setSelected(null);
@@ -141,6 +150,9 @@ export default function ThreatGroups() {
   const motivations = [...new Set(groups.map(g => g.motivation).filter(Boolean))] as string[];
   const countries = [...new Set(groups.map(g => g.country).filter(Boolean))] as string[];
 
+  const countryMap = Object.fromEntries(countryOptions.map(c => [c.name, c]));
+  const motivationMap = Object.fromEntries(motivationOptions.map(m => [m.name, m]));
+
   const filtered = groups.filter(g => {
     if (filterMotivation && g.motivation !== filterMotivation) return false;
     if (filterCountry && g.country !== filterCountry) return false;
@@ -164,7 +176,7 @@ export default function ThreatGroups() {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-xl font-semibold text-slate-100">Threat Groups</h1>
-              <p className="text-sm text-slate-400 mt-0.5">{groups.length} tracked APT and cybercriminal groups with detection coverage</p>
+              <p className="text-sm text-slate-400 mt-0.5">{filtered.length === groups.length ? groups.length : `${filtered.length} of ${groups.length}`} tracked APT and cybercriminal groups</p>
             </div>
             <button onClick={openCreate}
               className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 flex items-center gap-1.5">
@@ -182,7 +194,7 @@ export default function ThreatGroups() {
             <select value={filterCountry} onChange={e => setFilterCountry(e.target.value)}
               className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
               <option value="">All Countries</option>
-              {countries.map(c => <option key={c} value={c}>{COUNTRY_FLAG[c] ?? ''} {c}</option>)}
+              {countries.map(c => <option key={c} value={c}>{countryMap[c]?.flag ?? ''} {c}</option>)}
             </select>
           </div>
         </div>
@@ -215,14 +227,27 @@ export default function ThreatGroups() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-400 text-sm">
-                      {g.country ? `${COUNTRY_FLAG[g.country] ?? ''} ${g.country}` : '—'}
+                      {g.country ? (
+                        <span className="flex items-center gap-1.5">
+                          {countryMap[g.country]?.flag && <span>{countryMap[g.country].flag}</span>}
+                          <span style={countryMap[g.country] ? { color: countryMap[g.country].color } : undefined}>{g.country}</span>
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className="px-4 py-3">
-                      {g.motivation && (
-                        <span className={`text-xs px-2 py-0.5 rounded border ${MOTIVATION_COLOR[g.motivation] ?? 'text-slate-400 bg-slate-700 border-slate-600'}`}>
-                          {g.motivation}
-                        </span>
-                      )}
+                      {g.motivation && (() => {
+                        const mot = motivationMap[g.motivation];
+                        return mot ? (
+                          <span className="text-xs px-2 py-0.5 rounded border font-medium"
+                            style={{ color: mot.color, borderColor: mot.color + '40', backgroundColor: mot.color + '18' }}>
+                            {g.motivation}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded border text-slate-400 bg-slate-700 border-slate-600">
+                            {g.motivation}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -269,8 +294,17 @@ export default function ThreatGroups() {
           techSearch={techSearch}
           setTechSearch={setTechSearch}
           filteredTechs={filteredTechs}
+          allTechniques={allTechniques}
           selectedTechIds={selectedTechIds}
           toggleTech={toggleTech}
+          motivations={motivationOptions}
+          countries={countryOptions}
+          existingProcedures={existingProcedures}
+          onDeleteExistingProcedure={id => setDeletedProcedureIds(prev => [...prev, id])}
+          pendingProcedures={pendingProcedures}
+          onAddPendingProcedure={p => setPendingProcedures(prev => [...prev, p])}
+          onRemovePendingProcedure={idx => setPendingProcedures(prev => prev.filter((_, i) => i !== idx))}
+          deletedProcedureIds={deletedProcedureIds}
           onSave={saveGroup}
           onClose={() => setShowModal(false)}
         />
@@ -298,16 +332,44 @@ export default function ThreatGroups() {
   );
 }
 
+const BLANK_PROC = { technique_id: '', type: 'command' as ProcedureType, content: '', source: '' };
+
 function GroupModal({
   form, setForm, isEdit, saving, error, techSearch, setTechSearch,
-  filteredTechs, selectedTechIds, toggleTech, onSave, onClose,
+  filteredTechs, allTechniques, selectedTechIds, toggleTech,
+  motivations, countries,
+  existingProcedures, onDeleteExistingProcedure,
+  pendingProcedures, onAddPendingProcedure, onRemovePendingProcedure,
+  deletedProcedureIds,
+  onSave, onClose,
 }: {
   form: any; setForm: any; isEdit: boolean; saving: boolean; error: string;
   techSearch: string; setTechSearch: (v: string) => void;
-  filteredTechs: Technique[]; selectedTechIds: Set<string>;
-  toggleTech: (id: string) => void; onSave: () => void; onClose: () => void;
+  filteredTechs: Technique[]; allTechniques: Technique[]; selectedTechIds: Set<string>;
+  toggleTech: (id: string) => void;
+  motivations: Motivation[];
+  countries: Country[];
+  existingProcedures: Procedure[];
+  onDeleteExistingProcedure: (id: number) => void;
+  pendingProcedures: Array<{technique_id: string; type: ProcedureType; content: string; source: string}>;
+  onAddPendingProcedure: (p: typeof BLANK_PROC) => void;
+  onRemovePendingProcedure: (idx: number) => void;
+  deletedProcedureIds: number[];
+  onSave: () => void; onClose: () => void;
 }) {
+  const [procForm, setProcForm] = useState(BLANK_PROC);
   const f = (field: string, val: string) => setForm((p: any) => ({ ...p, [field]: val }));
+
+  const techMap = Object.fromEntries(allTechniques.map(t => [t.id, t.name]));
+  const selectedTechList = [...selectedTechIds].sort();
+
+  const visibleExisting = existingProcedures.filter(p => !deletedProcedureIds.includes(p.id));
+
+  const addProc = () => {
+    if (!procForm.technique_id || !procForm.content.trim()) return;
+    onAddPendingProcedure({ ...procForm, content: procForm.content.trim() });
+    setProcForm(p => ({ ...BLANK_PROC, technique_id: p.technique_id, type: p.type }));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -317,9 +379,10 @@ function GroupModal({
           <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {error && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</div>}
 
+          {/* ── Group metadata ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-400 block mb-1">Group ID <span className="text-red-400">*</span></label>
@@ -334,13 +397,22 @@ function GroupModal({
             </div>
             <div>
               <label className="text-xs text-slate-400 block mb-1">Country / Origin</label>
-              <input value={form.country} onChange={e => f('country', e.target.value)} placeholder="e.g. Russia"
+              <input value={form.country} onChange={e => f('country', e.target.value)}
+                placeholder="e.g. Russia" list="countries-datalist"
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+              <datalist id="countries-datalist">
+                {countries.map(c => <option key={c.id} value={c.name}>{c.flag} {c.name}</option>)}
+              </datalist>
             </div>
             <div>
               <label className="text-xs text-slate-400 block mb-1">Motivation</label>
-              <input value={form.motivation} onChange={e => f('motivation', e.target.value)} placeholder="e.g. Espionage"
+              <input
+                value={form.motivation} onChange={e => f('motivation', e.target.value)}
+                placeholder="e.g. Espionage" list="motivations-datalist"
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+              <datalist id="motivations-datalist">
+                {motivations.map(m => <option key={m.id} value={m.name} />)}
+              </datalist>
             </div>
             <div className="col-span-2">
               <label className="text-xs text-slate-400 block mb-1">Aliases <span className="text-slate-600">(comma-separated)</span></label>
@@ -359,6 +431,7 @@ function GroupModal({
             </div>
           </div>
 
+          {/* ── Techniques ── */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-slate-300">
@@ -382,6 +455,86 @@ function GroupModal({
               )}
             </div>
           </div>
+
+          {/* ── Procedures ── */}
+          {selectedTechIds.size > 0 && (
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-2">
+                Procedures
+                {(visibleExisting.length + pendingProcedures.length) > 0 && (
+                  <span className="ml-1.5 text-slate-500 font-normal">({visibleExisting.length + pendingProcedures.length})</span>
+                )}
+              </label>
+
+              {/* Existing procedures (edit mode) */}
+              {visibleExisting.length > 0 && (
+                <div className="mb-2 space-y-1">
+                  {visibleExisting.map(p => (
+                    <div key={p.id} className="flex items-start gap-2 px-2.5 py-2 bg-slate-800/50 border border-slate-700 rounded-lg">
+                      <span className="font-mono text-[10px] text-slate-500 w-14 flex-shrink-0 pt-0.5">{p.technique_id}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 ${PROC_TYPE_STYLE[p.type]}`}>{p.type}</span>
+                      <span className="text-xs text-slate-400 flex-1 truncate">{p.content}</span>
+                      <button onClick={() => onDeleteExistingProcedure(p.id)}
+                        className="text-[10px] text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded hover:bg-red-500/10 flex-shrink-0">Remove</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Pending new procedures */}
+              {pendingProcedures.length > 0 && (
+                <div className="mb-2 space-y-1">
+                  {pendingProcedures.map((p, idx) => (
+                    <div key={idx} className="flex items-start gap-2 px-2.5 py-2 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                      <span className="font-mono text-[10px] text-slate-500 w-14 flex-shrink-0 pt-0.5">{p.technique_id}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border flex-shrink-0 ${PROC_TYPE_STYLE[p.type]}`}>{p.type}</span>
+                      <span className="text-xs text-slate-400 flex-1 truncate">{p.content}</span>
+                      <button onClick={() => onRemovePendingProcedure(idx)}
+                        className="text-[10px] text-slate-500 hover:text-red-400 px-1.5 py-0.5 rounded flex-shrink-0">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add procedure form */}
+              <div className="p-3 bg-slate-800/40 border border-slate-700/60 rounded-lg space-y-2">
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-500 block mb-1">Technique</label>
+                    <select value={procForm.technique_id} onChange={e => setProcForm(p => ({ ...p, technique_id: e.target.value }))}
+                      className="w-full px-2 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-300 focus:outline-none focus:border-blue-500">
+                      <option value="">Select technique...</option>
+                      {selectedTechList.map(id => (
+                        <option key={id} value={id}>{id} — {techMap[id] ?? ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 block mb-1">Type</label>
+                    <select value={procForm.type} onChange={e => setProcForm(p => ({ ...p, type: e.target.value as ProcedureType }))}
+                      className="px-2 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-300 focus:outline-none focus:border-blue-500">
+                      {PROC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 block mb-1">Source <span className="text-slate-700">(optional)</span></label>
+                    <input value={procForm.source} onChange={e => setProcForm(p => ({ ...p, source: e.target.value }))}
+                      placeholder="Reference / report"
+                      className="w-full px-2 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-300 placeholder-slate-600 focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div className="flex gap-2 items-end">
+                  <textarea value={procForm.content} onChange={e => setProcForm(p => ({ ...p, content: e.target.value }))}
+                    rows={2} placeholder={procForm.type === 'command' ? 'e.g. powershell.exe -nop -w hidden -enc JABj...' : procForm.type === 'reference' ? 'https://...' : 'Describe observed behavior...'}
+                    className="flex-1 px-2 py-1.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none" />
+                  <button onClick={addProc} disabled={!procForm.technique_id || !procForm.content.trim()}
+                    className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-40 whitespace-nowrap self-end">
+                    + Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2 justify-end px-5 py-4 border-t border-slate-800">
@@ -396,11 +549,188 @@ function GroupModal({
   );
 }
 
+const PROC_TYPE_STYLE: Record<ProcedureType, string> = {
+  command:     'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  script:      'text-violet-400 bg-violet-500/10 border-violet-500/20',
+  description: 'text-slate-300 bg-slate-700/50 border-slate-600/30',
+  artifact:    'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  reference:   'text-blue-400 bg-blue-500/10 border-blue-500/20',
+};
+
+const PROC_TYPES: ProcedureType[] = ['command', 'script', 'description', 'artifact', 'reference'];
+
+function ProcedureRow({ proc, groupId, onUpdated, onDeleted }: {
+  proc: Procedure; groupId: string; onUpdated: (p: Procedure) => void; onDeleted: (id: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ type: proc.type, content: proc.content, source: proc.source ?? '' });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!form.content.trim()) return;
+    setSaving(true);
+    try {
+      const updated = await api.updateProcedure(groupId, proc.id, {
+        type: form.type, content: form.content, source: form.source || undefined,
+      });
+      onUpdated(updated);
+      setEditing(false);
+    } finally { setSaving(false); }
+  };
+
+  const remove = async () => {
+    await api.deleteProcedure(groupId, proc.id);
+    onDeleted(proc.id);
+  };
+
+  if (editing) {
+    return (
+      <div className="mt-1 p-2 bg-slate-800 border border-slate-700 rounded-lg space-y-2">
+        <div className="flex gap-2">
+          <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value as ProcedureType }))}
+            className="px-2 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-slate-300 focus:outline-none focus:border-blue-500">
+            {PROC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <input value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
+            placeholder="Source / reference (optional)"
+            className="flex-1 px-2 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500" />
+        </div>
+        <textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))} rows={3}
+          className="w-full px-2 py-1.5 text-xs font-mono bg-slate-900 border border-slate-600 rounded text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
+        <div className="flex gap-2 justify-end">
+          <button onClick={() => setEditing(false)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Cancel</button>
+          <button onClick={save} disabled={saving || !form.content.trim()}
+            className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1 group/proc flex gap-2 items-start">
+      <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border ${PROC_TYPE_STYLE[proc.type]}`}>
+        {proc.type}
+      </span>
+      <div className="flex-1 min-w-0">
+        {(proc.type === 'command' || proc.type === 'script') ? (
+          <pre className="text-xs font-mono text-slate-300 bg-slate-900 px-2 py-1.5 rounded border border-slate-700/50 whitespace-pre-wrap break-all">{proc.content}</pre>
+        ) : (
+          <p className="text-xs text-slate-300 leading-relaxed">{proc.content}</p>
+        )}
+        {proc.source && (
+          <div className="text-[10px] text-slate-500 mt-0.5">Source: {proc.source}</div>
+        )}
+      </div>
+      <div className="flex-shrink-0 flex gap-1 opacity-0 group-hover/proc:opacity-100 transition-opacity">
+        <button onClick={() => { setForm({ type: proc.type, content: proc.content, source: proc.source ?? '' }); setEditing(true); }}
+          className="text-[10px] text-slate-400 hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-slate-700">Edit</button>
+        <button onClick={remove}
+          className="text-[10px] text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded hover:bg-red-500/10">Del</button>
+      </div>
+    </div>
+  );
+}
+
+function TechniqueWithProcedures({ t, groupId, procedures, onProcsChange }: {
+  t: { technique_id: string; technique_name: string; detected: boolean };
+  groupId: string;
+  procedures: Procedure[];
+  onProcsChange: (procs: Procedure[]) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newForm, setNewForm] = useState<{ type: ProcedureType; content: string; source: string }>({ type: 'command', content: '', source: '' });
+  const [saving, setSaving] = useState(false);
+
+  const myProcs = procedures.filter(p => p.technique_id === t.technique_id);
+
+  const addProc = async () => {
+    if (!newForm.content.trim()) return;
+    setSaving(true);
+    try {
+      const created = await api.createProcedure(groupId, t.technique_id, {
+        type: newForm.type,
+        content: newForm.content,
+        source: newForm.source || undefined,
+      });
+      onProcsChange([...procedures, created]);
+      setNewForm({ type: 'command', content: '', source: '' });
+      setAdding(false);
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="border border-slate-800 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-800/50 transition-colors text-left">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.detected ? 'bg-emerald-400' : 'bg-red-500'}`} />
+        <span className="font-mono text-slate-500 w-14 flex-shrink-0">{t.technique_id}</span>
+        <span className={`flex-1 truncate ${t.detected ? 'text-slate-300' : 'text-slate-500'}`}>{t.technique_name}</span>
+        {myProcs.length > 0 && (
+          <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">{myProcs.length} proc{myProcs.length > 1 ? 's' : ''}</span>
+        )}
+        {!t.detected && <span className="text-red-400 text-[10px]">EXPOSED</span>}
+        <span className="text-slate-600 ml-1">{expanded ? '▾' : '›'}</span>
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-3 pt-1 border-t border-slate-800 bg-slate-900/30 space-y-1">
+          {myProcs.length === 0 && !adding && (
+            <p className="text-[11px] text-slate-600 italic">No procedures recorded.</p>
+          )}
+          {myProcs.map(p => (
+            <ProcedureRow key={p.id} proc={p} groupId={groupId}
+              onUpdated={updated => onProcsChange(procedures.map(x => x.id === updated.id ? updated : x))}
+              onDeleted={id => onProcsChange(procedures.filter(x => x.id !== id))} />
+          ))}
+
+          {adding ? (
+            <div className="mt-2 p-2 bg-slate-800 border border-slate-700 rounded-lg space-y-2">
+              <div className="flex gap-2">
+                <select value={newForm.type} onChange={e => setNewForm(p => ({ ...p, type: e.target.value as ProcedureType }))}
+                  className="px-2 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-slate-300 focus:outline-none focus:border-blue-500">
+                  {PROC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <input value={newForm.source} onChange={e => setNewForm(p => ({ ...p, source: e.target.value }))}
+                  placeholder="Source / reference (optional)"
+                  className="flex-1 px-2 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500" />
+              </div>
+              <textarea value={newForm.content} onChange={e => setNewForm(p => ({ ...p, content: e.target.value }))} rows={3}
+                placeholder={newForm.type === 'command' ? 'e.g. powershell.exe -enc <base64>' : newForm.type === 'reference' ? 'https://...' : 'Describe the observed behavior...'}
+                className="w-full px-2 py-1.5 text-xs font-mono bg-slate-900 border border-slate-600 rounded text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none" />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setAdding(false)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Cancel</button>
+                <button onClick={addProc} disabled={saving || !newForm.content.trim()}
+                  className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50">
+                  {saving ? 'Adding...' : 'Add'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setAdding(true)}
+              className="mt-1 text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1">
+              + Add Procedure
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GroupDetailPane({ group, detail, onClose, onEdit }: {
   group: ThreatGroup; detail: GroupDetail; onClose: () => void; onEdit: () => void;
 }) {
   const { coverage } = detail;
   const exposed = coverage.details.filter(t => !t.detected);
+  const [procedures, setProcedures] = useState<Procedure[]>([]);
+
+  useEffect(() => {
+    api.getGroupProcedures(group.id).then(setProcedures).catch(() => {});
+  }, [group.id]);
 
   return (
     <div className="p-5 space-y-5">
@@ -441,15 +771,14 @@ function GroupDetailPane({ group, detail, onClose, onEdit }: {
       </div>
 
       <div>
-        <div className="text-xs font-semibold text-slate-400 mb-2">Technique Coverage</div>
-        <div className="space-y-1 max-h-80 overflow-y-auto">
+        <div className="text-xs font-semibold text-slate-400 mb-2">
+          Techniques &amp; Procedures
+          {procedures.length > 0 && <span className="ml-2 text-slate-600 font-normal">{procedures.length} total procedures</span>}
+        </div>
+        <div className="space-y-1 max-h-[32rem] overflow-y-auto">
           {coverage.details.map(t => (
-            <div key={t.technique_id} className="flex items-center gap-2 text-xs">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.detected ? 'bg-emerald-400' : 'bg-red-500'}`} />
-              <span className="font-mono text-slate-500 w-14">{t.technique_id}</span>
-              <span className={t.detected ? 'text-slate-300' : 'text-slate-500'}>{t.technique_name}</span>
-              {!t.detected && <span className="ml-auto text-red-400 text-xs">EXPOSED</span>}
-            </div>
+            <TechniqueWithProcedures key={t.technique_id} t={t} groupId={group.id}
+              procedures={procedures} onProcsChange={setProcedures} />
           ))}
         </div>
       </div>

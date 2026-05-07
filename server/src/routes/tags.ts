@@ -19,7 +19,7 @@ router.post('/', (req, res) => {
     name, color ?? '#6366f1', description ?? null
   );
   const tag = db.prepare('SELECT * FROM tags WHERE id = ?').get(result.lastInsertRowid);
-  logAudit(db, 'tag', String(result.lastInsertRowid), 'created', 'user', { name });
+  logAudit(db, 'tag', String(result.lastInsertRowid), 'created', (req as any).actor ?? 'user', { name }, (req as any).sourceIp);
   res.status(201).json(tag);
 });
 

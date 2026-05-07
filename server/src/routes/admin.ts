@@ -47,7 +47,7 @@ router.delete('/purge/:dataset', (req, res) => {
       const result = db.prepare(`DELETE FROM ${table}`).run() as any;
       totalDeleted += result.changes;
     }
-    logAudit(db, 'admin', req.params.dataset, 'purge', 'user', { dataset: req.params.dataset, rows_deleted: totalDeleted });
+    logAudit(db, 'admin', req.params.dataset, 'purge', (req as any).actor ?? 'user', { dataset: req.params.dataset, rows_deleted: totalDeleted }, (req as any).sourceIp);
   })();
 
   res.json({ purged: req.params.dataset, rows_deleted: totalDeleted });
@@ -67,7 +67,7 @@ router.delete('/purge-all', (req, res) => {
       const result = db.prepare(`DELETE FROM ${table}`).run() as any;
       totalDeleted += result.changes;
     }
-    logAudit(db, 'admin', 'all', 'purge_all', 'user', { rows_deleted: totalDeleted });
+    logAudit(db, 'admin', 'all', 'purge_all', (req as any).actor ?? 'user', { rows_deleted: totalDeleted }, (req as any).sourceIp);
   })();
 
   res.json({ purged: 'all', rows_deleted: totalDeleted });

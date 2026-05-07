@@ -172,6 +172,7 @@ export function initSchema(db: Database.Database): void {
       action TEXT NOT NULL,
       actor TEXT NOT NULL DEFAULT 'user',
       changes TEXT,
+      source_ip TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
@@ -210,6 +211,37 @@ export function initSchema(db: Database.Database): void {
       FOREIGN KEY (group_id) REFERENCES threat_groups(id)
     );
 
+    CREATE TABLE IF NOT EXISTS group_technique_procedures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id TEXT NOT NULL,
+      technique_id TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'command',
+      content TEXT NOT NULL,
+      source TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (group_id) REFERENCES threat_groups(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_procedures_group_tech ON group_technique_procedures(group_id, technique_id);
+
+    -- Motivations
+    CREATE TABLE IF NOT EXISTS motivations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      description TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Countries
+    CREATE TABLE IF NOT EXISTS countries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      flag TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- API Keys
     CREATE TABLE IF NOT EXISTS api_keys (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -245,6 +277,10 @@ export function initSchema(db: Database.Database): void {
       PRIMARY KEY (technique_id, control_id)
     );
   `);
+
+  // Migrations for existing databases
+  try { db.exec(`ALTER TABLE motivations ADD COLUMN color TEXT NOT NULL DEFAULT '#6366f1'`); } catch {}
+  try { db.exec(`ALTER TABLE audit_log ADD COLUMN source_ip TEXT`); } catch {}
 }
 
 export function logAudit(
@@ -253,9 +289,10 @@ export function logAudit(
   entityId: string,
   action: string,
   actor = 'user',
-  changes?: Record<string, unknown>
+  changes?: Record<string, unknown>,
+  sourceIp?: string | null
 ): void {
   db.prepare(
-    'INSERT INTO audit_log (entity_type, entity_id, action, actor, changes) VALUES (?, ?, ?, ?, ?)'
-  ).run(entityType, entityId, action, actor, changes ? JSON.stringify(changes) : null);
+    'INSERT INTO audit_log (entity_type, entity_id, action, actor, changes, source_ip) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(entityType, entityId, action, actor, changes ? JSON.stringify(changes) : null, sourceIp ?? null);
 }

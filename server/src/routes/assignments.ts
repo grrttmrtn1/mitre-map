@@ -33,7 +33,7 @@ router.post('/', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(entity_type, String(entity_id), assignee, status ?? 'open', priority ?? 'medium', due_date ?? null, notes ?? null);
   const created = db.prepare('SELECT * FROM assignments WHERE id = ?').get(result.lastInsertRowid);
-  logAudit(db, entity_type, String(entity_id), 'assigned', 'user', { assignee });
+  logAudit(db, entity_type, String(entity_id), 'assigned', (req as any).actor ?? 'user', { assignee }, (req as any).sourceIp);
   res.status(201).json(created);
 });
 
@@ -48,7 +48,7 @@ router.put('/:id', (req, res) => {
   `).run(assignee ?? existing.assignee, status ?? existing.status, priority ?? existing.priority,
     due_date ?? existing.due_date, notes ?? existing.notes, req.params.id);
   if (status && status !== existing.status) {
-    logAudit(db, existing.entity_type, existing.entity_id, 'assignment_status_changed', 'user', { from: existing.status, to: status });
+    logAudit(db, existing.entity_type, existing.entity_id, 'assignment_status_changed', (req as any).actor ?? 'user', { from: existing.status, to: status }, (req as any).sourceIp);
   }
   res.json(db.prepare('SELECT * FROM assignments WHERE id = ?').get(req.params.id));
 });
@@ -58,7 +58,7 @@ router.delete('/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM assignments WHERE id = ?').get(req.params.id) as any;
   if (!existing) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM assignments WHERE id = ?').run(req.params.id);
-  logAudit(db, existing.entity_type, existing.entity_id, 'unassigned', 'user', { assignee: existing.assignee });
+  logAudit(db, existing.entity_type, existing.entity_id, 'unassigned', (req as any).actor ?? 'user', { assignee: existing.assignee }, (req as any).sourceIp);
   res.status(204).send();
 });
 

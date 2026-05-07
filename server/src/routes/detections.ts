@@ -38,7 +38,7 @@ router.post('/', (req, res) => {
     status ?? 'active', severity ?? 'medium', confidence ?? 'medium', false_positive_rate ?? null, notes ?? null);
 
   const created = db.prepare('SELECT * FROM detections WHERE id = ?').get(result.lastInsertRowid) as any;
-  logAudit(db, 'detection', String(result.lastInsertRowid), 'created', 'user', { name });
+  logAudit(db, 'detection', String(result.lastInsertRowid), 'created', (req as any).actor ?? 'user', { name }, (req as any).sourceIp);
   res.status(201).json({ ...created, technique_ids: JSON.parse(created.technique_ids) });
 });
 
@@ -60,7 +60,7 @@ router.put('/:id', (req, res) => {
     false_positive_rate ?? null, notes ?? null, req.params.id);
 
   const updated = db.prepare('SELECT * FROM detections WHERE id = ?').get(req.params.id) as any;
-  logAudit(db, 'detection', req.params.id, 'updated', 'user', { status, severity });
+  logAudit(db, 'detection', req.params.id, 'updated', (req as any).actor ?? 'user', { status, severity }, (req as any).sourceIp);
   res.json({ ...updated, technique_ids: JSON.parse(updated.technique_ids) });
 });
 
@@ -68,7 +68,7 @@ router.delete('/:id', (req, res) => {
   const db = getDb();
   const existing = db.prepare('SELECT * FROM detections WHERE id = ?').get(req.params.id) as any;
   if (!existing) return res.status(404).json({ error: 'Not found' });
-  logAudit(db, 'detection', req.params.id, 'deleted', 'user', { name: existing.name });
+  logAudit(db, 'detection', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: existing.name }, (req as any).sourceIp);
   db.prepare('DELETE FROM detections WHERE id = ?').run(req.params.id);
   res.status(204).send();
 });
@@ -85,7 +85,7 @@ router.patch('/bulk', (req, res) => {
   const placeholders = ids.map(() => '?').join(',');
   const update = db.transaction(() => {
     db.prepare(`UPDATE detections SET status = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`).run(status, ...ids);
-    for (const id of ids) logAudit(db, 'detection', String(id), 'bulk_status_update', 'user', { status });
+    for (const id of ids) logAudit(db, 'detection', String(id), 'bulk_status_update', (req as any).actor ?? 'user', { status }, (req as any).sourceIp);
   });
   update();
   res.json({ updated: ids.length });
@@ -98,7 +98,7 @@ router.delete('/bulk', (req, res) => {
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids array is required' });
   const placeholders = ids.map(() => '?').join(',');
   const del = db.transaction(() => {
-    for (const id of ids) logAudit(db, 'detection', String(id), 'deleted', 'user');
+    for (const id of ids) logAudit(db, 'detection', String(id), 'deleted', (req as any).actor ?? 'user', undefined, (req as any).sourceIp);
     db.prepare(`DELETE FROM detections WHERE id IN (${placeholders})`).run(...ids);
   });
   del();

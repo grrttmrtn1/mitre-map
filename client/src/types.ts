@@ -151,6 +151,7 @@ export interface AuditLogEntry {
   action: string;
   actor: string;
   changes: Record<string, unknown> | null;
+  source_ip: string | null;
   created_at: string;
 }
 
@@ -166,6 +167,35 @@ export interface CoverageSnapshot {
   active_detections: number;
   total_tools: number;
   notes: string | null;
+}
+
+export interface Motivation {
+  id: number;
+  name: string;
+  color: string;
+  description: string | null;
+  created_at: string;
+}
+
+export interface Country {
+  id: number;
+  name: string;
+  color: string;
+  flag: string | null;
+  created_at: string;
+}
+
+export type ProcedureType = 'command' | 'script' | 'description' | 'artifact' | 'reference';
+
+export interface Procedure {
+  id: number;
+  group_id: string;
+  technique_id: string;
+  type: ProcedureType;
+  content: string;
+  source: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ThreatGroup {

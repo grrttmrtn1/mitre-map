@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api, getStoredApiKey, setStoredApiKey, clearStoredApiKey } from '../api';
-import type { Tag, AuditLogEntry, ApiKey } from '../types';
+import type { Country, Motivation, Tag, AuditLogEntry, ApiKey } from '../types';
 
-type TabId = 'tags' | 'risk' | 'audit' | 'api_keys' | 'data';
+type TabId = 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data';
 
 const SCOPES = ['read', 'write', 'admin'];
-const BLANK_KEY_FORM = { name: '', scopes: ['read'] as string[], expires_at: '' };
+const SCOPE_DESC: Record<string, string> = {
+  read:  'GET — view all data',
+  write: 'POST/PUT/PATCH/DELETE — modify detections, tools, groups, tags, etc.',
+  admin: 'Key management + bulk purge (implies read & write)',
+};
+const BLANK_KEY_FORM = { name: '', scopes: ['read'] as string[], expires_at: '', never_expires: true };
 
 export default function Settings() {
   const [tags, setTags] = useState<Tag[]>([]);
@@ -19,6 +24,20 @@ export default function Settings() {
   const [tagForm, setTagForm] = useState({ name: '', color: '#6366f1', description: '' });
   const [editTagId, setEditTagId] = useState<number | null>(null);
   const [savingTag, setSavingTag] = useState(false);
+
+  // Motivations state
+  const [motivations, setMotivations] = useState<Motivation[]>([]);
+  const [motForm, setMotForm] = useState({ name: '', color: '#6366f1', description: '' });
+  const [editMotId, setEditMotId] = useState<number | null>(null);
+  const [savingMot, setSavingMot] = useState(false);
+  const [motError, setMotError] = useState('');
+
+  // Countries state
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [countryForm, setCountryForm] = useState({ name: '', color: '#6366f1', flag: '' });
+  const [editCountryId, setEditCountryId] = useState<number | null>(null);
+  const [savingCountry, setSavingCountry] = useState(false);
+  const [countryError, setCountryError] = useState('');
 
   // API Keys state
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -40,13 +59,15 @@ export default function Settings() {
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
 
   const loadTags = () => api.getTags().then(setTags);
+  const loadMotivations = () => api.getMotivations().then(setMotivations);
+  const loadCountries = () => api.getCountries().then(setCountries);
   const loadAudit = () => api.getAuditLog({ limit: 100 }).then(r => { setAuditRows(r.rows); setAuditTotal(r.total); });
   const loadRisk = () => Promise.all([api.getRiskScore(), api.getRiskByTactic()]).then(([s, t]) => { setRiskScore(s); setRiskByTactic(t); });
   const loadApiKeys = () => api.getApiKeys().then(setApiKeys);
   const loadDatasets = () => api.getPurgeableDatasets().then(r => setDatasets(r.datasets));
 
   useEffect(() => {
-    loadTags(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets();
+    loadTags(); loadMotivations(); loadCountries(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets();
   }, []);
 
   // ── Tag actions ─────────────────────────────────────────────────────────────
@@ -73,6 +94,62 @@ export default function Settings() {
     setTagForm({ name: tag.name, color: tag.color, description: tag.description ?? '' });
   };
 
+  // ── Motivation actions ───────────────────────────────────────────────────────
+  const saveMot = async () => {
+    if (!motForm.name.trim()) return;
+    setSavingMot(true);
+    setMotError('');
+    try {
+      if (editMotId !== null) await api.updateMotivation(editMotId, motForm);
+      else await api.createMotivation(motForm);
+      setMotForm({ name: '', color: '#6366f1', description: '' });
+      setEditMotId(null);
+      loadMotivations();
+    } catch (e: any) {
+      setMotError(e.message ?? 'Save failed');
+    } finally { setSavingMot(false); }
+  };
+
+  const deleteMot = async (id: number) => {
+    if (!confirm('Delete this motivation? Existing threat groups will keep their current value.')) return;
+    await api.deleteMotivation(id);
+    loadMotivations();
+  };
+
+  const startEditMot = (m: Motivation) => {
+    setEditMotId(m.id);
+    setMotForm({ name: m.name, color: m.color ?? '#6366f1', description: m.description ?? '' });
+    setMotError('');
+  };
+
+  // ── Country actions ──────────────────────────────────────────────────────────
+  const saveCountry = async () => {
+    if (!countryForm.name.trim()) return;
+    setSavingCountry(true);
+    setCountryError('');
+    try {
+      if (editCountryId !== null) await api.updateCountry(editCountryId, countryForm);
+      else await api.createCountry(countryForm);
+      setCountryForm({ name: '', color: '#6366f1', flag: '' });
+      setEditCountryId(null);
+      loadCountries();
+    } catch (e: any) {
+      setCountryError(e.message ?? 'Save failed');
+    } finally { setSavingCountry(false); }
+  };
+
+  const deleteCountry = async (id: number) => {
+    if (!confirm('Delete this country? Existing threat groups will keep their current value.')) return;
+    await api.deleteCountry(id);
+    loadCountries();
+  };
+
+  const startEditCountry = (c: Country) => {
+    setEditCountryId(c.id);
+    setCountryForm({ name: c.name, color: c.color ?? '#6366f1', flag: c.flag ?? '' });
+    setCountryError('');
+  };
+
   // ── API Key actions ──────────────────────────────────────────────────────────
   const createKey = async () => {
     if (!keyForm.name.trim()) return;
@@ -81,10 +158,15 @@ export default function Settings() {
       const res = await api.createApiKey({
         name: keyForm.name.trim(),
         scopes: keyForm.scopes,
-        expires_at: keyForm.expires_at || undefined,
+        expires_at: keyForm.never_expires ? undefined : (keyForm.expires_at || undefined),
       });
-      setNewKey((res as any).key);
+      const rawKey = (res as any).key;
+      setNewKey(rawKey);
       setKeyForm(BLANK_KEY_FORM);
+      if (!activeAppKey) {
+        setStoredApiKey(rawKey);
+        setActiveAppKey(rawKey);
+      }
       loadApiKeys();
     } finally { setSavingKey(false); }
   };
@@ -139,6 +221,8 @@ export default function Settings() {
 
   const TABS: { id: TabId; label: string }[] = [
     { id: 'tags', label: 'Tag Management' },
+    { id: 'motivations', label: 'Motivations' },
+    { id: 'countries', label: 'Countries' },
     { id: 'risk', label: 'Risk Dashboard' },
     { id: 'audit', label: 'Audit Log' },
     { id: 'api_keys', label: 'API Keys' },
@@ -220,6 +304,133 @@ export default function Settings() {
           </div>
         )}
 
+        {/* ── Motivations ── */}
+        {activeTab === 'motivations' && (
+          <div className="max-w-2xl space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-4">
+                {editMotId !== null ? 'Edit Motivation' : 'Add Motivation'}
+              </h2>
+              {motError && (
+                <div className="mb-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{motError}</div>
+              )}
+              <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-3 items-end">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Name</label>
+                  <input value={motForm.name} onChange={e => setMotForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Espionage"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Color</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={motForm.color} onChange={e => setMotForm(f => ({ ...f, color: e.target.value }))}
+                      className="w-9 h-9 rounded border border-slate-700 bg-slate-800 cursor-pointer" />
+                    <input value={motForm.color} onChange={e => setMotForm(f => ({ ...f, color: e.target.value }))}
+                      className="w-24 px-2 py-2 bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 font-mono focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Description <span className="text-slate-600">(optional)</span></label>
+                  <input value={motForm.description} onChange={e => setMotForm(f => ({ ...f, description: e.target.value }))}
+                    placeholder="Brief description"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div className="flex gap-2">
+                  {editMotId !== null && (
+                    <button onClick={() => { setEditMotId(null); setMotForm({ name: '', color: '#6366f1', description: '' }); setMotError(''); }}
+                      className="px-3 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+                  )}
+                  <button onClick={saveMot} disabled={savingMot || !motForm.name.trim()}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
+                    {savingMot ? '...' : editMotId !== null ? 'Save' : 'Add'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {motivations.map(m => (
+                <div key={m.id} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl">
+                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
+                  <span className="text-xs px-2 py-0.5 rounded border font-medium flex-shrink-0"
+                    style={{ color: m.color, borderColor: m.color + '40', backgroundColor: m.color + '18' }}>
+                    {m.name}
+                  </span>
+                  <span className="font-mono text-xs" style={{ color: m.color }}>{m.color}</span>
+                  {m.description && <span className="text-xs text-slate-500 flex-1 truncate">{m.description}</span>}
+                  <button onClick={() => startEditMot(m)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 ml-auto">Edit</button>
+                  <button onClick={() => deleteMot(m.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
+                </div>
+              ))}
+              {motivations.length === 0 && (
+                <div className="text-sm text-slate-500 text-center py-8">No motivations yet. Add one above.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Countries ── */}
+        {activeTab === 'countries' && (
+          <div className="max-w-2xl space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-4">
+                {editCountryId !== null ? 'Edit Country' : 'Add Country'}
+              </h2>
+              {countryError && (
+                <div className="mb-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{countryError}</div>
+              )}
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Country Name</label>
+                  <input value={countryForm.name} onChange={e => setCountryForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Russia"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Color</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={countryForm.color} onChange={e => setCountryForm(f => ({ ...f, color: e.target.value }))}
+                      className="w-9 h-9 rounded border border-slate-700 bg-slate-800 cursor-pointer" />
+                    <input value={countryForm.color} onChange={e => setCountryForm(f => ({ ...f, color: e.target.value }))}
+                      className="w-24 px-2 py-2 bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 font-mono focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Flag <span className="text-slate-600">(emoji)</span></label>
+                  <input value={countryForm.flag} onChange={e => setCountryForm(f => ({ ...f, flag: e.target.value }))}
+                    placeholder="🇺🇸"
+                    className="w-20 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-lg text-center focus:outline-none focus:border-blue-500" />
+                </div>
+                <div className="flex gap-2">
+                  {editCountryId !== null && (
+                    <button onClick={() => { setEditCountryId(null); setCountryForm({ name: '', color: '#6366f1', flag: '' }); setCountryError(''); }}
+                      className="px-3 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+                  )}
+                  <button onClick={saveCountry} disabled={savingCountry || !countryForm.name.trim()}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
+                    {savingCountry ? '...' : editCountryId !== null ? 'Save' : 'Add'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {countries.map(c => (
+                <div key={c.id} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl">
+                  {c.flag && <span className="text-xl flex-shrink-0">{c.flag}</span>}
+                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
+                  <span className="text-sm font-medium text-slate-200 flex-1">{c.name}</span>
+                  <span className="font-mono text-xs" style={{ color: c.color }}>{c.color}</span>
+                  <button onClick={() => startEditCountry(c)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>
+                  <button onClick={() => deleteCountry(c.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
+                </div>
+              ))}
+              {countries.length === 0 && (
+                <div className="text-sm text-slate-500 text-center py-8">No countries yet. Add one above.</div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Risk Dashboard ── */}
         {activeTab === 'risk' && riskScore && (
           <div className="space-y-6 max-w-3xl">
@@ -287,7 +498,7 @@ export default function Settings() {
                     {new Date(entry.created_at).toLocaleString()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono text-blue-400">{entry.entity_type}</span>
                       <span className="text-xs text-slate-500">#{entry.entity_id}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
@@ -295,7 +506,14 @@ export default function Settings() {
                         entry.action.includes('create') || entry.action.includes('import') ? 'bg-emerald-500/10 text-emerald-400' :
                         'bg-slate-800 text-slate-400'
                       }`}>{entry.action}</span>
-                      <span className="text-xs text-slate-600">by {entry.actor}</span>
+                      <span className="text-xs text-slate-600">
+                        by <span className={entry.actor.startsWith('key:') ? 'text-amber-400' : 'text-slate-400'}>
+                          {entry.actor}
+                        </span>
+                      </span>
+                      {entry.source_ip && (
+                        <span className="text-xs text-slate-600 font-mono">from {entry.source_ip}</span>
+                      )}
                     </div>
                     {entry.changes && (
                       <div className="text-xs text-slate-600 mt-0.5 font-mono truncate">
@@ -369,11 +587,13 @@ export default function Settings() {
                     className={`px-3 py-2 text-xs rounded-lg border transition-colors ${keyCopied ? 'border-emerald-500 text-emerald-400' : 'border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'}`}>
                     {keyCopied ? 'Copied!' : 'Copy'}
                   </button>
-                  <button
-                    onClick={() => { setStoredApiKey(newKey); setActiveAppKey(newKey); setAppKeyInput(''); }}
-                    className="px-3 py-2 text-xs rounded-lg border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 transition-colors whitespace-nowrap">
-                    Use as app key
-                  </button>
+                  {activeAppKey !== newKey && (
+                    <button
+                      onClick={() => { setStoredApiKey(newKey!); setActiveAppKey(newKey!); setAppKeyInput(''); }}
+                      className="px-3 py-2 text-xs rounded-lg border border-blue-500/40 text-blue-400 hover:bg-blue-500/10 transition-colors whitespace-nowrap">
+                      Use as app key
+                    </button>
+                  )}
                 </div>
                 <button onClick={() => setNewKey(null)} className="mt-2 text-xs text-slate-500 hover:text-slate-300">Dismiss</button>
               </div>
@@ -381,7 +601,7 @@ export default function Settings() {
 
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <h2 className="text-sm font-medium text-slate-300 mb-4">Create API Key</h2>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Key Name</label>
                   <input value={keyForm.name} onChange={e => setKeyForm(f => ({ ...f, name: e.target.value }))}
@@ -389,26 +609,40 @@ export default function Settings() {
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Scopes</label>
-                  <div className="flex gap-2">
+                  <label className="text-xs text-slate-400 block mb-2">Scopes</label>
+                  <div className="space-y-2">
                     {SCOPES.map(scope => (
-                      <label key={scope} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer text-xs transition-colors ${
+                      <label key={scope} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
                         keyForm.scopes.includes(scope)
-                          ? 'border-blue-500/50 bg-blue-500/10 text-blue-300'
-                          : 'border-slate-700 text-slate-400 hover:border-slate-600'
+                          ? 'border-blue-500/50 bg-blue-500/10'
+                          : 'border-slate-700 hover:border-slate-600'
                       }`}>
-                        <input type="checkbox" checked={keyForm.scopes.includes(scope)} onChange={() => toggleScope(scope)} className="sr-only" />
-                        {scope}
+                        <input type="checkbox" checked={keyForm.scopes.includes(scope)} onChange={() => toggleScope(scope)} className="accent-blue-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <span className={`text-xs font-medium ${keyForm.scopes.includes(scope) ? 'text-blue-300' : 'text-slate-300'}`}>{scope}</span>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{SCOPE_DESC[scope]}</p>
+                        </div>
                       </label>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Expiry <span className="text-slate-600">(optional)</span></label>
-                  <input type="date" value={keyForm.expires_at} onChange={e => setKeyForm(f => ({ ...f, expires_at: e.target.value }))}
-                    className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                  <label className="text-xs text-slate-400 block mb-2">Expiry</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={keyForm.never_expires}
+                        onChange={e => setKeyForm(f => ({ ...f, never_expires: e.target.checked, expires_at: e.target.checked ? '' : f.expires_at }))}
+                        className="accent-blue-500" />
+                      <span className="text-xs text-slate-300">Never expires</span>
+                    </label>
+                    {!keyForm.never_expires && (
+                      <input type="date" value={keyForm.expires_at}
+                        onChange={e => setKeyForm(f => ({ ...f, expires_at: e.target.value }))}
+                        className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                    )}
+                  </div>
                 </div>
-                <button onClick={createKey} disabled={savingKey || !keyForm.name.trim()}
+                <button onClick={createKey} disabled={savingKey || !keyForm.name.trim() || keyForm.scopes.length === 0}
                   className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
                   {savingKey ? 'Creating...' : 'Create Key'}
                 </button>
@@ -418,25 +652,32 @@ export default function Settings() {
             <div className="space-y-2">
               <h2 className="text-sm font-medium text-slate-300">Active Keys ({apiKeys.length})</h2>
               {apiKeys.map(key => {
-                const scopes = Array.isArray(key.scopes) ? key.scopes : JSON.parse(key.scopes as any);
+                const scopes: string[] = Array.isArray(key.scopes) ? key.scopes : JSON.parse(key.scopes as any);
                 const expired = key.expires_at && new Date(key.expires_at) < new Date();
+                const scopeColor: Record<string, string> = {
+                  read:  'bg-slate-800 text-slate-400',
+                  write: 'bg-blue-500/10 text-blue-400',
+                  admin: 'bg-amber-500/10 text-amber-400',
+                };
                 return (
                   <div key={key.id} className={`px-4 py-3 bg-slate-900 border rounded-xl flex items-start gap-3 ${expired ? 'border-red-500/30' : 'border-slate-800'}`}>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-slate-200">{key.name}</span>
                         {expired && <span className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded">Expired</span>}
-                      </div>
-                      <div className="text-xs font-mono text-slate-500 mt-0.5">{key.masked_key}</div>
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
-                        <span>Created {new Date(key.created_at).toLocaleDateString()}</span>
-                        {key.last_used_at && <span>Last used {new Date(key.last_used_at).toLocaleDateString()}</span>}
-                        {key.expires_at && <span className={expired ? 'text-red-400' : ''}>Expires {new Date(key.expires_at).toLocaleDateString()}</span>}
                         <div className="flex gap-1">
                           {scopes.map((s: string) => (
-                            <span key={s} className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{s}</span>
+                            <span key={s} className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${scopeColor[s] ?? 'bg-slate-800 text-slate-400'}`}>{s}</span>
                           ))}
                         </div>
+                      </div>
+                      <div className="text-xs font-mono text-slate-500 mt-0.5">{key.masked_key}</div>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                        <span>Created {new Date(key.created_at).toLocaleDateString()}</span>
+                        {key.last_used_at && <span>Last used {new Date(key.last_used_at).toLocaleDateString()}</span>}
+                        {key.expires_at
+                          ? <span className={expired ? 'text-red-400' : 'text-slate-400'}>Expires {new Date(key.expires_at).toLocaleDateString()}</span>
+                          : <span className="text-emerald-500/70">Never expires</span>}
                       </div>
                     </div>
                     <button onClick={() => deleteKey(key.id)} disabled={deletingKeyId === key.id}
