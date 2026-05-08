@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getDb, logAudit } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, logAudit } from '../db/database';
 
 const router = Router();
 
@@ -14,62 +14,62 @@ const PURGEABLE: Record<string, { tables: string[]; label: string }> = {
   tools: { tables: ['tool_d3fend', 'tool_mitigations', 'tools'], label: 'Tools' },
 };
 
-router.get('/purgeable', (_req, res) => {
-  const db = getDb();
-  const summary: Record<string, number> = {};
-  const countQueries: Record<string, string> = {
-    detections: 'SELECT COUNT(*) as c FROM detections',
-    audit: 'SELECT COUNT(*) as c FROM audit_log',
-    snapshots: 'SELECT COUNT(*) as c FROM coverage_snapshots',
-    comments: 'SELECT COUNT(*) as c FROM comments',
-    assignments: 'SELECT COUNT(*) as c FROM assignments',
-    threat_groups: 'SELECT COUNT(*) as c FROM threat_groups',
-    tags: 'SELECT COUNT(*) as c FROM tags',
-    tools: 'SELECT COUNT(*) as c FROM tools',
-  };
-  for (const [key, q] of Object.entries(countQueries)) {
-    summary[key] = (db.prepare(q).get() as any).c;
-  }
-  res.json({ datasets: Object.entries(PURGEABLE).map(([key, cfg]) => ({
-    key, label: cfg.label, count: summary[key] ?? 0,
-  }))});
+const COUNT_QUERIES: Record<string, string> = {
+  detections: 'SELECT COUNT(*) as c FROM detections',
+  audit: 'SELECT COUNT(*) as c FROM audit_log',
+  snapshots: 'SELECT COUNT(*) as c FROM coverage_snapshots',
+  comments: 'SELECT COUNT(*) as c FROM comments',
+  assignments: 'SELECT COUNT(*) as c FROM assignments',
+  threat_groups: 'SELECT COUNT(*) as c FROM threat_groups',
+  tags: 'SELECT COUNT(*) as c FROM tags',
+  tools: 'SELECT COUNT(*) as c FROM tools',
+};
+
+router.get('/purgeable', async (_req, res) => {
+  const db = getKnex();
+  const counts = await Promise.all(
+    Object.entries(COUNT_QUERIES).map(async ([key, q]) => {
+      const row = await rawGet<{ c: number }>(db, q) as any;
+      return [key, row.c] as [string, number];
+    })
+  );
+  const summary = Object.fromEntries(counts);
+  res.json({ datasets: Object.entries(PURGEABLE).map(([key, cfg]) => ({ key, label: cfg.label, count: summary[key] ?? 0 })) });
 });
 
-router.delete('/purge/:dataset', (req, res) => {
+router.delete('/purge/:dataset', async (req, res) => {
   const cfg = PURGEABLE[req.params.dataset];
   if (!cfg) return res.status(400).json({ error: 'Unknown dataset' });
-
-  const db = getDb();
+  const db = getKnex();
   let totalDeleted = 0;
-
-  db.transaction(() => {
+  await db.transaction(async trx => {
     for (const table of cfg.tables) {
-      const result = db.prepare(`DELETE FROM ${table}`).run() as any;
-      totalDeleted += result.changes;
+      const rows = await rawAll(trx, `SELECT COUNT(*) as c FROM ${table}`);
+      totalDeleted += (rows[0] as any).c;
+      await rawRun(trx, `DELETE FROM ${table}`);
     }
-    logAudit(db, 'admin', req.params.dataset, 'purge', (req as any).actor ?? 'user', { dataset: req.params.dataset, rows_deleted: totalDeleted }, (req as any).sourceIp);
-  })();
-
+    await logAudit(trx, 'admin', req.params.dataset, 'purge', (req as any).actor ?? 'user',
+      { dataset: req.params.dataset, rows_deleted: totalDeleted }, (req as any).sourceIp);
+  });
   res.json({ purged: req.params.dataset, rows_deleted: totalDeleted });
 });
 
-router.delete('/purge-all', (req, res) => {
-  const db = getDb();
+router.delete('/purge-all', async (req, res) => {
+  const db = getKnex();
   let totalDeleted = 0;
-
-  db.transaction(() => {
-    const orderedTables = [
-      'entity_tags', 'tool_d3fend', 'tool_mitigations', 'group_techniques',
-      'detections', 'tools', 'threat_groups', 'tags', 'comments',
-      'assignments', 'coverage_snapshots', 'audit_log',
-    ];
+  const orderedTables = [
+    'entity_tags', 'tool_d3fend', 'tool_mitigations', 'group_techniques',
+    'detections', 'tools', 'threat_groups', 'tags', 'comments',
+    'assignments', 'coverage_snapshots', 'audit_log',
+  ];
+  await db.transaction(async trx => {
     for (const table of orderedTables) {
-      const result = db.prepare(`DELETE FROM ${table}`).run() as any;
-      totalDeleted += result.changes;
+      const rows = await rawAll(trx, `SELECT COUNT(*) as c FROM ${table}`);
+      totalDeleted += (rows[0] as any).c;
+      await rawRun(trx, `DELETE FROM ${table}`);
     }
-    logAudit(db, 'admin', 'all', 'purge_all', (req as any).actor ?? 'user', { rows_deleted: totalDeleted }, (req as any).sourceIp);
-  })();
-
+    await logAudit(trx, 'admin', 'all', 'purge_all', (req as any).actor ?? 'user', { rows_deleted: totalDeleted }, (req as any).sourceIp);
+  });
   res.json({ purged: 'all', rows_deleted: totalDeleted });
 });
 

@@ -1,8 +1,9 @@
 import type {
-  ApiKey, Assignment, AuditLogEntry, Comment, ComplianceFramework, CoverageSnapshot, CoverageStats,
-  Country, Detection, D3FendTechnique, ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation,
-  Procedure, ProcedureType, RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique,
-  ThreatGroup, ThreatGroupDetail, Tool, ToolDetail,
+  ApiKey, ArtResult, ArtTest, Assignment, AttackVersion, AuditLogEntry, Comment, ComplianceFramework,
+  CoverageSnapshot, CoverageStats, Country, DataSource, Detection, D3FendTechnique, ExecutiveReport,
+  GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
+  RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
+  Tool, ToolDetail, User,
 } from './types';
 
 const BASE = '/api';
@@ -18,12 +19,16 @@ export function clearStoredApiKey(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+let _jwtToken: string | null = null;
+export function setJwtToken(token: string | null) { _jwtToken = token; }
+export function getJwtToken(): string | null { return _jwtToken; }
+
 let _authErrorHandler: (() => void) | null = null;
 export function onAuthError(fn: () => void) { _authErrorHandler = fn; }
 
 function authHeaders(): Record<string, string> {
-  const key = getStoredApiKey();
-  return key ? { Authorization: `Bearer ${key}` } : {};
+  const token = _jwtToken ?? getStoredApiKey();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 function handleUnauth(status: number) {
@@ -201,8 +206,53 @@ export const api = {
   parseSigmaRule: (rule_text: string) => post<SigmaParseResult>('/sigma/parse', { rule_text }),
   importSigmaRules: (rules: string[]) => post<{ imported: number; skipped: number; detection_ids: number[] }>('/sigma/import', { rules }),
 
+  // Auth
+  login: (email: string, password: string) => post<{ token: string; user: User }>('/auth/login', { email, password }),
+  logout: () => fetch(`${BASE}/auth/logout`, { method: 'POST', credentials: 'include', headers: authHeaders() }),
+  refreshToken: () => fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' }).then(r => r.ok ? r.json() as Promise<{ token: string }> : null),
+  getMe: () => get<User>('/auth/me'),
+  getOidcProviders: () => get<OidcProvider[]>('/auth/oidc/providers'),
+  getOidcLoginUrl: (slug: string) => `${BASE}/auth/oidc/${slug}`,
+  createOidcProvider: (data: { name: string; slug: string; issuer_url: string; client_id: string; client_secret: string; enabled?: boolean }) => post<OidcProvider>('/auth/oidc/providers', data),
+  updateOidcProvider: (id: number, data: { name?: string; slug?: string; issuer_url?: string; client_id?: string; client_secret?: string; enabled?: boolean }) => put<OidcProvider>(`/auth/oidc/providers/${id}`, data),
+  deleteOidcProvider: (id: number) => del(`/auth/oidc/providers/${id}`),
+
+  // Users (admin)
+  getUsers: () => get<User[]>('/users'),
+  createUser: (data: { email: string; name?: string; password: string; role?: string }) => post<User>('/users', data),
+  updateUser: (id: number, data: { name?: string; role?: string; is_active?: boolean }) => put<User>(`/users/${id}`, data),
+  deleteUser: (id: number) => del(`/users/${id}`),
+  resetUserPassword: (id: number, password: string) => post<{ message: string }>(`/users/${id}/reset-password`, { password }),
+
+  // Data Sources
+  getDataSources: () => get<DataSource[]>('/data-sources'),
+  createDataSource: (data: { name: string; category: string; description?: string }) => post<DataSource>('/data-sources', data),
+  updateDataSource: (id: number, data: { name?: string; category?: string; description?: string }) => put<DataSource>(`/data-sources/${id}`, data),
+  deleteDataSource: (id: number) => del(`/data-sources/${id}`),
+  getDataSourceTechniques: (id: number) => get<any[]>(`/data-sources/${id}/techniques`),
+  addDataSourceTechnique: (id: number, technique_id: string) => post<{ ok: boolean }>(`/data-sources/${id}/techniques`, { technique_id }),
+  removeDataSourceTechnique: (id: number, technique_id: string) => del(`/data-sources/${id}/techniques/${technique_id}`),
+  updateDataSourceStatus: (id: number, data: { status?: string; collection_method?: string; notes?: string }) => put<DataSource>(`/data-sources/${id}/status`, data),
+  getTechniqueDataSources: (technique_id: string) => get<DataSource[]>(`/data-sources/technique/${technique_id}`),
+  getDataSourceAnalysis: () => get<{ total_gaps: number; gaps: any[] }>('/data-sources/analysis'),
+
+  // ATT&CK Version
+  getAttackVersion: () => get<AttackVersion>('/attack/version'),
+  getDeprecatedTechniques: () => get<any[]>('/attack/deprecated'),
+  getMigrationScan: () => get<any>('/attack/migration-scan'),
+
+  // Atomic Red Team
+  getArtTests: () => get<ArtTest[]>('/atomic/tests'),
+  getArtTestsForTechnique: (technique_id: string) => get<ArtTest[]>(`/atomic/tests/${technique_id}`),
+  getArtCoverage: () => get<any>('/atomic/coverage'),
+  createArtResult: (data: { detection_id: number; art_test_id: number; status?: string; notes?: string; run_by?: string }) => post<ArtResult>('/atomic/results', data),
+  updateArtResult: (id: number, data: { status?: string; notes?: string; run_by?: string }) => put<ArtResult>(`/atomic/results/${id}`, data),
+  deleteArtResult: (id: number) => del(`/atomic/results/${id}`),
+  importArtYaml: (yaml: string) => post<{ imported: number; skipped: number; total: number }>('/atomic/import', { yaml }),
+
   // Exports (returns URLs to navigate to directly)
   getExportUrl: (type: 'navigator' | 'detections/csv' | 'tools/csv' | 'coverage/json') => `${BASE}/exports/${type}`,
+  getPptxExportUrl: () => `${BASE}/exports/report/pptx`,
 
   // Reports
   getExecutiveReport: () => get<ExecutiveReport>('/reports/executive'),

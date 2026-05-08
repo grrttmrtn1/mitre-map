@@ -285,6 +285,66 @@ export interface ApiKey {
   expires_at: string | null;
 }
 
+export interface User {
+  id: number;
+  email: string;
+  name: string | null;
+  role: 'admin' | 'analyst' | 'readonly';
+  is_active: number;
+  created_at: string;
+  last_login: string | null;
+}
+
+export interface OidcProvider {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface DataSource {
+  id: number;
+  name: string;
+  category: string;
+  description: string | null;
+  org_status: 'collecting' | 'partial' | 'not_collecting' | null;
+  collection_method: string | null;
+  org_notes: string | null;
+  technique_count: number;
+}
+
+export interface ArtTest {
+  id: number;
+  technique_id: string;
+  technique_name: string;
+  test_guid: string;
+  name: string;
+  description: string | null;
+  platform: string;
+  executor_type: string;
+  auto_generated_command: string | null;
+}
+
+export interface ArtResult {
+  id: number;
+  detection_id: number;
+  art_test_id: number;
+  status: 'untested' | 'tested' | 'validated' | 'failed';
+  run_at: string | null;
+  run_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AttackVersion {
+  id: number;
+  version: string;
+  name: string;
+  released_at: string;
+  notes: string | null;
+  is_active: number;
+}
+
 export interface ExecutiveReport {
   generated_at: string;
   summary: {

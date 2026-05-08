@@ -8,13 +8,28 @@ import CoverageBar from '../components/CoverageBar';
 export default function Dashboard() {
   const [stats, setStats] = useState<CoverageStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    api.getCoverageStats().then(setStats).finally(() => setLoading(false));
-  }, []);
+  const load = () => {
+    setLoading(true);
+    setError(false);
+    api.getCoverageStats()
+      .then(data => { setStats(data); setError(false); })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
 
   if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Loading...</div>;
-  if (!stats) return <div className="p-8 text-red-400">Failed to load coverage data.</div>;
+  if (error || !stats) return (
+    <div className="flex flex-col items-center justify-center h-full gap-4">
+      <div className="text-red-400 text-sm">Failed to load coverage data.</div>
+      <button onClick={load} className="px-4 py-2 text-sm bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">
+        Retry
+      </button>
+    </div>
+  );
 
   const kpis = [
     { label: 'Overall Coverage', value: `${stats.coverage_pct}%`, sub: `${stats.covered_techniques} / ${stats.total_techniques} techniques`, color: 'text-blue-400', bg: 'border-blue-500/20 bg-blue-500/5' },

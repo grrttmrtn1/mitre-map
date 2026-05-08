@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api, getStoredApiKey, setStoredApiKey, clearStoredApiKey } from '../api';
-import type { Country, Motivation, Tag, AuditLogEntry, ApiKey } from '../types';
+import type { Country, Motivation, Tag, AuditLogEntry, ApiKey, User, AttackVersion } from '../types';
+import { useAuth } from '../context/AuthContext';
 
-type TabId = 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data';
+const ROLE_INFO: Record<string, { label: string; description: string; color: string }> = {
+  readonly:  { label: 'Read Only',  description: 'View all data — cannot create, edit, or delete anything.', color: 'text-slate-400 bg-slate-800 border-slate-700' },
+  analyst:   { label: 'Analyst',    description: 'Create and edit detections, tools, threat groups, tags, and comments. Cannot manage users or API keys.', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
+  admin:     { label: 'Admin',      description: 'Full access — includes user management, API key management, data purge, and all write operations.', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
+};
+
+type TabId = 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data' | 'users' | 'attack_version' | 'sso';
 
 const SCOPES = ['read', 'write', 'admin'];
 const SCOPE_DESC: Record<string, string> = {
@@ -13,6 +20,39 @@ const SCOPE_DESC: Record<string, string> = {
 const BLANK_KEY_FORM = { name: '', scopes: ['read'] as string[], expires_at: '', never_expires: true };
 
 export default function Settings() {
+  const { user: currentUser, canWrite, canAdmin } = useAuth();
+  // Show admin tabs if logged in as admin OR using API key mode (no user — server enforces auth)
+  const isAdmin = canAdmin;
+
+  // Users state
+  const [users, setUsers] = useState<User[]>([]);
+  const [userForm, setUserForm] = useState({ email: '', name: '', password: '', role: 'analyst' });
+  const [userError, setUserError] = useState('');
+  const [savingUser, setSavingUser] = useState(false);
+  const [savingRoleId, setSavingRoleId] = useState<number | null>(null);
+
+  // ATT&CK Version state
+  const [attackVersion, setAttackVersion] = useState<AttackVersion | null>(null);
+  const [deprecated, setDeprecated] = useState<any[]>([]);
+  const [migrationScan, setMigrationScan] = useState<any | null>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+
+  // OIDC providers state
+  const [oidcProviders, setOidcProviders] = useState<any[]>([]);
+  const [oidcForm, setOidcForm] = useState({ name: '', slug: '', issuer_url: '', client_id: '', client_secret: '', enabled: true });
+  const [editOidcId, setEditOidcId] = useState<number | null>(null);
+  const [savingOidc, setSavingOidc] = useState(false);
+  const [oidcError, setOidcError] = useState('');
+  const BLANK_OIDC = { name: '', slug: '', issuer_url: '', client_id: '', client_secret: '', enabled: true };
+
+  const loadOidcProviders = () => api.getOidcProviders().then(setOidcProviders).catch(() => {});
+
+  const loadUsers = () => api.getUsers().then(setUsers).catch(() => {});
+  const loadAttackVersion = () => {
+    api.getAttackVersion().then(setAttackVersion).catch(() => {});
+    api.getDeprecatedTechniques().then(setDeprecated).catch(() => {});
+  };
+
   const [tags, setTags] = useState<Tag[]>([]);
   const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
   const [auditTotal, setAuditTotal] = useState(0);
@@ -68,7 +108,8 @@ export default function Settings() {
 
   useEffect(() => {
     loadTags(); loadMotivations(); loadCountries(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets();
-  }, []);
+    if (isAdmin) { loadUsers(); loadAttackVersion(); loadOidcProviders(); }
+  }, [isAdmin]);
 
   // ── Tag actions ─────────────────────────────────────────────────────────────
   const saveTag = async () => {
@@ -219,7 +260,7 @@ export default function Settings() {
     } finally { setPurging(false); }
   };
 
-  const TABS: { id: TabId; label: string }[] = [
+  const ALL_TABS: { id: TabId; label: string; adminOnly?: boolean; disabled?: boolean }[] = [
     { id: 'tags', label: 'Tag Management' },
     { id: 'motivations', label: 'Motivations' },
     { id: 'countries', label: 'Countries' },
@@ -227,7 +268,11 @@ export default function Settings() {
     { id: 'audit', label: 'Audit Log' },
     { id: 'api_keys', label: 'API Keys' },
     { id: 'data', label: 'Data Management' },
+    { id: 'users', label: 'Users', adminOnly: true, disabled: true },
+    { id: 'sso', label: 'SSO / OIDC', adminOnly: true, disabled: true },
+    { id: 'attack_version', label: 'ATT&CK Version', adminOnly: true },
   ];
+  const TABS = ALL_TABS.filter(t => !t.adminOnly || isAdmin);
 
   const riskLevelColor: Record<string, string> = {
     critical: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-emerald-400',
@@ -239,9 +284,18 @@ export default function Settings() {
         <h1 className="text-xl font-semibold text-slate-100">Settings &amp; Administration</h1>
         <div className="flex gap-1 mt-4 flex-wrap">
           {TABS.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTab === tab.id ? 'bg-blue-600/20 text-blue-400 font-medium' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
-              {tab.label}
+            <button key={tab.id}
+              onClick={() => !tab.disabled && setActiveTab(tab.id)}
+              disabled={tab.disabled}
+              title={tab.disabled ? 'Under construction' : undefined}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                tab.disabled
+                  ? 'text-slate-600 cursor-not-allowed opacity-60'
+                  : activeTab === tab.id
+                    ? 'bg-blue-600/20 text-blue-400 font-medium'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}>
+              {tab.label}{tab.disabled && <span className="ml-1 text-[10px] text-amber-600/80">🚧</span>}
             </button>
           ))}
         </div>
@@ -252,7 +306,7 @@ export default function Settings() {
         {/* ── Tag Management ── */}
         {activeTab === 'tags' && (
           <div className="max-w-2xl space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            {canWrite && <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <h2 className="text-sm font-medium text-slate-300 mb-4">{editTagId !== null ? 'Edit Tag' : 'Create Tag'}</h2>
               <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-3 items-end">
                 <div>
@@ -287,7 +341,7 @@ export default function Settings() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>}
             <div className="space-y-2">
               {tags.map(tag => (
                 <div key={tag.id} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl">
@@ -295,11 +349,11 @@ export default function Settings() {
                   <span className="text-sm font-medium text-slate-200 flex-1">{tag.name}</span>
                   {tag.description && <span className="text-xs text-slate-500 flex-1 truncate">{tag.description}</span>}
                   <span className="font-mono text-xs" style={{ color: tag.color }}>{tag.color}</span>
-                  <button onClick={() => startEditTag(tag)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>
-                  <button onClick={() => deleteTag(tag.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
+                  {canWrite && <button onClick={() => startEditTag(tag)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>}
+                  {canWrite && <button onClick={() => deleteTag(tag.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
                 </div>
               ))}
-              {tags.length === 0 && <div className="text-sm text-slate-500 text-center py-8">No tags yet. Create one above.</div>}
+              {tags.length === 0 && <div className="text-sm text-slate-500 text-center py-8">No tags yet.{canWrite ? ' Create one above.' : ''}</div>}
             </div>
           </div>
         )}
@@ -307,7 +361,7 @@ export default function Settings() {
         {/* ── Motivations ── */}
         {activeTab === 'motivations' && (
           <div className="max-w-2xl space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            {canWrite && <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <h2 className="text-sm font-medium text-slate-300 mb-4">
                 {editMotId !== null ? 'Edit Motivation' : 'Add Motivation'}
               </h2>
@@ -347,7 +401,7 @@ export default function Settings() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>}
             <div className="space-y-2">
               {motivations.map(m => (
                 <div key={m.id} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl">
@@ -358,12 +412,12 @@ export default function Settings() {
                   </span>
                   <span className="font-mono text-xs" style={{ color: m.color }}>{m.color}</span>
                   {m.description && <span className="text-xs text-slate-500 flex-1 truncate">{m.description}</span>}
-                  <button onClick={() => startEditMot(m)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 ml-auto">Edit</button>
-                  <button onClick={() => deleteMot(m.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
+                  {canWrite && <button onClick={() => startEditMot(m)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 ml-auto">Edit</button>}
+                  {canWrite && <button onClick={() => deleteMot(m.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
                 </div>
               ))}
               {motivations.length === 0 && (
-                <div className="text-sm text-slate-500 text-center py-8">No motivations yet. Add one above.</div>
+                <div className="text-sm text-slate-500 text-center py-8">No motivations yet.{canWrite ? ' Add one above.' : ''}</div>
               )}
             </div>
           </div>
@@ -372,7 +426,7 @@ export default function Settings() {
         {/* ── Countries ── */}
         {activeTab === 'countries' && (
           <div className="max-w-2xl space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            {canWrite && <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <h2 className="text-sm font-medium text-slate-300 mb-4">
                 {editCountryId !== null ? 'Edit Country' : 'Add Country'}
               </h2>
@@ -412,7 +466,7 @@ export default function Settings() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>}
             <div className="space-y-2">
               {countries.map(c => (
                 <div key={c.id} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl">
@@ -420,12 +474,12 @@ export default function Settings() {
                   <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
                   <span className="text-sm font-medium text-slate-200 flex-1">{c.name}</span>
                   <span className="font-mono text-xs" style={{ color: c.color }}>{c.color}</span>
-                  <button onClick={() => startEditCountry(c)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>
-                  <button onClick={() => deleteCountry(c.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
+                  {canWrite && <button onClick={() => startEditCountry(c)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>}
+                  {canWrite && <button onClick={() => deleteCountry(c.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
                 </div>
               ))}
               {countries.length === 0 && (
-                <div className="text-sm text-slate-500 text-center py-8">No countries yet. Add one above.</div>
+                <div className="text-sm text-slate-500 text-center py-8">No countries yet.{canWrite ? ' Add one above.' : ''}</div>
               )}
             </div>
           </div>
@@ -599,7 +653,7 @@ export default function Settings() {
               </div>
             )}
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            {canAdmin && <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <h2 className="text-sm font-medium text-slate-300 mb-4">Create API Key</h2>
               <div className="space-y-4">
                 <div>
@@ -647,7 +701,7 @@ export default function Settings() {
                   {savingKey ? 'Creating...' : 'Create Key'}
                 </button>
               </div>
-            </div>
+            </div>}
 
             <div className="space-y-2">
               <h2 className="text-sm font-medium text-slate-300">Active Keys ({apiKeys.length})</h2>
@@ -680,14 +734,14 @@ export default function Settings() {
                           : <span className="text-emerald-500/70">Never expires</span>}
                       </div>
                     </div>
-                    <button onClick={() => deleteKey(key.id)} disabled={deletingKeyId === key.id}
+                    {canAdmin && <button onClick={() => deleteKey(key.id)} disabled={deletingKeyId === key.id}
                       className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10 disabled:opacity-50 flex-shrink-0">
                       {deletingKeyId === key.id ? '...' : 'Revoke'}
-                    </button>
+                    </button>}
                   </div>
                 );
               })}
-              {apiKeys.length === 0 && <div className="text-sm text-slate-500 text-center py-6">No API keys. Create one above.</div>}
+              {apiKeys.length === 0 && <div className="text-sm text-slate-500 text-center py-6">No API keys.{canAdmin ? ' Create one above.' : ''}</div>}
             </div>
           </div>
         )}
@@ -733,6 +787,308 @@ export default function Settings() {
                 Purge All Data
               </button>
             </div>
+          </div>
+        )}
+
+        {/* ── Under Construction ── */}
+        {(activeTab === 'users' || activeTab === 'sso') && (
+          <div className="max-w-lg flex flex-col items-center justify-center py-20 text-center">
+            <div className="text-4xl mb-4">🚧</div>
+            <h2 className="text-lg font-semibold text-slate-300 mb-2">Under Construction</h2>
+            <p className="text-sm text-slate-500">
+              {activeTab === 'users' ? 'User management' : 'SSO / OIDC configuration'} is not yet available.
+            </p>
+          </div>
+        )}
+
+        {/* ── Users (disabled) ── */}
+        {false && activeTab === 'users' && (
+          <div className="max-w-3xl space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-4">Create User</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Email</label>
+                  <input value={userForm.email} onChange={e => setUserForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="user@example.com" type="email"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Name (optional)</label>
+                  <input value={userForm.name} onChange={e => setUserForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Display name"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Password</label>
+                  <input value={userForm.password} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))}
+                    type="password" placeholder="Min 8 characters"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Role</label>
+                  <select value={userForm.role} onChange={e => setUserForm(f => ({ ...f, role: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                    <option value="readonly">Read Only</option>
+                    <option value="analyst">Analyst</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  {userForm.role && ROLE_INFO[userForm.role] && (
+                    <p className="mt-1.5 text-[11px] text-slate-500">{ROLE_INFO[userForm.role].description}</p>
+                  )}
+                </div>
+              </div>
+              {userError && <p className="text-red-400 text-xs mt-2">{userError}</p>}
+              <button
+                onClick={async () => {
+                  if (!userForm.email || !userForm.password) return;
+                  setSavingUser(true); setUserError('');
+                  try {
+                    await api.createUser(userForm);
+                    setUserForm({ email: '', name: '', password: '', role: 'analyst' });
+                    loadUsers();
+                  } catch (e: any) { setUserError(e.message ?? 'Failed'); }
+                  finally { setSavingUser(false); }
+                }}
+                disabled={savingUser}
+                className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:opacity-50">
+                {savingUser ? 'Creating…' : 'Create User'}
+              </button>
+            </div>
+
+            {/* Role reference */}
+            <div className="grid grid-cols-3 gap-3">
+              {Object.entries(ROLE_INFO).map(([role, info]) => (
+                <div key={role} className={`rounded-xl px-4 py-3 border text-xs ${info.color}`}>
+                  <div className="font-semibold mb-0.5">{info.label}</div>
+                  <div className="opacity-70">{info.description}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              {users.map(u => {
+                const ri = ROLE_INFO[u.role];
+                return (
+                  <div key={u.id} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm text-slate-200 font-medium">{u.name ?? u.email}</span>
+                        {u.name && <span className="text-xs text-slate-500">{u.email}</span>}
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded border font-medium ${ri?.color ?? 'text-slate-400 bg-slate-800 border-slate-700'}`}>
+                          {ri?.label ?? u.role}
+                        </span>
+                        {!u.is_active && <span className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded">Inactive</span>}
+                        {u.id === currentUser?.id && <span className="text-[11px] text-slate-600">(you)</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select
+                        value={u.role}
+                        disabled={savingRoleId === u.id || u.id === currentUser?.id}
+                        onChange={async e => {
+                          const newRole = e.target.value;
+                          setSavingRoleId(u.id);
+                          try { await api.updateUser(u.id, { role: newRole }); loadUsers(); }
+                          finally { setSavingRoleId(null); }
+                        }}
+                        className="text-xs px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={u.id === currentUser?.id ? "You cannot change your own role" : "Change role"}>
+                        <option value="readonly">Read Only</option>
+                        <option value="analyst">Analyst</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <button
+                        onClick={async () => { await api.updateUser(u.id, { is_active: !u.is_active }); loadUsers(); }}
+                        disabled={u.id === currentUser?.id}
+                        className="text-xs px-2.5 py-1 border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={u.id === currentUser?.id ? "You cannot deactivate yourself" : ""}>
+                        {u.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const pw = prompt('New password (min 8 chars):');
+                          if (!pw || pw.length < 8) return;
+                          await api.resetUserPassword(u.id, pw);
+                          alert('Password reset. All sessions invalidated.');
+                        }}
+                        className="text-xs px-2.5 py-1 border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors">
+                        Reset PW
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {users.length === 0 && <p className="text-slate-500 text-sm">No users yet.</p>}
+            </div>
+          </div>
+        )}
+
+        {/* ── SSO / OIDC (disabled) ── */}
+        {false && activeTab === 'sso' && (
+          <div className="max-w-3xl space-y-6">
+            <div className="text-xs text-slate-400 bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+              <div className="text-sm font-medium text-slate-300 mb-2">Single Sign-On</div>
+              <p>MitreMap supports OIDC (OpenID Connect) for SSO. Configured providers appear on the login page and auto-provision users on first sign-in.</p>
+              <p className="text-slate-500">SAML 2.0 is not currently supported. Use OIDC-compatible IdPs (Entra ID, Okta, Google Workspace, Keycloak, etc.).</p>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-4">
+                {editOidcId !== null ? 'Edit OIDC Provider' : 'Add OIDC Provider'}
+              </h2>
+              {oidcError && (
+                <div className="mb-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{oidcError}</div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Display Name</label>
+                  <input value={oidcForm.name} onChange={e => setOidcForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Okta, Azure AD"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Slug (URL-safe ID)</label>
+                  <input value={oidcForm.slug} onChange={e => setOidcForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))}
+                    placeholder="e.g. okta, azure-ad"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-400 block mb-1">Issuer URL</label>
+                  <input value={oidcForm.issuer_url} onChange={e => setOidcForm(f => ({ ...f, issuer_url: e.target.value }))}
+                    placeholder="https://your-idp.example.com"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Client ID</label>
+                  <input value={oidcForm.client_id} onChange={e => setOidcForm(f => ({ ...f, client_id: e.target.value }))}
+                    placeholder="Client ID from your IdP"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Client Secret</label>
+                  <input value={oidcForm.client_secret} onChange={e => setOidcForm(f => ({ ...f, client_secret: e.target.value }))}
+                    type="password" placeholder="Client secret"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-400 block mb-1">Callback URL (configure in your IdP)</label>
+                  <div className="px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-xs font-mono text-slate-400 select-all">
+                    {window.location.origin}/api/auth/oidc/{oidcForm.slug || '<slug>'}/callback
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                {editOidcId !== null && (
+                  <button onClick={() => { setEditOidcId(null); setOidcForm(BLANK_OIDC); setOidcError(''); }}
+                    className="px-3 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+                )}
+                <button
+                  onClick={async () => {
+                    if (!oidcForm.name || !oidcForm.slug || !oidcForm.issuer_url || !oidcForm.client_id || !oidcForm.client_secret) {
+                      setOidcError('All fields are required.'); return;
+                    }
+                    setSavingOidc(true); setOidcError('');
+                    try {
+                      if (editOidcId !== null) {
+                        await api.updateOidcProvider(editOidcId, oidcForm);
+                      } else {
+                        await api.createOidcProvider(oidcForm);
+                      }
+                      setOidcForm(BLANK_OIDC); setEditOidcId(null);
+                      loadOidcProviders();
+                    } catch (e: any) { setOidcError(e.message ?? 'Save failed'); }
+                    finally { setSavingOidc(false); }
+                  }}
+                  disabled={savingOidc}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
+                  {savingOidc ? 'Saving…' : editOidcId !== null ? 'Save Changes' : 'Add Provider'}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-sm font-medium text-slate-300">Configured Providers ({oidcProviders.length})</h2>
+              {oidcProviders.map((p: any) => (
+                <div key={p.id} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-200">{p.name}</div>
+                    <div className="text-xs font-mono text-slate-500">{p.slug} · {p.issuer_url}</div>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded border ${p.enabled ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-slate-500 border-slate-700 bg-slate-800'}`}>
+                    {p.enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                  <button
+                    onClick={() => { setEditOidcId(p.id); setOidcForm({ name: p.name, slug: p.slug, issuer_url: p.issuer_url, client_id: p.client_id, client_secret: '', enabled: !!p.enabled }); setOidcError(''); }}
+                    className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Delete "${p.name}"?`)) return;
+                      await api.deleteOidcProvider(p.id);
+                      loadOidcProviders();
+                    }}
+                    className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
+                </div>
+              ))}
+              {oidcProviders.length === 0 && (
+                <div className="text-sm text-slate-500 text-center py-6">No OIDC providers configured. Add one above to enable SSO.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── ATT&CK Version ── */}
+        {activeTab === 'attack_version' && (
+          <div className="max-w-3xl space-y-6">
+            {attackVersion && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <h2 className="text-sm font-medium text-slate-300 mb-3">Current Active Version</h2>
+                <div className="text-2xl font-bold text-indigo-400">{attackVersion.name}</div>
+                <div className="text-slate-400 text-sm mt-1">Released {attackVersion.released_at}</div>
+                {attackVersion.notes && <div className="text-slate-500 text-xs mt-1">{attackVersion.notes}</div>}
+              </div>
+            )}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-medium text-slate-300">Migration Scan</h2>
+                <button
+                  onClick={async () => { setScanLoading(true); try { setMigrationScan(await api.getMigrationScan()); } finally { setScanLoading(false); } }}
+                  disabled={scanLoading}
+                  className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50">
+                  {scanLoading ? 'Scanning…' : 'Run Scan'}
+                </button>
+              </div>
+              <p className="text-slate-500 text-xs mb-3">Scans all detections for deprecated technique IDs from the current ATT&CK version.</p>
+              {migrationScan && (
+                migrationScan.needs_update?.length === 0
+                  ? <p className="text-green-400 text-sm">All detections use current technique IDs.</p>
+                  : (
+                    <div className="space-y-2">
+                      <p className="text-yellow-400 text-sm">{migrationScan.needs_update?.length ?? 0} detection(s) reference deprecated techniques:</p>
+                      {(migrationScan.needs_update ?? []).map((d: any) => (
+                        <div key={d.detection_id} className="bg-slate-800 rounded-lg px-3 py-2 text-xs">
+                          <span className="text-slate-300 font-medium">{d.detection_name}</span>
+                          <span className="text-red-400 ml-2">{d.deprecated_ids?.join(', ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+              )}
+            </div>
+            {deprecated.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <h2 className="text-sm font-medium text-slate-300 mb-3">Deprecated Techniques ({deprecated.length})</h2>
+                <div className="space-y-1 max-h-64 overflow-y-auto">
+                  {deprecated.map((d: any) => (
+                    <div key={d.technique_id} className="flex items-center gap-3 text-xs py-1">
+                      <span className="font-mono text-red-400">{d.technique_id}</span>
+                      {d.superseded_by && <span className="text-slate-400">→ <span className="font-mono text-indigo-400">{d.superseded_by}</span></span>}
+                      {d.reason && <span className="text-slate-500">{d.reason}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -781,6 +1137,7 @@ export default function Settings() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

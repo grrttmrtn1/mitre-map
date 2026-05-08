@@ -1,103 +1,77 @@
 import { Router } from 'express';
-import { getDb, logAudit } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
 
 const router = Router();
 
-router.get('/', (_req, res) => {
-  const db = getDb();
-  const tools = db.prepare('SELECT * FROM tools ORDER BY category, name').all() as any[];
-
-  const withCoverage = tools.map(tool => {
-    const d3fendCount = (db.prepare('SELECT COUNT(*) as c FROM tool_d3fend WHERE tool_id = ?').get(tool.id) as any).c;
-    const mitigationCount = (db.prepare('SELECT COUNT(*) as c FROM tool_mitigations WHERE tool_id = ?').get(tool.id) as any).c;
-    return { ...tool, d3fend_count: d3fendCount, mitigation_count: mitigationCount };
-  });
-
+router.get('/', async (_req, res) => {
+  const db = getKnex();
+  const tools = await rawAll(db, 'SELECT * FROM tools ORDER BY category, name');
+  const withCoverage = await Promise.all(tools.map(async (tool: any) => {
+    const [d3, mit] = await Promise.all([
+      rawGet<{ c: number }>(db, 'SELECT COUNT(*) as c FROM tool_d3fend WHERE tool_id = ?', [tool.id]),
+      rawGet<{ c: number }>(db, 'SELECT COUNT(*) as c FROM tool_mitigations WHERE tool_id = ?', [tool.id]),
+    ]);
+    return { ...tool, d3fend_count: d3?.c ?? 0, mitigation_count: mit?.c ?? 0 };
+  }));
   res.json(withCoverage);
 });
 
-router.get('/:id', (req, res) => {
-  const db = getDb();
-  const tool = db.prepare('SELECT * FROM tools WHERE id = ?').get(req.params.id);
+router.get('/:id', async (req, res) => {
+  const db = getKnex();
+  const tool = await rawGet(db, 'SELECT * FROM tools WHERE id = ?', [req.params.id]);
   if (!tool) return res.status(404).json({ error: 'Not found' });
-
-  const d3fend = db.prepare(`
-    SELECT d.*, td.notes FROM d3fend_techniques d
-    JOIN tool_d3fend td ON d.id = td.d3fend_id
-    WHERE td.tool_id = ?
-    ORDER BY d.category, d.name
-  `).all(req.params.id);
-
-  const mitigations = db.prepare(`
-    SELECT m.*, tm.notes FROM attack_mitigations m
-    JOIN tool_mitigations tm ON m.id = tm.mitigation_id
-    WHERE tm.tool_id = ?
-    ORDER BY m.id
-  `).all(req.params.id);
-
+  const [d3fend, mitigations] = await Promise.all([
+    rawAll(db, `SELECT d.*, td.notes FROM d3fend_techniques d JOIN tool_d3fend td ON d.id = td.d3fend_id WHERE td.tool_id = ? ORDER BY d.category, d.name`, [req.params.id]),
+    rawAll(db, `SELECT m.*, tm.notes FROM attack_mitigations m JOIN tool_mitigations tm ON m.id = tm.mitigation_id WHERE tm.tool_id = ? ORDER BY m.id`, [req.params.id]),
+  ]);
   res.json({ ...tool, d3fend_techniques: d3fend, mitigations });
 });
 
-router.post('/', (req, res) => {
-  const db = getDb();
+router.post('/', async (req, res) => {
+  const db = getKnex();
   const { name, vendor, description, category, status, notes, d3fend_ids, mitigation_ids } = req.body;
   if (!name || !category) return res.status(400).json({ error: 'name and category are required' });
-
-  const result = db.prepare(`
-    INSERT INTO tools (name, vendor, description, category, status, notes)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name, vendor ?? null, description ?? null, category, status ?? 'active', notes ?? null);
-
-  const toolId = result.lastInsertRowid;
-
+  const toolId = await rawInsert(db, `
+    INSERT INTO tools (name, vendor, description, category, status, notes) VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+  `, [name, vendor ?? null, description ?? null, category, status ?? 'active', notes ?? null]);
   if (Array.isArray(d3fend_ids)) {
-    const ins = db.prepare('INSERT OR IGNORE INTO tool_d3fend (tool_id, d3fend_id) VALUES (?, ?)');
-    for (const id of d3fend_ids) ins.run(toolId, id);
+    for (const id of d3fend_ids) await rawRun(db, 'INSERT INTO tool_d3fend (tool_id, d3fend_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [toolId, id]);
   }
   if (Array.isArray(mitigation_ids)) {
-    const ins = db.prepare('INSERT OR IGNORE INTO tool_mitigations (tool_id, mitigation_id) VALUES (?, ?)');
-    for (const id of mitigation_ids) ins.run(toolId, id);
+    for (const id of mitigation_ids) await rawRun(db, 'INSERT INTO tool_mitigations (tool_id, mitigation_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [toolId, id]);
   }
-
-  const created = db.prepare('SELECT * FROM tools WHERE id = ?').get(toolId);
-  logAudit(db, 'tool', String(toolId), 'created', (req as any).actor ?? 'user', { name }, (req as any).sourceIp);
+  const created = await rawGet(db, 'SELECT * FROM tools WHERE id = ?', [toolId]);
+  await logAudit(db, 'tool', String(toolId), 'created', (req as any).actor ?? 'user', { name }, (req as any).sourceIp);
   res.status(201).json(created);
 });
 
-router.put('/:id', (req, res) => {
-  const db = getDb();
-  const existing = db.prepare('SELECT * FROM tools WHERE id = ?').get(req.params.id);
+router.put('/:id', async (req, res) => {
+  const db = getKnex();
+  const existing = await rawGet(db, 'SELECT * FROM tools WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Not found' });
-
   const { name, vendor, description, category, status, notes, d3fend_ids, mitigation_ids } = req.body;
-
-  db.prepare(`
-    UPDATE tools SET name = ?, vendor = ?, description = ?, category = ?, status = ?, notes = ?,
-    updated_at = datetime('now') WHERE id = ?
-  `).run(name, vendor ?? null, description ?? null, category, status ?? 'active', notes ?? null, req.params.id);
-
+  await rawRun(db, `
+    UPDATE tools SET name=?, vendor=?, description=?, category=?, status=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
+  `, [name, vendor ?? null, description ?? null, category, status ?? 'active', notes ?? null, req.params.id]);
   if (Array.isArray(d3fend_ids)) {
-    db.prepare('DELETE FROM tool_d3fend WHERE tool_id = ?').run(req.params.id);
-    const ins = db.prepare('INSERT OR IGNORE INTO tool_d3fend (tool_id, d3fend_id) VALUES (?, ?)');
-    for (const id of d3fend_ids) ins.run(req.params.id, id);
+    await rawRun(db, 'DELETE FROM tool_d3fend WHERE tool_id = ?', [req.params.id]);
+    for (const id of d3fend_ids) await rawRun(db, 'INSERT INTO tool_d3fend (tool_id, d3fend_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [req.params.id, id]);
   }
   if (Array.isArray(mitigation_ids)) {
-    db.prepare('DELETE FROM tool_mitigations WHERE tool_id = ?').run(req.params.id);
-    const ins = db.prepare('INSERT OR IGNORE INTO tool_mitigations (tool_id, mitigation_id) VALUES (?, ?)');
-    for (const id of mitigation_ids) ins.run(req.params.id, id);
+    await rawRun(db, 'DELETE FROM tool_mitigations WHERE tool_id = ?', [req.params.id]);
+    for (const id of mitigation_ids) await rawRun(db, 'INSERT INTO tool_mitigations (tool_id, mitigation_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [req.params.id, id]);
   }
-
-  const updated = db.prepare('SELECT * FROM tools WHERE id = ?').get(req.params.id);
-  logAudit(db, 'tool', req.params.id, 'updated', (req as any).actor ?? 'user', { name, status }, (req as any).sourceIp);
+  const updated = await rawGet(db, 'SELECT * FROM tools WHERE id = ?', [req.params.id]);
+  await logAudit(db, 'tool', req.params.id, 'updated', (req as any).actor ?? 'user', { name, status }, (req as any).sourceIp);
   res.json(updated);
 });
 
-router.delete('/:id', (req, res) => {
-  const db = getDb();
-  const existing = db.prepare('SELECT * FROM tools WHERE id = ?').get(req.params.id) as any;
+router.delete('/:id', async (req, res) => {
+  const db = getKnex();
+  const existing = await rawGet<any>(db, 'SELECT * FROM tools WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Not found' });
-  logAudit(db, 'tool', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: existing.name }, (req as any).sourceIp);
-  db.prepare('DELETE FROM tools WHERE id = ?').run(req.params.id);
+  await logAudit(db, 'tool', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: existing.name }, (req as any).sourceIp);
+  await rawRun(db, 'DELETE FROM tools WHERE id = ?', [req.params.id]);
   res.status(204).send();
 });
 

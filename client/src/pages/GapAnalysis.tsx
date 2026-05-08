@@ -103,6 +103,12 @@ export default function GapAnalysis() {
                   <span className="font-mono text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 flex-shrink-0">GAP</span>
                   <span className="font-mono text-xs text-slate-400 flex-shrink-0">{g.id}</span>
                   <span className="text-sm text-slate-200 font-medium">{g.name}</span>
+                  {(g as any).gap_reason === 'no_data_source' && (
+                    <span className="text-xs px-2 py-0.5 rounded border bg-orange-500/10 text-orange-400 border-orange-500/30 hidden sm:inline">No Data Source</span>
+                  )}
+                  {(g as any).gap_reason === 'has_data_no_rule' && (
+                    <span className="text-xs px-2 py-0.5 rounded border bg-yellow-500/10 text-yellow-400 border-yellow-500/30 hidden sm:inline">Has Data, No Rule</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-4 ml-4">
                   <div className="flex gap-1.5">

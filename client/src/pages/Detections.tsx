@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { Detection, Technique } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
+import { useAuth } from '../context/AuthContext';
 
 const SOURCES = ['Microsoft Sentinel', 'Microsoft Defender for Endpoint', 'Splunk', 'QRadar', 'CrowdStrike', 'Palo Alto NGFW', 'Proofpoint Email Security', 'Other'];
 const STATUSES = ['active', 'disabled', 'tuning', 'planned', 'archived'];
@@ -17,6 +18,7 @@ const EMPTY_FORM = {
 };
 
 export default function Detections() {
+  const { canWrite } = useAuth();
   const [detections, setDetections] = useState<Detection[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,7 @@ export default function Detections() {
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterSource, setFilterSource] = useState('');
   const [search, setSearch] = useState('');
+  const [selectedDetection, setSelectedDetection] = useState<Detection | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importTab, setImportTab] = useState<'csv' | 'sigma'>('csv');
@@ -46,7 +49,8 @@ export default function Detections() {
   useEffect(() => { api.getTechniques().then(setTechniques); }, []);
 
   const openCreate = () => { setEditDetection(null); setForm({ ...EMPTY_FORM }); setModalOpen(true); };
-  const openEdit = (d: Detection) => {
+  const openEdit = (d: Detection, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setEditDetection(d);
     setForm({
       name: d.name, description: d.description ?? '', rule_id: d.rule_id ?? '',
@@ -70,9 +74,11 @@ export default function Detections() {
     } finally { setSaving(false); }
   };
 
-  const del = async (id: number) => {
+  const del = async (id: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!confirm('Delete this detection?')) return;
     await api.deleteDetection(id);
+    if (selectedDetection?.id === id) setSelectedDetection(null);
     load();
   };
 
@@ -135,7 +141,8 @@ export default function Detections() {
     } finally { setImporting(false); }
   };
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setSelectedIds(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -144,7 +151,7 @@ export default function Detections() {
   };
 
   const selectAll = () => {
-    setSelectedIds(displayed.length === selectedIds.size ? new Set() : new Set(displayed.map(d => d.id)));
+    setSelectedIds(displayed.length > 0 && selectedIds.size === displayed.length ? new Set() : new Set(displayed.map(d => d.id)));
   };
 
   const bulkUpdate = async () => {
@@ -159,6 +166,7 @@ export default function Detections() {
     if (!confirm(`Delete ${selectedIds.size} detection(s)?`)) return;
     await api.bulkDeleteDetections([...selectedIds]);
     setSelectedIds(new Set());
+    if (selectedDetection && selectedIds.has(selectedDetection.id)) setSelectedDetection(null);
     load();
   };
 
@@ -186,112 +194,211 @@ export default function Detections() {
   const sources = [...new Set(detections.map(d => d.source).filter(Boolean))];
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-100">SIEM Detections</h1>
-            <p className="text-sm text-slate-400 mt-0.5">{detections.length} detections mapped to ATT&CK techniques</p>
+    <div className="flex h-full">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-slate-100">SIEM Detections</h1>
+              <p className="text-sm text-slate-400 mt-0.5">{detections.length} detections mapped to ATT&CK techniques</p>
+            </div>
+            {canWrite && <div className="flex gap-2">
+              <button onClick={() => setImportModalOpen(true)} className="px-3 py-1.5 text-sm bg-slate-700 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
+                Import CSV
+              </button>
+              <button onClick={openCreate} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors">
+                + Add Detection
+              </button>
+            </div>}
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setImportModalOpen(true)} className="px-3 py-1.5 text-sm bg-slate-700 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
-              Import CSV
-            </button>
-            <button onClick={openCreate} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors">
-              + Add Detection
-            </button>
+          <div className="flex gap-3 mt-3">
+            <label className="flex items-center gap-2 flex-shrink-0">
+              <input type="checkbox"
+                checked={displayed.length > 0 && selectedIds.size === displayed.length}
+                onChange={selectAll}
+                className="accent-blue-500" />
+              <span className="text-xs text-slate-500">All</span>
+            </label>
+            <input
+              value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, rule ID, technique..."
+              className="flex-1 px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+            {[{ val: filterStatus, set: setFilterStatus, opts: ['', ...STATUSES], label: 'Status' },
+              { val: filterSeverity, set: setFilterSeverity, opts: ['', ...SEVERITIES], label: 'Severity' },
+              { val: filterSource, set: setFilterSource, opts: ['', ...sources], label: 'Source' },
+            ].map(f => (
+              <select key={f.label} value={f.val} onChange={e => f.set(e.target.value)}
+                className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
+                <option value="">{f.label}: All</option>
+                {f.opts.filter(Boolean).map(o => <option key={o as string} value={o as string}>{o}</option>)}
+              </select>
+            ))}
           </div>
         </div>
-        <div className="flex gap-3 mt-3">
-          <input
-            value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, rule ID, technique..."
-            className="flex-1 px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-          />
-          {[{ val: filterStatus, set: setFilterStatus, opts: ['', ...STATUSES], label: 'Status' },
-            { val: filterSeverity, set: setFilterSeverity, opts: ['', ...SEVERITIES], label: 'Severity' },
-            { val: filterSource, set: setFilterSource, opts: ['', ...sources], label: 'Source' },
-          ].map(f => (
-            <select key={f.label} value={f.val} onChange={e => f.set(e.target.value)}
-              className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
-              <option value="">{f.label}: All</option>
-              {f.opts.filter(Boolean).map(o => <option key={o as string} value={o as string}>{o}</option>)}
+
+        {canWrite && selectedIds.size > 0 && (
+          <div className="flex-shrink-0 flex items-center gap-3 px-6 py-2.5 bg-blue-600/10 border-b border-blue-500/20">
+            <span className="text-sm text-blue-300 font-medium">{selectedIds.size} selected</span>
+            <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)}
+              className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded text-slate-300 focus:outline-none">
+              <option value="">Set status...</option>
+              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-          ))}
-        </div>
-      </div>
+            <button onClick={bulkUpdate} disabled={!bulkStatus}
+              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50 transition-colors">
+              Apply
+            </button>
+            <button onClick={bulkDelete} className="px-3 py-1 text-xs bg-red-600/80 text-white rounded hover:bg-red-600 transition-colors">
+              Delete Selected
+            </button>
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-slate-500 hover:text-slate-300 ml-1">Clear</button>
+          </div>
+        )}
 
-      {selectedIds.size > 0 && (
-        <div className="flex-shrink-0 flex items-center gap-3 px-6 py-2.5 bg-blue-600/10 border-b border-blue-500/20">
-          <span className="text-sm text-blue-300 font-medium">{selectedIds.size} selected</span>
-          <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)}
-            className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded text-slate-300 focus:outline-none">
-            <option value="">Set status...</option>
-            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button onClick={bulkUpdate} disabled={!bulkStatus}
-            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50 transition-colors">
-            Apply
-          </button>
-          <button onClick={bulkDelete} className="px-3 py-1 text-xs bg-red-600/80 text-white rounded hover:bg-red-600 transition-colors">
-            Delete Selected
-          </button>
-          <button onClick={() => setSelectedIds(new Set())} className="text-xs text-slate-500 hover:text-slate-300 ml-1">Clear</button>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-32 text-slate-500">Loading...</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-slate-900 border-b border-slate-800">
-              <tr>
-                <th className="px-3 py-2.5">
-                  <input type="checkbox" checked={displayed.length > 0 && selectedIds.size === displayed.length}
-                    onChange={selectAll} className="accent-blue-500" />
-                </th>
-                {['Name', 'Rule ID', 'Source', 'Technique(s)', 'Status', 'Severity', 'Confidence', ''].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-slate-400">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? (
+            <div className="flex items-center justify-center h-32 text-slate-500">Loading...</div>
+          ) : (
+            <div className="space-y-2">
               {displayed.map(d => (
-                <tr key={d.id} className={`border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors ${selectedIds.has(d.id) ? 'bg-blue-600/5' : ''}`}>
-                  <td className="px-3 py-3">
-                    <input type="checkbox" checked={selectedIds.has(d.id)} onChange={() => toggleSelect(d.id)} className="accent-blue-500" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-200">{d.name}</div>
-                    {d.description && <div className="text-xs text-slate-500 truncate max-w-xs mt-0.5">{d.description}</div>}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-400">{d.rule_id ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-400 text-xs">{d.source ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {d.technique_ids.map(t => (
-                        <span key={t} className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded font-mono text-xs">{t}</span>
-                      ))}
+                <div
+                  key={d.id}
+                  onClick={() => setSelectedDetection(prev => prev?.id === d.id ? null : d)}
+                  className={`bg-slate-900 border rounded-xl p-4 cursor-pointer transition-all hover:border-slate-600 ${
+                    selectedDetection?.id === d.id
+                      ? 'border-blue-500/50 bg-blue-500/5'
+                      : selectedIds.has(d.id)
+                      ? 'border-blue-500/20 bg-blue-600/5'
+                      : 'border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(d.id)}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => toggleSelect(d.id, e as any)}
+                      className="accent-blue-500 mt-1 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-slate-200">{d.name}</div>
+                          {d.description && (
+                            <div className="text-xs text-slate-500 truncate mt-0.5 max-w-xl">{d.description}</div>
+                          )}
+                        </div>
+                        {canWrite && <div className="flex gap-1 flex-shrink-0">
+                          <button onClick={e => openEdit(d, e)} className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded">Edit</button>
+                          <button onClick={e => del(d.id, e)} className="px-2 py-1 text-xs text-red-400 hover:text-red-300 bg-slate-800 rounded">Delete</button>
+                        </div>}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap mt-2">
+                        <StatusBadge value={d.status} variant="detection_status" />
+                        <StatusBadge value={d.severity} variant="severity" />
+                        {d.rule_id && <span className="font-mono text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{d.rule_id}</span>}
+                        {d.source && <span className="text-xs text-slate-500">{d.source}</span>}
+                        <span className="text-xs text-slate-600">{d.confidence} confidence</span>
+                      </div>
+                      {d.technique_ids.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {d.technique_ids.map(t => (
+                            <span key={t} className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded font-mono text-xs">{t}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </td>
-                  <td className="px-4 py-3"><StatusBadge value={d.status} variant="detection_status" /></td>
-                  <td className="px-4 py-3"><StatusBadge value={d.severity} variant="severity" /></td>
-                  <td className="px-4 py-3 text-xs text-slate-400">{d.confidence}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => openEdit(d)} className="text-xs text-slate-400 hover:text-slate-200">Edit</button>
-                      <button onClick={() => del(d.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
-                    </div>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
               {displayed.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-slate-500">No detections found.</td></tr>
+                <div className="text-center py-16 text-slate-500">No detections found.</div>
               )}
-            </tbody>
-          </table>
-        )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {selectedDetection && (
+        <div className="w-80 flex-shrink-0 border-l border-slate-800 bg-slate-900 overflow-y-auto">
+          <div className="px-4 py-4 border-b border-slate-800 flex items-start justify-between">
+            <div className="flex-1 min-w-0 pr-2">
+              <div className="text-sm font-semibold text-slate-200 leading-snug">{selectedDetection.name}</div>
+              {selectedDetection.rule_id && (
+                <div className="text-xs font-mono text-slate-500 mt-0.5">{selectedDetection.rule_id}</div>
+              )}
+              <div className="flex gap-2 mt-1.5 flex-wrap">
+                <StatusBadge value={selectedDetection.status} variant="detection_status" />
+                <StatusBadge value={selectedDetection.severity} variant="severity" />
+              </div>
+            </div>
+            <button onClick={() => setSelectedDetection(null)} className="text-slate-500 hover:text-slate-300 text-lg flex-shrink-0">×</button>
+          </div>
+
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              {selectedDetection.source && (
+                <div>
+                  <div className="text-slate-500 mb-0.5">Source</div>
+                  <div className="text-slate-300">{selectedDetection.source}</div>
+                </div>
+              )}
+              <div>
+                <div className="text-slate-500 mb-0.5">Confidence</div>
+                <div className="text-slate-300">{selectedDetection.confidence}</div>
+              </div>
+              {selectedDetection.false_positive_rate && (
+                <div>
+                  <div className="text-slate-500 mb-0.5">FP Rate</div>
+                  <div className="text-slate-300">{selectedDetection.false_positive_rate}</div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-xs font-semibold text-slate-300 mb-2">ATT&CK Techniques ({selectedDetection.technique_ids.length})</div>
+              {selectedDetection.technique_ids.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {selectedDetection.technique_ids.map(t => (
+                    <span key={t} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded font-mono text-xs border border-blue-500/30">{t}</span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">None.</p>
+              )}
+            </div>
+
+            {selectedDetection.description && (
+              <div className="pt-2 border-t border-slate-800">
+                <div className="text-xs font-semibold text-slate-300 mb-1">Description</div>
+                <p className="text-xs text-slate-400 leading-relaxed">{selectedDetection.description}</p>
+              </div>
+            )}
+
+            {selectedDetection.notes && (
+              <div className="pt-2 border-t border-slate-800">
+                <div className="text-xs font-semibold text-slate-300 mb-1">Notes</div>
+                <p className="text-xs text-slate-400 leading-relaxed">{selectedDetection.notes}</p>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-slate-800 flex gap-2">
+              <button
+                onClick={e => openEdit(selectedDetection, e)}
+                className="flex-1 px-3 py-2 text-xs bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600/30 transition-colors"
+              >
+                Edit
+              </button>
+              <button
+                onClick={e => del(selectedDetection.id, e)}
+                className="px-3 py-2 text-xs bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editDetection ? 'Edit Detection' : 'Add Detection'} width="max-w-3xl">
         <div className="grid grid-cols-2 gap-4">

@@ -1,9 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
-import { getDb, initSchema } from './db/database';
+import { runMigrations, getKnex, rawGet } from './db/database';
 import { seedDatabase } from './db/seed';
 import attackRouter from './routes/attack';
 import d3fendRouter from './routes/d3fend';
@@ -25,20 +26,23 @@ import apiKeysRouter from './routes/api-keys';
 import adminRouter from './routes/admin';
 import motivationsRouter from './routes/motivations';
 import countriesRouter from './routes/countries';
+import authRouter from './routes/auth';
+import usersRouter from './routes/users';
+import dataSourcesRouter from './routes/data-sources';
+import atomicRouter from './routes/atomic';
 import { requireApiKey } from './middleware/auth';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
 
-app.use(cors());
+app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173', credentials: true }));
 app.use(compression());
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use('/api', requireApiKey);
 
-const db = getDb();
-initSchema(db);
-seedDatabase(db);
-
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
 app.use('/api/attack', attackRouter);
 app.use('/api/d3fend', d3fendRouter);
 app.use('/api/detections', detectionsRouter);
@@ -59,16 +63,35 @@ app.use('/api/api-keys', apiKeysRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/motivations', motivationsRouter);
 app.use('/api/countries', countriesRouter);
+app.use('/api/data-sources', dataSourcesRouter);
+app.use('/api/atomic', atomicRouter);
 
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/api/health', async (_req, res) => {
+  const db = getKnex();
+  const [keyCount, userCount] = await Promise.all([
+    rawGet<{ n: number }>(db, 'SELECT COUNT(*) as n FROM api_keys', []),
+    rawGet<{ n: number }>(db, 'SELECT COUNT(*) as n FROM users', []),
+  ]);
+  const totalAuthEntities = ((keyCount as any)?.n ?? 0) + ((userCount as any)?.n ?? 0);
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), bootstrap: totalAuthEntities === 0 });
+});
 
-// Serve built React app in production
 const clientDist = path.join(__dirname, '../../client/dist');
 if (process.env.NODE_ENV === 'production' && fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
 }
 
-app.listen(PORT, () => {
-  console.log(`MitreMap server running on http://localhost:${PORT}`);
+async function start() {
+  await runMigrations();
+  const db = getKnex();
+  await seedDatabase(db);
+  app.listen(PORT, () => {
+    console.log(`MitreMap server running on http://localhost:${PORT}`);
+  });
+}
+
+start().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });

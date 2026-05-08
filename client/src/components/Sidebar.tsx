@@ -1,4 +1,7 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useEffect, useState } from 'react';
+import { api } from '../api';
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: '⬡' },
@@ -8,12 +11,27 @@ const NAV = [
   { to: '/defense', label: 'Defense Mapping', icon: '⛨' },
   { to: '/gaps', label: 'Gap Analysis', icon: '△' },
   { to: '/threats', label: 'Threat Groups', icon: '◈' },
+  { to: '/data-sources', label: 'Data Sources', icon: '◫' },
+  { to: '/atomic', label: 'Atomic Tests', icon: '⚗' },
   { to: '/reports', label: 'Reports & Exports', icon: '▦' },
   { to: '/settings', label: 'Settings', icon: '⚛' },
   { to: '/api', label: 'API Playground', icon: '⚡' },
 ];
 
 export default function Sidebar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [version, setVersion] = useState('ATT&CK v14');
+
+  useEffect(() => {
+    api.getAttackVersion().then(v => setVersion(`ATT&CK ${v.version}`)).catch(() => {});
+  }, []);
+
+  async function handleLogout() {
+    await logout();
+    navigate('/login');
+  }
+
   return (
     <aside className="w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
       <div className="px-4 py-5 border-b border-slate-800">
@@ -45,8 +63,31 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-4 py-3 border-t border-slate-800">
-        <div className="text-xs text-slate-500">MITRE ATT&CK v14 · D3FEND v1</div>
+      <div className="px-4 py-3 border-t border-slate-800 space-y-2">
+        {user ? (
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <div className="text-xs text-slate-300 font-medium truncate">{user.name ?? user.email}</div>
+              <div className="text-xs text-slate-500 truncate">{user.role}</div>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Sign out"
+              className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+            >
+              ⏻
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full text-left text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-2 px-1 py-0.5"
+          >
+            <span>→</span>
+            <span>Sign in</span>
+          </button>
+        )}
+        <div className="text-xs text-slate-500">{version} · D3FEND v1</div>
       </div>
     </aside>
   );
