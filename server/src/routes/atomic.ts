@@ -78,6 +78,36 @@ router.delete('/results/:id', async (req, res) => {
   res.status(204).end();
 });
 
+router.post('/custom', async (req, res) => {
+  const db = getKnex();
+  const { technique_id, name, description, platform, executor_type, command } = req.body;
+  if (!technique_id || !name?.trim()) return res.status(400).json({ error: 'technique_id and name are required' });
+  if (!await rawGet(db, 'SELECT id FROM attack_techniques WHERE id=?', [technique_id])) return res.status(404).json({ error: 'Technique not found' });
+  const id = await rawInsert(db,
+    'INSERT INTO art_tests (technique_id, test_guid, name, description, platform, executor_type, auto_generated_command, source) VALUES (?, NULL, ?, ?, ?, ?, ?, \'custom\') RETURNING id',
+    [technique_id, name.trim(), description ?? null, platform ?? '', executor_type ?? '', command ?? null]);
+  res.status(201).json(await rawGet(db, 'SELECT * FROM art_tests WHERE id=?', [id]));
+});
+
+router.put('/custom/:id', async (req, res) => {
+  const db = getKnex();
+  const test = await rawGet<any>(db, 'SELECT * FROM art_tests WHERE id=? AND source=\'custom\'', [req.params.id]);
+  if (!test) return res.status(404).json({ error: 'Custom test not found' });
+  const { name, description, platform, executor_type, command } = req.body;
+  if (name !== undefined && !name?.trim()) return res.status(400).json({ error: 'name cannot be empty' });
+  await rawRun(db,
+    'UPDATE art_tests SET name=COALESCE(?,name), description=COALESCE(?,description), platform=COALESCE(?,platform), executor_type=COALESCE(?,executor_type), auto_generated_command=COALESCE(?,auto_generated_command) WHERE id=?',
+    [name?.trim() ?? null, description ?? null, platform ?? null, executor_type ?? null, command ?? null, req.params.id]);
+  res.json(await rawGet(db, 'SELECT * FROM art_tests WHERE id=?', [req.params.id]));
+});
+
+router.delete('/custom/:id', async (req, res) => {
+  const db = getKnex();
+  if (!await rawGet(db, 'SELECT id FROM art_tests WHERE id=? AND source=\'custom\'', [req.params.id])) return res.status(404).json({ error: 'Custom test not found' });
+  await rawRun(db, 'DELETE FROM art_tests WHERE id=?', [req.params.id]);
+  res.status(204).end();
+});
+
 router.post('/import', async (req, res) => {
   const db = getKnex();
   const { yaml } = req.body;

@@ -327,12 +327,13 @@ export interface ArtTest {
   id: number;
   technique_id: string;
   technique_name: string;
-  test_guid: string;
+  test_guid: string | null;
   name: string;
   description: string | null;
   platform: string;
   executor_type: string;
   auto_generated_command: string | null;
+  source: 'atomic' | 'custom';
 }
 
 export interface ArtResult {
