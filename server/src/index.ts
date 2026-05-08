@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import https from 'https';
 import path from 'path';
 import fs from 'fs';
 import { runMigrations, getKnex, rawGet } from './db/database';
@@ -33,7 +34,7 @@ import atomicRouter from './routes/atomic';
 import { requireApiKey } from './middleware/auth';
 
 const app = express();
-const PORT = process.env.PORT ?? 4000;
+const PORT = parseInt(process.env.PORT ?? '4000', 10);
 
 app.use(cors({ origin: process.env.CLIENT_URL ?? 'http://localhost:5173', credentials: true }));
 app.use(compression());
@@ -82,12 +83,38 @@ if (process.env.NODE_ENV === 'production' && fs.existsSync(clientDist)) {
   app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
 }
 
+async function loadTlsOptions(): Promise<https.ServerOptions> {
+  const certPath = process.env.SSL_CERT_PATH;
+  const keyPath = process.env.SSL_KEY_PATH;
+
+  if (certPath && keyPath) {
+    console.log('Loading SSL certificates from provided paths...');
+    return {
+      cert: fs.readFileSync(certPath),
+      key: fs.readFileSync(keyPath),
+    };
+  }
+
+  console.log('No SSL_CERT_PATH/SSL_KEY_PATH set — generating self-signed certificate...');
+  const { generate } = await import('selfsigned');
+  const notAfterDate = new Date();
+  notAfterDate.setFullYear(notAfterDate.getFullYear() + 1);
+  const pems = await generate([{ name: 'commonName', value: 'localhost' }], {
+    keySize: 2048,
+    algorithm: 'sha256',
+    notAfterDate,
+  });
+  return { cert: pems.cert, key: pems.private };
+}
+
 async function start() {
   await runMigrations();
   const db = getKnex();
   await seedDatabase(db);
-  app.listen(PORT, () => {
-    console.log(`MitreMap server running on http://localhost:${PORT}`);
+
+  const tlsOptions = await loadTlsOptions();
+  https.createServer(tlsOptions, app).listen(PORT, () => {
+    console.log(`MitreMap server running on https://localhost:${PORT}`);
   });
 }
 

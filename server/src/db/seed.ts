@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import bcrypt from 'bcryptjs';
 import { TACTICS, TECHNIQUES, MITIGATIONS, TECHNIQUE_MITIGATIONS } from '../data/attack';
 import { D3FEND_TECHNIQUES, ATTACK_D3FEND } from '../data/d3fend';
 import { DEMO_TOOLS, DEMO_DETECTIONS } from '../data/demo';
@@ -34,6 +35,18 @@ const SEED_COUNTRIES = [
 export async function seedDatabase(db: Knex): Promise<void> {
   const { count: existingTactics } = await db('attack_tactics').count('id as count').first() as any;
   const isFirstRun = Number(existingTactics) === 0;
+
+  // Create default admin on first run if env vars are set
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (adminEmail && adminPassword) {
+    const existing = await db('users').where('email', adminEmail.toLowerCase().trim()).first();
+    if (!existing) {
+      const hash = await bcrypt.hash(adminPassword, 12);
+      await db('users').insert({ email: adminEmail.toLowerCase().trim(), name: 'Admin', password_hash: hash, role: 'admin' });
+      console.log(`Default admin created: ${adminEmail}`);
+    }
+  }
 
   // Always seed ATT&CK + D3FEND (ON CONFLICT DO NOTHING is idempotent)
   await db.transaction(async trx => {

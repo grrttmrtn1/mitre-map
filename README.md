@@ -12,6 +12,13 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 
 ## Features
 
+### Authentication & User Management
+- **Login page** — email/password login with JWT access tokens (15-minute expiry) and 30-day httpOnly refresh cookies
+- **Multi-user roles** — `admin` (full access), `analyst` (read/write), `readonly` (view only)
+- **OIDC / SSO** — configurable OAuth2/OIDC providers; new users provisioned automatically as `analyst` on first login
+- **Bootstrap mode** — no lockout: the app runs open until the first user or API key is created
+- **User management** — full CRUD for users, password reset (invalidates all active sessions), and active/inactive toggling
+
 ### Coverage Intelligence
 - **ATT&CK Matrix heatmap** — full 14-tactic × 180-technique matrix with per-cell status (`full` / `detected` / `mitigated` / `tuning` / `planned` / `gap`)
 - **D3FEND mapping** — 68 countermeasures across Harden / Detect / Isolate / Deceive / Evict, mapped to ATT&CK techniques
@@ -62,6 +69,18 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 | Threat landscape | JSON API | `GET /api/reports/threat-landscape` |
 | Prioritized gaps | JSON API | `GET /api/reports/gaps` |
 
+### Atomic Red Team Integration
+- **Test library** — browse imported Atomic Red Team tests grouped by technique; each test shows name, GUID, platform, executor type, and the generated command
+- **YAML import** — paste any `atomics/*.yaml` file from the Red Canary Atomic Red Team repository; duplicates are skipped by GUID
+- **Test results** — record per-detection test outcomes (`untested` / `tested` / `validated` / `failed`) with notes and run attribution
+- **Coverage stats** — technique-level count of how many ART tests exist per ATT&CK technique
+
+### ATT&CK Data Sources
+- **Source inventory** — track which log sources (Windows Event Logs, Sysmon, CloudTrail, etc.) your organization collects; categorized and searchable
+- **Collection status** — `collecting` / `partial` / `not_collecting` with a free-text collection-method and notes field per source
+- **Technique mapping** — link each data source to the ATT&CK techniques it enables detection for; detection coverage shown inline
+- **Gap analysis** — identifies undetected techniques and classifies the gap: no data source known, has a collecting source but no rule, or unknown
+
 ### API Playground
 - Interactive in-app API explorer — browse every endpoint grouped by resource, fill path/query/body params, and fire live requests authenticated with your stored API key. Responses are syntax-highlighted inline.
 
@@ -91,6 +110,8 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  Express 4 · TypeScript · Node 20                   │
 │                                                     │
 │  Routes                                             │
+│  ├── /api/auth           Login · logout · OIDC SSO  │
+│  ├── /api/users          User management            │
 │  ├── /api/attack         ATT&CK tactics/techniques  │
 │  ├── /api/d3fend         D3FEND techniques          │
 │  ├── /api/detections     SIEM detection CRUD        │
@@ -104,6 +125,8 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  ├── /api/threat-groups  APT / cybercrime groups    │
 │  ├── /api/compliance     NIST CSF 2.0 · CIS v8      │
 │  ├── /api/sigma          SIGMA rule import          │
+│  ├── /api/atomic         ART tests & results        │
+│  ├── /api/data-sources   ATT&CK data source mgmt   │
 │  ├── /api/exports        Navigator / CSV / JSON     │
 │  ├── /api/reports        Pre-computed reports       │
 │  ├── /api/risk           Risk scoring               │
@@ -112,7 +135,8 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  ├── /api/motivations    Threat group motivations   │
 │  └── /api/countries      Threat group countries     │
 │                                                     │
-│  requireApiKey middleware (Bearer token, SHA-256)   │
+│  Auth middleware: JWT Bearer · API key · bootstrap  │
+│  Knex.js query builder · versioned migrations       │
 │  better-sqlite3 (synchronous WAL-mode SQLite)       │
 └──────────────┬──────────────────────────────────────┘
                │
@@ -129,6 +153,10 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  group_techniques · group_technique_procedures      │
 │  compliance_frameworks · compliance_controls        │
 │  technique_compliance · api_keys                    │
+│  users · refresh_tokens · oidc_providers            │
+│  data_sources · technique_data_sources              │
+│  org_data_sources · art_tests                       │
+│  detection_art_results · attack_version_info        │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -137,7 +165,9 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **Polymorphic entity model** — `entity_tags`, `comments`, and `assignments` all use `(entity_type, entity_id)` keys so the same schema handles detections, techniques, tools, and gaps without separate junction tables.
 - **Synchronous DB layer** — `better-sqlite3` is synchronous, eliminating async waterfall bugs on the server while keeping the API simple.
 - **SIGMA parsing without a library** — a minimal line-by-line YAML parser extracts the handful of fields MitreMap needs (`title`, `id`, `level`, `tags`) without a full YAML dependency.
-- **Bootstrap-safe API key enforcement** — the `requireApiKey` middleware checks whether any keys exist at request time. Zero keys → open access. First key created → all subsequent requests must authenticate. This prevents permanent lockout without shipping a default credential.
+- **Bootstrap-safe authentication** — the auth middleware checks for any users or API keys at request time. Zero configured → open access (bootstrap mode). This prevents permanent lockout and means a fresh install works without pre-seeding credentials.
+- **JWT + refresh-token session model** — short-lived JWTs (15 min) keep the server stateless; a 30-day httpOnly refresh cookie (SHA-256 hashed at rest) handles silent renewal without exposing long-lived credentials in JavaScript memory.
+- **Knex.js migrations** — the database schema is version-controlled via numbered migration files (`001_core_schema.ts`, `002_new_features.ts`). Applied automatically on startup; safe to run repeatedly.
 
 ---
 
@@ -231,6 +261,30 @@ Once at least one API key has been created, every request must include:
 ```
 Authorization: Bearer <raw-key>
 ```
+
+### Authentication
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/auth/login` | Login `{ email, password }` — returns JWT + sets refresh cookie |
+| `POST` | `/api/auth/refresh` | Exchange refresh cookie for a new JWT |
+| `POST` | `/api/auth/logout` | Invalidate refresh token and clear cookie |
+| `GET` | `/api/auth/me` | Current user info |
+| `GET` | `/api/auth/oidc/providers` | List configured OIDC providers |
+| `POST` | `/api/auth/oidc/providers` | Create OIDC provider `{ name, slug, issuer_url, client_id, client_secret }` |
+| `PUT/DELETE` | `/api/auth/oidc/providers/:id` | Update / delete OIDC provider |
+| `GET` | `/api/auth/oidc/:slug` | Initiate OIDC login flow (redirect) |
+| `GET` | `/api/auth/oidc/:slug/callback` | OIDC callback handler (redirect to app) |
+
+### Users
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/users` | List users (id, email, name, role, is_active) |
+| `POST` | `/api/users` | Create user `{ email, name, password, role? }` — roles: `admin`, `analyst`, `readonly` |
+| `PUT` | `/api/users/:id` | Update name / role / is_active |
+| `DELETE` | `/api/users/:id` | Delete user and revoke all sessions |
+| `POST` | `/api/users/:id/reset-password` | Reset password `{ password }` — invalidates all refresh tokens |
 
 ### Detections
 
@@ -339,6 +393,37 @@ Authorization: Bearer <raw-key>
 | `PUT/DELETE` | `/api/assignments/:id` | Update / delete assignment |
 | `GET` | `/api/audit` | Audit log (filter: `entity_type`, `entity_id`, `actor`, `action`) |
 
+### Atomic Red Team
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/atomic/tests` | List all imported ART tests |
+| `GET` | `/api/atomic/tests/:technique_id` | Tests for a specific technique |
+| `GET` | `/api/atomic/coverage` | Technique-level test count and overall coverage % |
+| `POST` | `/api/atomic/import` | Import ART YAML `{ yaml }` — returns `{ imported, skipped, total }` |
+| `POST` | `/api/atomic/results` | Record test result `{ detection_id, art_test_id, status, notes?, run_by? }` |
+| `PUT` | `/api/atomic/results/:id` | Update result status / notes |
+| `DELETE` | `/api/atomic/results/:id` | Delete result |
+
+**Test result statuses:** `untested` · `tested` · `validated` · `failed`
+
+### ATT&CK Data Sources
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/data-sources` | List all data sources with org collection status and technique count |
+| `POST` | `/api/data-sources` | Create data source `{ name, category, description? }` |
+| `PUT` | `/api/data-sources/:id` | Update data source fields |
+| `DELETE` | `/api/data-sources/:id` | Delete data source and all associations |
+| `GET` | `/api/data-sources/:id/techniques` | Techniques mapped to this source (includes `has_detection` flag) |
+| `POST` | `/api/data-sources/:id/techniques` | Add technique mapping `{ technique_id }` |
+| `DELETE` | `/api/data-sources/:id/techniques/:technique_id` | Remove technique mapping |
+| `PUT` | `/api/data-sources/:id/status` | Set org collection status `{ status, collection_method?, notes? }` |
+| `GET` | `/api/data-sources/technique/:technique_id` | Data sources mapped to a specific technique |
+| `GET` | `/api/data-sources/analysis` | Gap analysis: undetected techniques classified by data-source availability |
+
+**Collection statuses:** `collecting` · `partial` · `not_collecting`
+
 ### Exports
 
 | Method | Path | Description |
@@ -358,6 +443,8 @@ Authorization: Bearer <raw-key>
 | Build tool | Vite 5 |
 | Backend | Node.js 20, Express 4, TypeScript |
 | Database | SQLite via `better-sqlite3` (WAL mode, foreign keys) |
+| Schema migrations | Knex.js (versioned migration files, run on startup) |
+| Authentication | JWT (`jsonwebtoken`), bcrypt (`bcryptjs`), OIDC (Authorization Code flow) |
 | Runtime tooling | `tsx` (TS dev runner), `concurrently` |
 | Container | Docker (multi-stage Alpine build) |
 
@@ -375,16 +462,29 @@ mitremap/
 │       ├── db/
 │       │   ├── database.ts     # Schema init, getDb(), logAudit()
 │       │   └── seed.ts         # Idempotent seeding
+│       ├── db/
+│       │   ├── database.ts     # getKnex(), logAudit(), raw* helpers
+│       │   ├── knex.ts         # Knex connection + migration runner
+│       │   ├── seed.ts         # Idempotent seeding
+│       │   └── migrations/
+│       │       ├── 001_core_schema.ts   # Base schema
+│       │       └── 002_new_features.ts  # Auth, ART, data sources
 │       ├── data/
-│       │   ├── attack.ts       # ATT&CK tactics, techniques, mitigations
-│       │   ├── d3fend.ts       # D3FEND techniques + ATT&CK mappings
+│       │   ├── attack.ts           # ATT&CK tactics, techniques, mitigations
+│       │   ├── d3fend.ts           # D3FEND techniques + ATT&CK mappings
 │       │   ├── threat-groups.ts
-│       │   ├── compliance.ts   # NIST CSF 2.0, CIS Controls v8
-│       │   └── demo.ts         # Demo tools and detections
-│       └── routes/             # One file per resource group
-│           ├── threat-groups.ts  # CRUD + technique assignment + procedures
-│           ├── api-keys.ts       # API key lifecycle (hash, mask, revoke)
-│           └── admin.ts          # Data purge endpoints
+│       │   ├── compliance.ts       # NIST CSF 2.0, CIS Controls v8
+│       │   ├── atomic-tests.ts     # Seed ART test data
+│       │   ├── data-sources.ts     # Seed ATT&CK data sources
+│       │   └── demo.ts             # Demo tools and detections
+│       └── routes/                 # One file per resource group
+│           ├── auth.ts               # Login, refresh, logout, OIDC
+│           ├── users.ts              # User CRUD + password reset
+│           ├── atomic.ts             # ART tests, coverage, results, import
+│           ├── data-sources.ts       # ATT&CK data source management
+│           ├── threat-groups.ts      # CRUD + technique assignment + procedures
+│           ├── api-keys.ts           # API key lifecycle (hash, mask, revoke)
+│           └── admin.ts              # Data purge endpoints
 ├── client/
 │   └── src/
 │       ├── api.ts              # Typed fetch wrappers for every endpoint
@@ -398,7 +498,10 @@ mitremap/
 │       │   ├── CommentThread.tsx
 │       │   ├── AssignmentPanel.tsx
 │       │   └── ReportBuilder.tsx   # Modular report composer
+│       ├── context/
+│       │   └── AuthContext.tsx     # JWT auth state, OIDC, role helpers
 │       └── pages/
+│           ├── LoginPage.tsx       # Email/password + OIDC login
 │           ├── Dashboard.tsx
 │           ├── AttackMatrix.tsx
 │           ├── Detections.tsx
@@ -406,9 +509,11 @@ mitremap/
 │           ├── DefenseMapping.tsx
 │           ├── GapAnalysis.tsx
 │           ├── ThreatGroups.tsx    # Includes per-TTP procedure editor
+│           ├── AtomicTests.tsx     # ART test browser + import
+│           ├── DataSources.tsx     # ATT&CK data source management
 │           ├── Reports.tsx
 │           ├── ApiPlayground.tsx   # Interactive API explorer
-│           └── Settings.tsx        # API keys + data management
+│           └── Settings.tsx        # API keys + users + data management
 ├── Dockerfile
 ├── docker-compose.yml
 └── package.json                # npm workspaces root
