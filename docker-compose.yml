@@ -23,11 +23,17 @@ services:
       # If omitted, a self-signed certificate is generated at startup.
       SSL_CERT_PATH: ${SSL_CERT_PATH:-}
       SSL_KEY_PATH: ${SSL_KEY_PATH:-}
+      # Optional: enterprise root CA for corporate environments.
+      # Set to the in-container path of the cert and mount certs/ below.
+      ENTERPRISE_CA_BUNDLE: ${ENTERPRISE_CA_BUNDLE:-}
 
     volumes:
       # Persist SQLite database across restarts/upgrades
       - mitremap-data:/app/server/data
       # Optional: mount a directory containing your TLS cert/key
+      # - ./certs:/app/certs:ro
+      # Optional: mount enterprise CA certs for runtime injection (no rebuild needed).
+      # Set ENTERPRISE_CA_BUNDLE=/app/certs/enterprise-root-ca.crt in environment above.
       # - ./certs:/app/certs:ro
 
     healthcheck:

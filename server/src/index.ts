@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import http from 'http';
 import https from 'https';
 import path from 'path';
 import fs from 'fs';
@@ -112,10 +113,16 @@ async function start() {
   const db = getKnex();
   await seedDatabase(db);
 
-  const tlsOptions = await loadTlsOptions();
-  https.createServer(tlsOptions, app).listen(PORT, () => {
-    console.log(`MitreMap server running on https://localhost:${PORT}`);
-  });
+  if (process.env.NODE_ENV === 'production') {
+    const tlsOptions = await loadTlsOptions();
+    https.createServer(tlsOptions, app).listen(PORT, () => {
+      console.log(`MitreMap server running on https://localhost:${PORT}`);
+    });
+  } else {
+    http.createServer(app).listen(PORT, () => {
+      console.log(`MitreMap server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 start().catch(err => {

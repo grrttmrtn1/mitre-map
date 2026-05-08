@@ -55,7 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Try cookie-based refresh (returning user)
-      const result = await api.refreshToken();
+      let result = null;
+      try { result = await api.refreshToken(); } catch {}
       if (result?.token) {
         setJwtToken(result.token);
         try {

@@ -207,3 +207,6 @@ marimo/_lsp/
 __marimo__/
 node_modules/
 .vscode/
+
+# Enterprise CA certificates — keep dir tracked, ignore actual cert files
+certs/*.crt

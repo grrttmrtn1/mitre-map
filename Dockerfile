@@ -34,7 +34,7 @@ RUN npm run build --workspace=server
 FROM node:20-bookworm-slim AS production
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 make g++ \
+      python3 make g++ ca-certificates gosu \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1001 mitremap \
     && useradd  --uid 1001 --gid mitremap --shell /bin/bash --no-create-home mitremap
@@ -56,7 +56,19 @@ COPY --from=client-builder /app/client/dist ./client/dist
 RUN mkdir -p /app/server/data && chown -R mitremap:mitremap /app
 VOLUME ["/app/server/data"]
 
-USER mitremap
+# ── Enterprise CA certificates (build-time) ───────────────────────────────────
+# Drop any *.crt files into certs/ before building to bake them into the image.
+# Runtime injection is handled by entrypoint.sh via ENTERPRISE_CA_BUNDLE.
+# Both paths are optional — the image builds and runs normally without any cert.
+COPY certs/ /tmp/enterprise-certs/
+RUN if ls /tmp/enterprise-certs/*.crt 1>/dev/null 2>&1; then \
+      cp /tmp/enterprise-certs/*.crt /usr/local/share/ca-certificates/ && \
+      update-ca-certificates; \
+    fi && \
+    rm -rf /tmp/enterprise-certs
+
+COPY --chown=root:root entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 ENV NODE_ENV=production
 ENV PORT=4000
@@ -66,4 +78,5 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "require('https').get({hostname:'localhost',port:4000,path:'/api/health',rejectUnauthorized:false},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "server/dist/index.js"]
