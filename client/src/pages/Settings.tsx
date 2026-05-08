@@ -36,6 +36,10 @@ export default function Settings() {
   const [deprecated, setDeprecated] = useState<any[]>([]);
   const [migrationScan, setMigrationScan] = useState<any | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
+  const [updateCheck, setUpdateCheck] = useState<any | null>(null);
+  const [checkLoading, setCheckLoading] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [applyResult, setApplyResult] = useState<any | null>(null);
 
   // OIDC providers state
   const [oidcProviders, setOidcProviders] = useState<any[]>([]);
@@ -1048,6 +1052,69 @@ export default function Settings() {
                 {attackVersion.notes && <div className="text-slate-500 text-xs mt-1">{attackVersion.notes}</div>}
               </div>
             )}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-medium text-slate-300">Check for Updates</h2>
+                <button
+                  onClick={async () => {
+                    setCheckLoading(true);
+                    setUpdateCheck(null);
+                    setApplyResult(null);
+                    try { setUpdateCheck(await api.checkAttackUpdates()); }
+                    catch { setUpdateCheck({ error: 'Failed to reach GitHub API' }); }
+                    finally { setCheckLoading(false); }
+                  }}
+                  disabled={checkLoading || applyLoading}
+                  className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50">
+                  {checkLoading ? 'Checking…' : 'Check for Updates'}
+                </button>
+              </div>
+              <p className="text-slate-500 text-xs mb-3">Queries GitHub for the latest MITRE ATT&CK STIX release and compares it to the active version.</p>
+              {updateCheck?.error && (
+                <p className="text-red-400 text-sm">{updateCheck.error}</p>
+              )}
+              {updateCheck && !updateCheck.error && (
+                <div className="space-y-3">
+                  <div className="flex gap-6 text-sm">
+                    <div><span className="text-slate-500">Current: </span><span className="font-mono text-slate-300">{updateCheck.current_version}</span></div>
+                    <div><span className="text-slate-500">Latest: </span><span className="font-mono text-indigo-400">{updateCheck.latest_version}</span></div>
+                    {updateCheck.published_at && (
+                      <div><span className="text-slate-500">Released: </span><span className="text-slate-400">{new Date(updateCheck.published_at).toLocaleDateString()}</span></div>
+                    )}
+                  </div>
+                  {updateCheck.up_to_date ? (
+                    <p className="text-green-400 text-sm">You are on the latest ATT&CK version.</p>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <p className="text-yellow-400 text-sm">v{updateCheck.latest_version} is available.</p>
+                      <button
+                        onClick={async () => {
+                          setApplyLoading(true);
+                          setApplyResult(null);
+                          try {
+                            const result = await api.applyAttackUpdate(updateCheck.latest_version);
+                            setApplyResult(result);
+                            loadAttackVersion();
+                          } catch (e: any) {
+                            setApplyResult({ error: e?.message ?? 'Update failed' });
+                          } finally { setApplyLoading(false); }
+                        }}
+                        disabled={applyLoading}
+                        className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-500 disabled:opacity-50">
+                        {applyLoading ? 'Applying…' : `Apply v${updateCheck.latest_version}`}
+                      </button>
+                    </div>
+                  )}
+                  {applyResult?.error && <p className="text-red-400 text-sm">{applyResult.error}</p>}
+                  {applyResult && !applyResult.error && (
+                    <div className="bg-slate-800 rounded-lg px-3 py-2 text-xs space-y-1">
+                      <p className="text-green-400 font-medium">Update applied — ATT&CK v{applyResult.version}</p>
+                      <p className="text-slate-400">{applyResult.techniques_new} new techniques · {applyResult.techniques_updated} updated · {applyResult.deprecated_added} newly deprecated · {applyResult.mitigations} mitigations</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-medium text-slate-300">Migration Scan</h2>

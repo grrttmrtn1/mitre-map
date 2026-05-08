@@ -140,6 +140,11 @@ router.get('/analysis', async (_req, res) => {
     AND NOT EXISTS (
       SELECT 1 FROM detections d WHERE d.status='active' AND d.technique_ids LIKE '%"' || t.id || '"%'
     )
+    AND NOT EXISTS (
+      SELECT 1 FROM attack_techniques sub
+      JOIN detections d ON d.status='active' AND d.technique_ids LIKE '%"' || sub.id || '"%'
+      WHERE sub.parent_id=t.id AND sub.is_subtechnique=1
+    )
   `, []);
 
   const result = await Promise.all(gaps.map(async (t: any) => {

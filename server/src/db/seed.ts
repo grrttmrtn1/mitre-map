@@ -2,6 +2,7 @@ import { Knex } from 'knex';
 import bcrypt from 'bcryptjs';
 import { TACTICS, TECHNIQUES, MITIGATIONS, TECHNIQUE_MITIGATIONS } from '../data/attack';
 import { D3FEND_TECHNIQUES, ATTACK_D3FEND } from '../data/d3fend';
+import { fetchAndParseStix } from '../data/stix-fetch';
 import { DEMO_TOOLS, DEMO_DETECTIONS } from '../data/demo';
 import { THREAT_GROUPS } from '../data/threat-groups';
 import { COMPLIANCE_FRAMEWORKS, COMPLIANCE_CONTROLS, TECHNIQUE_COMPLIANCE, DEMO_TAGS } from '../data/compliance';
@@ -32,6 +33,54 @@ const SEED_COUNTRIES = [
   { name: 'Unknown',      color: '#6b7280', flag: '🌐' },
 ];
 
+async function tryLiveAttackSeed(db: Knex): Promise<void> {
+  const stix = await fetchAndParseStix();
+  if (!stix) {
+    console.log('Live ATT&CK fetch unavailable — using static v14.1 baseline');
+    return;
+  }
+
+  const shortnameToTacticId = new Map(stix.tactics.map(t => [t.shortname, t.id]));
+  const liveTechIds = new Set(stix.techniques.map(t => t.id));
+
+  await db.transaction(async trx => {
+    for (const t of stix.tactics) {
+      await trx.raw(
+        'INSERT INTO attack_tactics (id, name, shortname, description) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, shortname=excluded.shortname, description=excluded.description',
+        [t.id, t.name, t.shortname, t.description]
+      );
+    }
+    for (const t of stix.techniques) {
+      const tacticIds = t.phase_names.map(p => shortnameToTacticId.get(p)).filter(Boolean);
+      await trx.raw(
+        'INSERT INTO attack_techniques (id, name, description, tactic_ids, is_subtechnique, parent_id, url) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, description=excluded.description, tactic_ids=excluded.tactic_ids, is_subtechnique=excluded.is_subtechnique, parent_id=excluded.parent_id, url=excluded.url',
+        [t.id, t.name, t.description, JSON.stringify(tacticIds), t.is_subtechnique, t.parent_id, t.url]
+      );
+    }
+    for (const m of stix.mitigations) {
+      await trx.raw(
+        'INSERT INTO attack_mitigations (id, name, description, url) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, description=excluded.description, url=excluded.url',
+        [m.id, m.name, m.description, m.url]
+      );
+    }
+    for (const rel of stix.mitRelationships) {
+      const techId = stix.stixIdToTechId.get(rel.stix_tech_id);
+      if (!techId || !liveTechIds.has(techId)) continue;
+      await trx.raw(
+        'INSERT INTO technique_mitigations (technique_id, mitigation_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+        [techId, rel.mitigation_id]
+      );
+    }
+    await trx.raw(
+      'INSERT INTO attack_version_info (version, name, released_at, is_active, notes) VALUES (?, ?, ?, 1, ?)',
+      [stix.version, `ATT&CK v${stix.version}`, new Date().toISOString().split('T')[0],
+       `Enterprise ATT&CK v${stix.version} — ${stix.tactics.length} tactics, ${stix.techniques.filter(t => !t.is_subtechnique).length} techniques (auto-fetched on install)`]
+    );
+  });
+
+  console.log(`Seeded from live ATT&CK v${stix.version}: ${stix.tactics.length} tactics, ${stix.techniques.length} techniques (${stix.techniques.filter(t => t.is_subtechnique).length} subtechniques)`);
+}
+
 export async function seedDatabase(db: Knex): Promise<void> {
   const { count: existingTactics } = await db('attack_tactics').count('id as count').first() as any;
   const isFirstRun = Number(existingTactics) === 0;
@@ -48,7 +97,7 @@ export async function seedDatabase(db: Knex): Promise<void> {
     }
   }
 
-  // Always seed ATT&CK + D3FEND (ON CONFLICT DO NOTHING is idempotent)
+  // Seed static ATT&CK + D3FEND baseline (idempotent, used as offline fallback)
   await db.transaction(async trx => {
     for (const t of TACTICS) {
       await trx.raw(
@@ -88,7 +137,11 @@ export async function seedDatabase(db: Knex): Promise<void> {
     }
   });
 
+  // On first run, try to upgrade ATT&CK data to the latest version from GitHub.
+  // If the fetch succeeds, it overwrites the static baseline and writes the version record so
+  // seedNewTables skips its hardcoded '14.1' insert. Falls back silently on network failure.
   if (isFirstRun) {
+    await tryLiveAttackSeed(db);
     console.log(`Seeded: ${TACTICS.length} tactics, ${TECHNIQUES.length} techniques`);
     await db.transaction(async trx => {
       for (const tool of DEMO_TOOLS) {
@@ -193,39 +246,42 @@ async function seedNewTables(db: Knex, isFirstRun: boolean): Promise<void> {
   // Initial coverage snapshot (first run only)
   const { count: snapCount } = await db('coverage_snapshots').count('id as count').first() as any;
   if (Number(snapCount) === 0) {
-    const { count: total } = await db('attack_techniques').where('is_subtechnique', 0).count('id as count').first() as any;
+    const parentTechRows = await db('attack_techniques').where('is_subtechnique', 0).select('id');
+    const parentIds = new Set(parentTechRows.map((r: any) => r.id));
+    const totalNum2 = parentIds.size;
     const activeDetections = await db('detections').where('status', 'active').select('technique_ids');
     const covered = new Set<string>();
     for (const d of activeDetections) {
-      for (const id of JSON.parse(d.technique_ids)) covered.add(id);
+      for (const id of JSON.parse(d.technique_ids)) {
+        if (parentIds.has(id)) covered.add(id);
+      }
     }
     const { count: activeDetCount } = await db('detections').where('status', 'active').count('id as count').first() as any;
     const { count: toolCount } = await db('tools').count('id as count').first() as any;
-    const coveredCount = Math.max(0, covered.size - 8);
-    const totalNum = Number(total);
+    const coveredCount = covered.size;
     await db('coverage_snapshots').insert({
       taken_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      total_techniques: totalNum,
+      total_techniques: totalNum2,
       covered_techniques: coveredCount,
       detected_techniques: coveredCount,
       mitigated_techniques: 12,
-      gap_techniques: totalNum - coveredCount,
-      coverage_pct: Math.round((coveredCount / totalNum) * 100),
+      gap_techniques: totalNum2 - coveredCount,
+      coverage_pct: Math.round((coveredCount / totalNum2) * 100),
       active_detections: Math.max(0, Number(activeDetCount) - 3),
       total_tools: Number(toolCount),
       notes: 'Initial baseline',
     });
   }
 
-  // ATT&CK version info (first run only)
+  // ATT&CK version info — only inserted if tryLiveAttackSeed didn't already write one
   const { count: versionCount } = await db('attack_version_info').count('id as count').first() as any;
   if (Number(versionCount) === 0) {
     await db('attack_version_info').insert({
       version: '14.1',
-      name: 'ATT&CK v14.1',
+      name: 'ATT&CK v14.1 (offline baseline)',
       released_at: '2023-10-31',
       is_active: 1,
-      notes: 'Enterprise ATT&CK v14.1 — 14 tactics, 193 techniques',
+      notes: 'Static baseline — use Settings → ATT&CK Version to update to the current release',
     });
   }
 

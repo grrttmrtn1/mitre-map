@@ -46,7 +46,7 @@ export default function Detections() {
     .then(setDetections).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, [filterStatus, filterSeverity, filterSource]);
-  useEffect(() => { api.getTechniques().then(setTechniques); }, []);
+  useEffect(() => { api.getTechniques(undefined, true).then(setTechniques); }, []);
 
   const openCreate = () => { setEditDetection(null); setForm({ ...EMPTY_FORM }); setModalOpen(true); };
   const openEdit = (d: Detection, e?: React.MouseEvent) => {
@@ -182,7 +182,7 @@ export default function Detections() {
   const filteredTechs = techniques.filter(t =>
     t.id.toLowerCase().includes(techSearch.toLowerCase()) ||
     t.name.toLowerCase().includes(techSearch.toLowerCase())
-  ).slice(0, 30);
+  ).slice(0, 150);
 
   const displayed = detections.filter(d => {
     if (!search) return true;
@@ -438,12 +438,12 @@ export default function Detections() {
                 <input value={techSearch} onChange={e => setTechSearch(e.target.value)} placeholder="Search techniques..."
                   className="w-full px-2 py-1 bg-slate-800 text-xs text-slate-300 rounded focus:outline-none" />
               </div>
-              <div className="max-h-36 overflow-y-auto p-1 bg-slate-900">
+              <div className="max-h-48 overflow-y-auto p-1 bg-slate-900">
                 {filteredTechs.map(t => (
-                  <label key={t.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer">
-                    <input type="checkbox" checked={form.technique_ids.includes(t.id)} onChange={() => toggleTechId(t.id)} className="accent-blue-500" />
-                    <span className="font-mono text-xs text-slate-400 w-14 flex-shrink-0">{t.id}</span>
-                    <span className="text-xs text-slate-300 truncate">{t.name}</span>
+                  <label key={t.id} className={`flex items-center gap-2 py-1 rounded hover:bg-slate-800 cursor-pointer ${t.is_subtechnique ? 'pl-5 pr-2' : 'px-2'}`}>
+                    <input type="checkbox" checked={form.technique_ids.includes(t.id)} onChange={() => toggleTechId(t.id)} className="accent-blue-500 flex-shrink-0" />
+                    <span className={`font-mono text-xs flex-shrink-0 ${t.is_subtechnique ? 'text-slate-500 w-20' : 'text-slate-400 w-14'}`}>{t.id}</span>
+                    <span className={`text-xs truncate ${t.is_subtechnique ? 'text-slate-400' : 'text-slate-300'}`}>{t.name}</span>
                   </label>
                 ))}
               </div>

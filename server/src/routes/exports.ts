@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet } from '../db/database';
+import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent } from '../db/database';
 import PptxGenJS from 'pptxgenjs';
 
 const router = Router();
@@ -86,23 +86,42 @@ router.get('/tools/csv', async (_req, res) => {
 
 router.get('/coverage/json', async (_req, res) => {
   const db = getKnex();
+  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
+
+  // Build detected and mitigated sets, resolving subtechniques to their parents
+  const detectedParents = new Set<string>();
+  for (const d of await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'")) {
+    for (const id of JSON.parse(d.technique_ids)) {
+      const p = resolveToParent(id, parentTechIds, subtechToParent);
+      if (p) detectedParents.add(p);
+    }
+  }
+  const mitigatedParents = new Set<string>();
+  for (const r of await rawAll<{ technique_id: string }>(db, `
+    SELECT DISTINCT tm.technique_id FROM technique_mitigations tm
+    JOIN tool_mitigations tlm ON tm.mitigation_id = tlm.mitigation_id
+    JOIN tools tl ON tlm.tool_id = tl.id WHERE tl.status = 'active'
+  `)) {
+    const p = resolveToParent(r.technique_id, parentTechIds, subtechToParent);
+    if (p) mitigatedParents.add(p);
+  }
+
   const techniques = await rawAll<any>(db, 'SELECT id, name, tactic_ids FROM attack_techniques WHERE is_subtechnique = 0', []);
-  const result = await Promise.all(techniques.map(async t => {
-    const detected = ((await rawGet<{ c: number }>(db,
-      "SELECT COUNT(*) as c FROM detections WHERE status='active' AND technique_ids LIKE ?", [`%"${t.id}"%`]) as any).c) > 0;
-    const mitigated = ((await rawGet<{ c: number }>(db, `
-      SELECT COUNT(*) as c FROM technique_mitigations tm
-      JOIN tool_mitigations tlm ON tm.mitigation_id = tlm.mitigation_id
-      JOIN tools tl ON tlm.tool_id = tl.id WHERE tm.technique_id = ? AND tl.status = 'active'
-    `, [t.id]) as any).c) > 0;
-    return { id: t.id, name: t.name, tactic_ids: JSON.parse(t.tactic_ids), detected, mitigated, status: detected && mitigated ? 'full' : detected ? 'detected' : mitigated ? 'mitigated' : 'gap' };
-  }));
+  const result = techniques.map(t => {
+    const detected = detectedParents.has(t.id);
+    const mitigated = mitigatedParents.has(t.id);
+    return {
+      id: t.id, name: t.name, tactic_ids: JSON.parse(t.tactic_ids), detected, mitigated,
+      status: detected && mitigated ? 'full' : detected ? 'detected' : mitigated ? 'mitigated' : 'gap',
+    };
+  });
   res.setHeader('Content-Disposition', 'attachment; filename="coverage-matrix.json"');
   res.json(result);
 });
 
 router.get('/report/pptx', async (_req, res) => {
   const db = getKnex();
+  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
 
   const [techniques, detections, tools, threatGroups] = await Promise.all([
     rawAll<any>(db, 'SELECT id, name, tactic_ids FROM attack_techniques WHERE is_subtechnique=0', []),
@@ -114,7 +133,10 @@ router.get('/report/pptx', async (_req, res) => {
   const activeDetections = detections.filter((d: any) => d.status === 'active');
   const coveredIds = new Set<string>();
   for (const d of activeDetections) {
-    for (const id of JSON.parse(d.technique_ids)) coveredIds.add(id);
+    for (const id of JSON.parse(d.technique_ids)) {
+      const p = resolveToParent(id, parentTechIds, subtechToParent);
+      if (p) coveredIds.add(p);
+    }
   }
   const coveragePct = techniques.length ? Math.round((coveredIds.size / techniques.length) * 100) : 0;
 

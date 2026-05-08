@@ -46,7 +46,7 @@ export default function ThreatGroups() {
   const loadGroups = () => api.getThreatGroups().then(setGroups).finally(() => setLoading(false));
 
   useEffect(() => { loadGroups(); }, []);
-  useEffect(() => { api.getTechniques().then(setAllTechniques); }, []);
+  useEffect(() => { api.getTechniques(undefined, true).then(setAllTechniques); }, []);
   useEffect(() => { api.getMotivations().then(setMotivationOptions); }, []);
   useEffect(() => { api.getCountries().then(setCountryOptions); }, []);
 
@@ -441,13 +441,13 @@ function GroupModal({
             <input value={techSearch} onChange={e => setTechSearch(e.target.value)} placeholder="Search by ID or name..."
               className="w-full px-3 py-1.5 mb-2 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500" />
             <div className="border border-slate-700 rounded-lg overflow-y-auto max-h-44 bg-slate-800/50">
-              {filteredTechs.slice(0, 200).map(t => (
+              {filteredTechs.slice(0, 400).map(t => (
                 <label key={t.id}
-                  className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-slate-700/50 ${selectedTechIds.has(t.id) ? 'bg-blue-600/10' : ''}`}>
+                  className={`flex items-center gap-2 py-1.5 cursor-pointer hover:bg-slate-700/50 ${selectedTechIds.has(t.id) ? 'bg-blue-600/10' : ''} ${t.is_subtechnique ? 'pl-6 pr-3' : 'px-3'}`}>
                   <input type="checkbox" checked={selectedTechIds.has(t.id)} onChange={() => toggleTech(t.id)}
-                    className="accent-blue-500" />
-                  <span className="font-mono text-xs text-slate-400 w-14 flex-shrink-0">{t.id}</span>
-                  <span className="text-xs text-slate-300 truncate">{t.name}</span>
+                    className="accent-blue-500 flex-shrink-0" />
+                  <span className={`font-mono text-xs flex-shrink-0 ${t.is_subtechnique ? 'text-slate-500 w-20' : 'text-slate-400 w-14'}`}>{t.id}</span>
+                  <span className={`text-xs truncate ${t.is_subtechnique ? 'text-slate-400' : 'text-slate-300'}`}>{t.name}</span>
                 </label>
               ))}
               {filteredTechs.length === 0 && (

@@ -1,11 +1,13 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet } from '../db/database';
+import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent } from '../db/database';
 
 const router = Router();
 
 router.get('/stats', async (_req, res) => {
   const db = getKnex();
-  const { c: totalTechniques } = await rawGet<{ c: number }>(db, 'SELECT COUNT(*) as c FROM attack_techniques WHERE is_subtechnique=0') as any;
+  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
+  const totalTechniques = parentTechIds.size;
+
   const [{ c: totalDetections }, { c: activeDetections }, { c: tuningDetections }, { c: disabledDetections }, { c: plannedDetections }, { c: totalTools }, { c: activeTools }] = await Promise.all([
     rawGet<any>(db, 'SELECT COUNT(*) as c FROM detections'),
     rawGet<any>(db, "SELECT COUNT(*) as c FROM detections WHERE status='active'"),
@@ -18,7 +20,10 @@ router.get('/stats', async (_req, res) => {
 
   const detectedTechniqueIds = new Set<string>();
   const allDetections = await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'");
-  for (const d of allDetections) for (const id of JSON.parse(d.technique_ids)) detectedTechniqueIds.add(id);
+  for (const d of allDetections) for (const id of JSON.parse(d.technique_ids)) {
+    const p = resolveToParent(id, parentTechIds, subtechToParent);
+    if (p) detectedTechniqueIds.add(p);
+  }
 
   const mitigatedTechniqueIds = new Set<string>();
   const techsWithMitigations = await rawAll<{ technique_id: string }>(db, `
@@ -26,7 +31,10 @@ router.get('/stats', async (_req, res) => {
     JOIN tool_mitigations tom ON tm.mitigation_id = tom.mitigation_id
     JOIN tools t ON tom.tool_id = t.id WHERE t.status='active'
   `);
-  for (const r of techsWithMitigations) mitigatedTechniqueIds.add(r.technique_id);
+  for (const r of techsWithMitigations) {
+    const p = resolveToParent(r.technique_id, parentTechIds, subtechToParent);
+    if (p) mitigatedTechniqueIds.add(p);
+  }
 
   const coveredCount = new Set([...detectedTechniqueIds, ...mitigatedTechniqueIds]).size;
 
@@ -62,39 +70,84 @@ router.get('/stats', async (_req, res) => {
 router.get('/matrix', async (_req, res) => {
   const db = getKnex();
   const tactics = await rawAll(db, 'SELECT * FROM attack_tactics ORDER BY id');
+
   const allDetections = await rawAll<{ id: number; name: string; status: string; severity: string; technique_ids: string }>(
     db, 'SELECT id, name, status, severity, technique_ids FROM detections'
   );
   const parsedDetections = allDetections.map(d => ({ ...d, technique_ids: JSON.parse(d.technique_ids) as string[] }));
 
-  const toolMitigatedTechs = new Set<string>();
-  const techsWithMitigations = await rawAll<{ technique_id: string }>(db, `
+  // Raw set of all technique IDs that have active-tool-backed mitigations
+  const rawMitigatedRows = await rawAll<{ technique_id: string }>(db, `
     SELECT DISTINCT tm.technique_id FROM technique_mitigations tm
     JOIN tool_mitigations tom ON tm.mitigation_id = tom.mitigation_id
     JOIN tools t ON tom.tool_id = t.id WHERE t.status='active'
   `);
-  for (const r of techsWithMitigations) toolMitigatedTechs.add(r.technique_id);
+  const rawMitigatedSet = new Set(rawMitigatedRows.map(r => r.technique_id));
+
+  // Load all subtechniques upfront with names for matrix display
+  const allSubtechDetails = await rawAll<{ id: string; name: string; parent_id: string }>(db,
+    'SELECT id, name, parent_id FROM attack_techniques WHERE is_subtechnique=1 AND parent_id IS NOT NULL ORDER BY id');
+  const subtechsByParent = new Map<string, Array<{ id: string; name: string }>>();
+  for (const st of allSubtechDetails) {
+    if (!subtechsByParent.has(st.parent_id)) subtechsByParent.set(st.parent_id, []);
+    subtechsByParent.get(st.parent_id)!.push({ id: st.id, name: st.name });
+  }
 
   const columns = await Promise.all(tactics.map(async (tactic: any) => {
     const techniques = await rawAll<{ id: string; name: string }>(db,
       'SELECT id, name FROM attack_techniques WHERE is_subtechnique=0 AND tactic_ids LIKE ? ORDER BY id', [`%"${tactic.id}"%`]);
+
     const cells = techniques.map(tech => {
-      const detections = parsedDetections.filter(d => d.technique_ids.includes(tech.id));
-      const activeDetections = detections.filter(d => d.status === 'active');
-      const tuningDetections = detections.filter(d => d.status === 'tuning');
-      const plannedDetections = detections.filter(d => d.status === 'planned');
-      const isMitigated = toolMitigatedTechs.has(tech.id);
+      const subs = subtechsByParent.get(tech.id) ?? [];
+
+      // Build individual subtechnique cells
+      const subtechniques = subs.map(sub => {
+        const subDets = parsedDetections.filter(d => d.technique_ids.includes(sub.id));
+        const subActive = subDets.filter(d => d.status === 'active');
+        const subTuning = subDets.filter(d => d.status === 'tuning');
+        const subPlanned = subDets.filter(d => d.status === 'planned');
+        const subMitigated = rawMitigatedSet.has(sub.id);
+        let subStatus: string;
+        if (subActive.length > 0 && subMitigated) subStatus = 'full';
+        else if (subActive.length > 0) subStatus = 'detected';
+        else if (subMitigated) subStatus = 'mitigated';
+        else if (subTuning.length > 0) subStatus = 'tuning';
+        else if (subPlanned.length > 0) subStatus = 'planned';
+        else subStatus = 'gap';
+        return {
+          id: sub.id, name: sub.name, status: subStatus,
+          detection_count: subActive.length,
+          detections: subActive.map(d => ({ id: d.id, name: d.name, severity: d.severity })),
+        };
+      });
+
+      // Parent-level detections (direct only, not via subtechniques)
+      const directDets = parsedDetections.filter(d => d.technique_ids.includes(tech.id));
+      const directActive = directDets.filter(d => d.status === 'active');
+      const directTuning = directDets.filter(d => d.status === 'tuning');
+      const directPlanned = directDets.filter(d => d.status === 'planned');
+
+      // Combined status: aggregate parent + all subtechniques
+      const hasActive = directActive.length > 0 || subtechniques.some(s => s.detection_count > 0);
+      const hasTuning = directTuning.length > 0 || subtechniques.some(s => s.status === 'tuning');
+      const hasPlanned = directPlanned.length > 0 || subtechniques.some(s => s.status === 'planned');
+      const isMitigated = rawMitigatedSet.has(tech.id) || subtechniques.some(s => s.status === 'mitigated' || s.status === 'full');
+
       let status: string;
-      if (activeDetections.length > 0 && isMitigated) status = 'full';
-      else if (activeDetections.length > 0) status = 'detected';
+      if (hasActive && isMitigated) status = 'full';
+      else if (hasActive) status = 'detected';
       else if (isMitigated) status = 'mitigated';
-      else if (tuningDetections.length > 0) status = 'tuning';
-      else if (plannedDetections.length > 0) status = 'planned';
+      else if (hasTuning) status = 'tuning';
+      else if (hasPlanned) status = 'planned';
       else status = 'gap';
+
       return {
         id: tech.id, name: tech.name, status,
-        detection_count: activeDetections.length,
-        detections: activeDetections.map(d => ({ id: d.id, name: d.name, severity: d.severity })),
+        detection_count: directActive.length + subtechniques.reduce((s, st) => s + st.detection_count, 0),
+        detections: directActive.map(d => ({ id: d.id, name: d.name, severity: d.severity })),
+        subtechniques,
+        subtechnique_count: subs.length,
+        subtechnique_covered: subtechniques.filter(s => s.status !== 'gap').length,
       };
     });
     return { tactic, cells };
@@ -105,16 +158,25 @@ router.get('/matrix', async (_req, res) => {
 
 router.get('/gaps', async (_req, res) => {
   const db = getKnex();
+  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
+
   const detectedIds = new Set<string>();
   for (const d of await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'")) {
-    for (const id of JSON.parse(d.technique_ids)) detectedIds.add(id);
+    for (const id of JSON.parse(d.technique_ids)) {
+      const p = resolveToParent(id, parentTechIds, subtechToParent);
+      if (p) detectedIds.add(p);
+    }
   }
+
   const mitigatedIds = new Set<string>();
   for (const r of await rawAll<{ technique_id: string }>(db, `
     SELECT DISTINCT tm.technique_id FROM technique_mitigations tm
     JOIN tool_mitigations tom ON tm.mitigation_id = tom.mitigation_id
     JOIN tools t ON tom.tool_id = t.id WHERE t.status='active'
-  `)) mitigatedIds.add(r.technique_id);
+  `)) {
+    const p = resolveToParent(r.technique_id, parentTechIds, subtechToParent);
+    if (p) mitigatedIds.add(p);
+  }
 
   const allTechniques = await rawAll<any>(db, 'SELECT * FROM attack_techniques WHERE is_subtechnique=0');
   const gaps = await Promise.all(

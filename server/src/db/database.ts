@@ -54,3 +54,37 @@ export async function logAudit(
 export async function runMigrations(): Promise<void> {
   await _knex.migrate.latest();
 }
+
+// Preload parent/subtechnique relationships for efficient coverage computation.
+// Returns: parentTechIds (all non-subtechnique IDs), subtechToParent (sub→parent map),
+// parentToSubtechs (parent→[sub IDs] map).
+export async function buildTechniqueGraph(db: DB): Promise<{
+  parentTechIds: Set<string>;
+  subtechToParent: Map<string, string>;
+  parentToSubtechs: Map<string, string[]>;
+}> {
+  const [parents, subtechs] = await Promise.all([
+    rawAll<{ id: string }>(db, 'SELECT id FROM attack_techniques WHERE is_subtechnique=0'),
+    rawAll<{ id: string; parent_id: string }>(db,
+      'SELECT id, parent_id FROM attack_techniques WHERE is_subtechnique=1 AND parent_id IS NOT NULL'),
+  ]);
+  const subtechToParent = new Map(subtechs.map(r => [r.id, r.parent_id]));
+  const parentToSubtechs = new Map<string, string[]>();
+  for (const { id, parent_id } of subtechs) {
+    if (!parentToSubtechs.has(parent_id)) parentToSubtechs.set(parent_id, []);
+    parentToSubtechs.get(parent_id)!.push(id);
+  }
+  return { parentTechIds: new Set(parents.map(r => r.id)), subtechToParent, parentToSubtechs };
+}
+
+// Map a technique ID (parent or subtechnique) to its parent technique ID.
+// Returns null if the ID is unknown (not a parent, not a known subtechnique).
+export function resolveToParent(
+  id: string,
+  parentTechIds: Set<string>,
+  subtechToParent: Map<string, string>
+): string | null {
+  if (parentTechIds.has(id)) return id;
+  const parent = subtechToParent.get(id);
+  return (parent && parentTechIds.has(parent)) ? parent : null;
+}

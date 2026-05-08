@@ -91,7 +91,13 @@ async function del(path: string, body?: unknown): Promise<any> {
 export const api = {
   // ATT&CK
   getTactics: () => get<Tactic[]>('/attack/tactics'),
-  getTechniques: (tactic?: string) => get<Technique[]>(`/attack/techniques${tactic ? `?tactic=${tactic}` : ''}`),
+  getTechniques: (tactic?: string, includeSubtechniques?: boolean) => {
+    const params = new URLSearchParams();
+    if (tactic) params.set('tactic', tactic);
+    if (includeSubtechniques) params.set('include_subtechniques', 'true');
+    const q = params.toString();
+    return get<Technique[]>(`/attack/techniques${q ? `?${q}` : ''}`);
+  },
   getTechnique: (id: string) => get<Technique & { mitigations: Mitigation[]; d3fend_countermeasures: D3FendTechnique[]; detections: Detection[] }>(`/attack/techniques/${id}`),
   getMitigations: () => get<Mitigation[]>('/attack/mitigations'),
 
@@ -240,6 +246,8 @@ export const api = {
   getAttackVersion: () => get<AttackVersion>('/attack/version'),
   getDeprecatedTechniques: () => get<any[]>('/attack/deprecated'),
   getMigrationScan: () => get<any>('/attack/migration-scan'),
+  checkAttackUpdates: () => get<any>('/attack/check-updates'),
+  applyAttackUpdate: (version?: string) => post<any>('/attack/apply-update', version ? { version } : {}),
 
   // Atomic Red Team
   getArtTests: () => get<ArtTest[]>('/atomic/tests'),

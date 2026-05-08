@@ -65,12 +65,23 @@ export interface ToolDetail extends Tool {
   mitigations: Mitigation[];
 }
 
+export interface SubtechniqueCell {
+  id: string;
+  name: string;
+  status: 'full' | 'detected' | 'mitigated' | 'tuning' | 'planned' | 'gap';
+  detection_count: number;
+  detections: Array<{ id: number; name: string; severity: string }>;
+}
+
 export interface MatrixCell {
   id: string;
   name: string;
   status: 'full' | 'detected' | 'mitigated' | 'tuning' | 'planned' | 'gap';
   detection_count: number;
   detections: Array<{ id: number; name: string; severity: string }>;
+  subtechniques: SubtechniqueCell[];
+  subtechnique_count: number;
+  subtechnique_covered: number;
 }
 
 export interface MatrixColumn {

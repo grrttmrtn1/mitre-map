@@ -27,7 +27,7 @@ export default function DefenseMapping() {
 
   useEffect(() => {
     api.getTactics().then(setTactics);
-    api.getTechniques().then(setTechniques);
+    api.getTechniques(undefined, true).then(setTechniques);
   }, []);
 
   const selectTechnique = async (tech: Technique) => {
@@ -63,20 +63,20 @@ export default function DefenseMapping() {
               {tactics.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
-          <div className="text-xs text-slate-500 mt-2">{filteredTechs.length} techniques</div>
+          <div className="text-xs text-slate-500 mt-2">{filteredTechs.filter(t => !t.is_subtechnique).length} techniques · {filteredTechs.filter(t => t.is_subtechnique).length} subtechniques</div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {filteredTechs.map(t => (
             <button
               key={t.id}
               onClick={() => selectTechnique(t)}
-              className={`w-full text-left px-4 py-2.5 border-b border-slate-800/50 transition-colors hover:bg-slate-800/50 ${
-                selected?.technique.id === t.id ? 'bg-blue-600/10 border-l-2 border-l-blue-500' : ''
-              }`}
+              className={`w-full text-left border-b border-slate-800/50 transition-colors hover:bg-slate-800/50 ${
+                t.is_subtechnique ? 'pl-8 pr-4 py-2' : 'px-4 py-2.5'
+              } ${selected?.technique.id === t.id ? 'bg-blue-600/10 border-l-2 border-l-blue-500' : ''}`}
             >
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-slate-500 flex-shrink-0">{t.id}</span>
-                <span className="text-xs text-slate-300 truncate">{t.name}</span>
+                <span className={`font-mono text-xs flex-shrink-0 ${t.is_subtechnique ? 'text-slate-500' : 'text-slate-400'}`}>{t.id}</span>
+                <span className={`text-xs truncate ${t.is_subtechnique ? 'text-slate-400' : 'text-slate-300'}`}>{t.name}</span>
               </div>
             </button>
           ))}

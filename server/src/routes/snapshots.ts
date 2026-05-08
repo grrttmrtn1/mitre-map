@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, buildTechniqueGraph, resolveToParent } from '../db/database';
 
 const router = Router();
 
@@ -12,10 +12,14 @@ router.post('/', async (req, res) => {
   const db = getKnex();
   const { notes } = req.body;
 
-  const { c: total } = await rawGet<{ c: number }>(db, 'SELECT COUNT(*) as c FROM attack_techniques WHERE is_subtechnique=0') as any;
+  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
+  const total = parentTechIds.size;
   const active = await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'");
   const covered = new Set<string>();
-  for (const d of active) for (const id of JSON.parse(d.technique_ids)) covered.add(id);
+  for (const d of active) for (const id of JSON.parse(d.technique_ids)) {
+    const p = resolveToParent(id, parentTechIds, subtechToParent);
+    if (p) covered.add(p);
+  }
 
   const { c: mitigated } = await rawGet<{ c: number }>(db, `
     SELECT COUNT(DISTINCT tm.technique_id) as c FROM technique_mitigations tm
