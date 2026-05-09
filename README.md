@@ -17,10 +17,11 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **Multi-user roles** — `admin` (full access), `analyst` (read/write), `readonly` (view only)
 - **OIDC / SSO** — configurable OAuth2/OIDC providers; new users provisioned automatically as `analyst` on first login
 - **Bootstrap mode** — no lockout: the app runs open until the first user or API key is created
+- **Bootstrap admin** — set `ADMIN_EMAIL` + `ADMIN_PASSWORD` in `.env` to seed an initial admin on first run
 - **User management** — full CRUD for users, password reset (invalidates all active sessions), and active/inactive toggling
 
 ### Coverage Intelligence
-- **ATT&CK Matrix heatmap** — full 14-tactic × 180-technique matrix with per-cell status (`full` / `detected` / `mitigated` / `tuning` / `planned` / `gap`)
+- **ATT&CK Matrix heatmap** — full 14-tactic matrix with parent techniques and subtechniques; per-cell status (`full` / `detected` / `mitigated` / `tuning` / `planned` / `gap`)
 - **D3FEND mapping** — 68 countermeasures across Harden / Detect / Isolate / Deceive / Evict, mapped to ATT&CK techniques
 - **Coverage snapshots** — point-in-time baselines; trend line shows coverage % over time
 - **Gap analysis** — every undetected technique ranked by threat-group exposure, compliance impact, and existing mitigation
@@ -69,11 +70,19 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 | Threat landscape | JSON API | `GET /api/reports/threat-landscape` |
 | Prioritized gaps | JSON API | `GET /api/reports/gaps` |
 
-### Atomic Red Team Integration
-- **Test library** — browse imported Atomic Red Team tests grouped by technique; each test shows name, GUID, platform, executor type, and the generated command
+### ATT&CK Live Updates
+- **Version tracking** — the active ATT&CK version is stored in the database and shown in Settings
+- **Update check** — admins can check GitHub for a newer ATT&CK release without leaving the app
+- **One-click update** — fetches the latest enterprise STIX bundle from the official MITRE repo and upserts all tactics, techniques, mitigations, and relationships in a single transaction; optionally target a specific version
+- **Deprecated technique tracking** — techniques removed or revoked by an update are recorded in `deprecated_techniques` with a superseded-by pointer when available
+- **Migration scan** — scans all your detections for references to deprecated technique IDs and lists which detections need updating
+
+### Atomic Red Team & Custom Tests
+- **ART test library** — browse imported Atomic Red Team tests grouped by technique; each test shows name, GUID, platform, executor type, and the generated command
 - **YAML import** — paste any `atomics/*.yaml` file from the Red Canary Atomic Red Team repository; duplicates are skipped by GUID
+- **Custom tests** — full CRUD for your own detection tests not sourced from ART; each test is marked `source: custom` and managed separately from imported ART tests
 - **Test results** — record per-detection test outcomes (`untested` / `tested` / `validated` / `failed`) with notes and run attribution
-- **Coverage stats** — technique-level count of how many ART tests exist per ATT&CK technique
+- **Coverage stats** — technique-level count of how many tests (ART + custom) exist per ATT&CK technique
 
 ### ATT&CK Data Sources
 - **Source inventory** — track which log sources (Windows Event Logs, Sysmon, CloudTrail, etc.) your organization collects; categorized and searchable
@@ -108,11 +117,17 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
                │  Vite proxy in development
 ┌──────────────▼──────────────────────────────────────┐
 │  Express 4 · TypeScript · Node 20                   │
+│  HTTPS in production (self-signed or custom cert)   │
 │                                                     │
 │  Routes                                             │
 │  ├── /api/auth           Login · logout · OIDC SSO  │
 │  ├── /api/users          User management            │
 │  ├── /api/attack         ATT&CK tactics/techniques  │
+│  │   ├── /check-updates  Compare DB vs latest STIX  │
+│  │   ├── /apply-update   Live STIX upsert           │
+│  │   ├── /version        Active ATT&CK version      │
+│  │   ├── /deprecated     Deprecated techniques      │
+│  │   └── /migration-scan Detection hygiene scan     │
 │  ├── /api/d3fend         D3FEND techniques          │
 │  ├── /api/detections     SIEM detection CRUD        │
 │  ├── /api/tools          Security tool CRUD         │
@@ -125,7 +140,8 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  ├── /api/threat-groups  APT / cybercrime groups    │
 │  ├── /api/compliance     NIST CSF 2.0 · CIS v8      │
 │  ├── /api/sigma          SIGMA rule import          │
-│  ├── /api/atomic         ART tests & results        │
+│  ├── /api/atomic         ART tests, custom tests    │
+│  │   └── /custom         Custom test CRUD           │
 │  ├── /api/data-sources   ATT&CK data source mgmt   │
 │  ├── /api/exports        Navigator / CSV / JSON     │
 │  ├── /api/reports        Pre-computed reports       │
@@ -145,6 +161,7 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │                                                     │
 │  attack_tactics · attack_techniques                 │
 │  attack_mitigations · technique_mitigations         │
+│  attack_version_info · deprecated_techniques        │
 │  d3fend_techniques · attack_d3fend                  │
 │  tools · tool_d3fend · tool_mitigations             │
 │  detections · tags · entity_tags                    │
@@ -155,19 +172,22 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  technique_compliance · api_keys                    │
 │  users · refresh_tokens · oidc_providers            │
 │  data_sources · technique_data_sources              │
-│  org_data_sources · art_tests                       │
-│  detection_art_results · attack_version_info        │
+│  org_data_sources · art_tests (source: atomic|custom)│
+│  detection_art_results                              │
 └─────────────────────────────────────────────────────┘
 ```
 
 **Key design choices:**
 - **SQLite + WAL mode** — zero-dependency persistence; WAL journal gives concurrent reads without blocking writes. Sufficient for a team of analysts; swap to Postgres if you need horizontal scale.
+- **HTTPS everywhere** — production always runs TLS. The server generates a `selfsigned` certificate automatically if no `SSL_CERT_PATH`/`SSL_KEY_PATH` are provided, so there's no plain-HTTP fallback.
 - **Polymorphic entity model** — `entity_tags`, `comments`, and `assignments` all use `(entity_type, entity_id)` keys so the same schema handles detections, techniques, tools, and gaps without separate junction tables.
 - **Synchronous DB layer** — `better-sqlite3` is synchronous, eliminating async waterfall bugs on the server while keeping the API simple.
 - **SIGMA parsing without a library** — a minimal line-by-line YAML parser extracts the handful of fields MitreMap needs (`title`, `id`, `level`, `tags`) without a full YAML dependency.
 - **Bootstrap-safe authentication** — the auth middleware checks for any users or API keys at request time. Zero configured → open access (bootstrap mode). This prevents permanent lockout and means a fresh install works without pre-seeding credentials.
 - **JWT + refresh-token session model** — short-lived JWTs (15 min) keep the server stateless; a 30-day httpOnly refresh cookie (SHA-256 hashed at rest) handles silent renewal without exposing long-lived credentials in JavaScript memory.
-- **Knex.js migrations** — the database schema is version-controlled via numbered migration files (`001_core_schema.ts`, `002_new_features.ts`). Applied automatically on startup; safe to run repeatedly.
+- **Knex.js migrations** — the database schema is version-controlled via numbered migration files. Applied automatically on startup; safe to run repeatedly.
+- **Live ATT&CK updates** — a dedicated STIX fetch module queries the official `mitre-attack/attack-stix-data` GitHub repo; updates run in a single DB transaction with upsert semantics so existing coverage data is preserved.
+- **Non-root container** — Docker runs the server as a dedicated `mitremap` user (uid 1001); `gosu` handles the privilege drop from root in the entrypoint after installing any enterprise CA certificates.
 
 ---
 
@@ -192,8 +212,10 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The Vite dev server proxies all `/api` requests to Express on port 4000.
 
+> Development mode runs plain HTTP. HTTPS is only enabled when `NODE_ENV=production`.
+
 The database is created automatically at `server/data/mitremap.db` on first run and seeded with:
-- Full MITRE ATT&CK Enterprise v14 (14 tactics, 180 techniques, 43 mitigations)
+- Full MITRE ATT&CK Enterprise (14 tactics, techniques + subtechniques, mitigations)
 - 68 D3FEND countermeasures with ATT&CK mappings
 - 18 major threat groups with technique associations
 - NIST CSF 2.0 and CIS Controls v8 compliance mappings
@@ -204,20 +226,84 @@ The database is created automatically at `server/data/mitremap.db` on first run 
 
 ## Docker
 
+### Setup
+
+Copy `.env.example` to `.env` and fill in the required values before starting:
+
+```bash
+cp .env.example .env
+# Edit .env — at minimum set JWT_SECRET, ADMIN_EMAIL, and ADMIN_PASSWORD
+```
+
+```env
+JWT_SECRET=replace-with-a-strong-random-secret
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=changeme
+```
+
 ### Single command
 
 ```bash
 docker compose up -d
 ```
 
-The app is available at [http://localhost:8080](http://localhost:8080).
+The app is available at **[https://localhost:8443](https://localhost:8443)**.
+
+A self-signed TLS certificate is generated automatically on first start. Accept the browser warning or provide your own certificate (see [Custom TLS Certificate](#custom-tls-certificate) below).
 
 The SQLite database is persisted in a named Docker volume (`mitremap-data`).
 
 ### Custom port
 
 ```bash
-MITREMAP_PORT=9000 docker compose up -d
+MITREMAP_PORT=9443 docker compose up -d
+```
+
+### Custom TLS Certificate
+
+Set `SSL_CERT_PATH` and `SSL_KEY_PATH` in `.env` to paths inside the container, then mount your cert directory:
+
+```env
+SSL_CERT_PATH=/app/certs/server.crt
+SSL_KEY_PATH=/app/certs/server.key
+```
+
+Uncomment the certs volume in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - ./certs:/app/certs:ro
+```
+
+### Enterprise CA Certificates
+
+Two options for trusting an internal/corporate CA:
+
+**Option A — Runtime injection (no rebuild needed)**
+
+Mount your CA cert and set `ENTERPRISE_CA_BUNDLE` in `.env`:
+
+```env
+ENTERPRISE_CA_BUNDLE=/app/certs/enterprise-root-ca.crt
+```
+
+Uncomment the certs volume in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - ./certs:/app/certs:ro
+```
+
+The entrypoint installs the cert into the OS trust store before starting the server.
+
+**Option B — Baked into the image**
+
+Drop any `*.crt` files into a `certs/` directory at the repo root before building. They are copied into the image and installed at build time.
+
+```bash
+mkdir -p certs
+cp /path/to/enterprise-root-ca.crt certs/
+docker compose build
 ```
 
 ### Build only (no compose)
@@ -225,7 +311,9 @@ MITREMAP_PORT=9000 docker compose up -d
 ```bash
 docker build -t mitremap:latest .
 docker run -d \
-  -p 8080:4000 \
+  -p 8443:4000 \
+  -e JWT_SECRET=your-secret \
+  -e NODE_ENV=production \
   -v mitremap-data:/app/server/data \
   --name mitremap \
   mitremap:latest
@@ -285,6 +373,21 @@ Authorization: Bearer <raw-key>
 | `PUT` | `/api/users/:id` | Update name / role / is_active |
 | `DELETE` | `/api/users/:id` | Delete user and revoke all sessions |
 | `POST` | `/api/users/:id/reset-password` | Reset password `{ password }` — invalidates all refresh tokens |
+
+### ATT&CK
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/attack/tactics` | List all tactics |
+| `GET` | `/api/attack/techniques` | List techniques (query: `tactic`, `include_subtechniques=true`) |
+| `GET` | `/api/attack/techniques/:id` | Technique detail with mitigations, D3FEND, and detections |
+| `GET` | `/api/attack/mitigations` | List all mitigations |
+| `GET` | `/api/attack/mitigations/:id` | Mitigation detail with techniques and covering tools |
+| `GET` | `/api/attack/version` | Active ATT&CK version in the database |
+| `GET` | `/api/attack/check-updates` | Compare DB version against latest GitHub release (admin) |
+| `POST` | `/api/attack/apply-update` | Fetch and apply ATT&CK STIX update `{ version? }` (admin) |
+| `GET` | `/api/attack/deprecated` | List deprecated / revoked techniques |
+| `GET` | `/api/attack/migration-scan` | Detections referencing deprecated technique IDs |
 
 ### Detections
 
@@ -393,14 +496,17 @@ Authorization: Bearer <raw-key>
 | `PUT/DELETE` | `/api/assignments/:id` | Update / delete assignment |
 | `GET` | `/api/audit` | Audit log (filter: `entity_type`, `entity_id`, `actor`, `action`) |
 
-### Atomic Red Team
+### Atomic Red Team & Custom Tests
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/atomic/tests` | List all imported ART tests |
+| `GET` | `/api/atomic/tests` | List all tests (ART + custom) |
 | `GET` | `/api/atomic/tests/:technique_id` | Tests for a specific technique |
 | `GET` | `/api/atomic/coverage` | Technique-level test count and overall coverage % |
 | `POST` | `/api/atomic/import` | Import ART YAML `{ yaml }` — returns `{ imported, skipped, total }` |
+| `POST` | `/api/atomic/custom` | Create custom test `{ technique_id, name, description?, platform?, executor_type?, command? }` |
+| `PUT` | `/api/atomic/custom/:id` | Update custom test fields |
+| `DELETE` | `/api/atomic/custom/:id` | Delete custom test |
 | `POST` | `/api/atomic/results` | Record test result `{ detection_id, art_test_id, status, notes?, run_by? }` |
 | `PUT` | `/api/atomic/results/:id` | Update result status / notes |
 | `DELETE` | `/api/atomic/results/:id` | Delete result |
@@ -445,8 +551,9 @@ Authorization: Bearer <raw-key>
 | Database | SQLite via `better-sqlite3` (WAL mode, foreign keys) |
 | Schema migrations | Knex.js (versioned migration files, run on startup) |
 | Authentication | JWT (`jsonwebtoken`), bcrypt (`bcryptjs`), OIDC (Authorization Code flow) |
+| TLS | `selfsigned` (auto self-signed cert) or BYO cert via `SSL_CERT_PATH`/`SSL_KEY_PATH` |
 | Runtime tooling | `tsx` (TS dev runner), `concurrently` |
-| Container | Docker (multi-stage Alpine build) |
+| Container | Docker (multi-stage Alpine build, non-root `mitremap` user, `gosu` privilege drop) |
 
 ---
 
@@ -456,31 +563,31 @@ Authorization: Bearer <raw-key>
 mitremap/
 ├── server/
 │   └── src/
-│       ├── index.ts            # Express app entry
+│       ├── index.ts            # Express app entry (HTTP dev / HTTPS prod)
 │       ├── middleware/
 │       │   └── auth.ts         # requireApiKey — Bearer token + SHA-256 validation
-│       ├── db/
-│       │   ├── database.ts     # Schema init, getDb(), logAudit()
-│       │   └── seed.ts         # Idempotent seeding
 │       ├── db/
 │       │   ├── database.ts     # getKnex(), logAudit(), raw* helpers
 │       │   ├── knex.ts         # Knex connection + migration runner
 │       │   ├── seed.ts         # Idempotent seeding
 │       │   └── migrations/
 │       │       ├── 001_core_schema.ts   # Base schema
-│       │       └── 002_new_features.ts  # Auth, ART, data sources
+│       │       ├── 002_new_features.ts  # Auth, ART, data sources, ATT&CK versioning
+│       │       └── 003_custom_tests.ts  # source column on art_tests
 │       ├── data/
 │       │   ├── attack.ts           # ATT&CK tactics, techniques, mitigations
 │       │   ├── d3fend.ts           # D3FEND techniques + ATT&CK mappings
+│       │   ├── stix-fetch.ts       # Live ATT&CK STIX fetcher (GitHub)
 │       │   ├── threat-groups.ts
 │       │   ├── compliance.ts       # NIST CSF 2.0, CIS Controls v8
 │       │   ├── atomic-tests.ts     # Seed ART test data
 │       │   ├── data-sources.ts     # Seed ATT&CK data sources
 │       │   └── demo.ts             # Demo tools and detections
 │       └── routes/                 # One file per resource group
+│           ├── attack.ts             # Tactics, techniques, live updates, versioning
 │           ├── auth.ts               # Login, refresh, logout, OIDC
 │           ├── users.ts              # User CRUD + password reset
-│           ├── atomic.ts             # ART tests, coverage, results, import
+│           ├── atomic.ts             # ART import, custom tests, coverage, results
 │           ├── data-sources.ts       # ATT&CK data source management
 │           ├── threat-groups.ts      # CRUD + technique assignment + procedures
 │           ├── api-keys.ts           # API key lifecycle (hash, mask, revoke)
@@ -503,19 +610,22 @@ mitremap/
 │       └── pages/
 │           ├── LoginPage.tsx       # Email/password + OIDC login
 │           ├── Dashboard.tsx
-│           ├── AttackMatrix.tsx
+│           ├── AttackMatrix.tsx    # Heatmap with subtechnique support
 │           ├── Detections.tsx
 │           ├── Tools.tsx
 │           ├── DefenseMapping.tsx
 │           ├── GapAnalysis.tsx
-│           ├── ThreatGroups.tsx    # Includes per-TTP procedure editor
-│           ├── AtomicTests.tsx     # ART test browser + import
+│           ├── ThreatGroups.tsx    # Per-TTP procedure editor
+│           ├── AtomicTests.tsx     # ART + custom test browser/editor
 │           ├── DataSources.tsx     # ATT&CK data source management
 │           ├── Reports.tsx
 │           ├── ApiPlayground.tsx   # Interactive API explorer
-│           └── Settings.tsx        # API keys + users + data management
+│           └── Settings.tsx        # API keys · users · ATT&CK updates · data mgmt
+├── certs/                      # Optional: TLS / enterprise CA certs (not committed)
+├── entrypoint.sh               # Docker entrypoint: CA injection → gosu privilege drop
 ├── Dockerfile
 ├── docker-compose.yml
+├── .env.example                # Copy to .env before running docker compose
 └── package.json                # npm workspaces root
 ```
 
