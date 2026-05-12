@@ -4,9 +4,22 @@
 
 MitreMap maps your SIEM detections and security tooling against the full MITRE ATT&CK Enterprise framework, correlates them to MITRE D3FEND countermeasures and ATT&CK mitigations, scores your risk exposure against tracked threat groups, and surfaces prioritized gaps — all in a single dark-mode dashboard.
 
-<img width="1493" height="812" alt="image" src="https://github.com/user-attachments/assets/99fe0db7-4def-4387-b6b1-c42074432ffd" />
-<img width="1483" height="812" alt="image" src="https://github.com/user-attachments/assets/da7ec4a5-0860-44db-b541-09fdf487a0a4" />
-<img width="1502" height="812" alt="image" src="https://github.com/user-attachments/assets/c760508a-624c-4114-8ffd-81e59d4fe14f" />
+<img width="1429" height="785" alt="image" src="https://github.com/user-attachments/assets/3b31ae3f-79c0-4456-bd42-33bec5d97a39" />
+<img width="1439" height="779" alt="image" src="https://github.com/user-attachments/assets/bbce9d1f-70fd-4f96-bf35-f893eacfa6de" />
+<img width="1439" height="788" alt="image" src="https://github.com/user-attachments/assets/5721fd29-394d-42b1-bf21-de7931caa9bf" />
+<img width="1431" height="787" alt="image" src="https://github.com/user-attachments/assets/f53c931f-c287-422b-bd7e-e23c2adb563b" />
+<img width="1438" height="784" alt="image" src="https://github.com/user-attachments/assets/a4349704-6bed-419c-ac5a-8bc4607f8cdf" />
+<img width="1433" height="785" alt="image" src="https://github.com/user-attachments/assets/0ddb2106-ecb6-4f84-a88d-64455728f9b6" />
+<img width="1438" height="780" alt="image" src="https://github.com/user-attachments/assets/2bace4bc-3ad9-4407-9584-3def9d560afa" />
+<img width="1440" height="783" alt="image" src="https://github.com/user-attachments/assets/67d01a20-c0d6-47c5-bc8c-9055d2dfd19f" />
+
+
+
+
+
+
+
+
 
 ---
 
