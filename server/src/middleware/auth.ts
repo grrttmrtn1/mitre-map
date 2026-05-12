@@ -56,7 +56,6 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
     if (method === p.method && reqPath === p.path) return next();
   }
   if (reqPath.startsWith('/auth/oidc/') && method === 'GET') return next();
-  if (reqPath === '/api-keys' && method === 'POST') return next();
 
   try {
     const totalAuthEntities = await getAuthEntityTotal();

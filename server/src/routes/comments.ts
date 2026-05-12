@@ -13,15 +13,16 @@ router.get('/:entityType/:entityId', async (req, res) => {
 
 router.post('/:entityType/:entityId', async (req, res) => {
   const db = getKnex();
-  const { body, author } = req.body;
+  const { body } = req.body;
   if (!body?.trim()) return res.status(400).json({ error: 'body is required' });
+  const author = (req as any).actor ?? 'analyst';
   const id = await rawInsert(db,
     'INSERT INTO comments (entity_type, entity_id, author, body) VALUES (?, ?, ?, ?) RETURNING id',
-    [req.params.entityType, req.params.entityId, author ?? 'analyst', body.trim()]
+    [req.params.entityType, req.params.entityId, author, body.trim()]
   );
   const created = await rawGet(db, 'SELECT * FROM comments WHERE id = ?', [id]);
   await logAudit(db, req.params.entityType, req.params.entityId, 'commented',
-    (req as any).actor ?? author ?? 'analyst', undefined, (req as any).sourceIp);
+    author, undefined, (req as any).sourceIp);
   res.status(201).json(created);
 });
 

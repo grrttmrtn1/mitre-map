@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { getKnex, rawGet, rawAll, rawInsert, rawRun } from '../db/database';
+import { getKnex, rawGet, rawAll, rawInsert, rawRun, logAudit } from '../db/database';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET ?? 'mitremap-dev-secret-change-in-production';
@@ -17,10 +17,17 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
   const db = getKnex();
+  const sourceIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? null;
   const user = await rawGet<any>(db, 'SELECT * FROM users WHERE email=? AND is_active=1', [email.toLowerCase()]);
-  if (!user || !user.password_hash) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!user || !user.password_hash) {
+    await logAudit(db, 'auth', 'login', 'failed', email.toLowerCase(), { reason: 'user not found' }, sourceIp);
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!valid) {
+    await logAudit(db, 'auth', 'login', 'failed', email.toLowerCase(), { reason: 'wrong password' }, sourceIp);
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
 
   const token = signToken(user.id, user.email, user.role);
   const refreshRaw = crypto.randomBytes(48).toString('hex');
@@ -119,6 +126,13 @@ router.get('/oidc/:slug', async (req, res) => {
   const provider = await rawGet<any>(db, 'SELECT * FROM oidc_providers WHERE slug=? AND enabled=1', [req.params.slug]);
   if (!provider) return res.status(404).json({ error: 'Provider not found' });
   const state = crypto.randomBytes(16).toString('hex');
+  // Store state in short-lived httpOnly cookie for CSRF validation in the callback
+  res.cookie('oidc_state', state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000,
+  });
   const params = new URLSearchParams({
     client_id: provider.client_id,
     redirect_uri: `${process.env.APP_URL ?? 'http://localhost:4000'}/api/auth/oidc/${req.params.slug}/callback`,
@@ -130,8 +144,16 @@ router.get('/oidc/:slug', async (req, res) => {
 });
 
 router.get('/oidc/:slug/callback', async (req, res) => {
-  const { code, state: _state } = req.query;
+  const { code, state } = req.query;
   if (!code) return res.status(400).json({ error: 'Missing authorization code' });
+
+  // Validate OIDC state to prevent CSRF
+  const expectedState = req.cookies?.oidc_state;
+  if (!state || !expectedState || state !== expectedState) {
+    return res.status(400).json({ error: 'Invalid or missing state parameter' });
+  }
+  res.clearCookie('oidc_state');
+
   const db = getKnex();
   const provider = await rawGet<any>(db, 'SELECT * FROM oidc_providers WHERE slug=? AND enabled=1', [req.params.slug]);
   if (!provider) return res.status(404).json({ error: 'Provider not found' });
@@ -149,8 +171,27 @@ router.get('/oidc/:slug/callback', async (req, res) => {
       }),
     });
     const tokens = await tokenRes.json() as any;
+
+    // Validate ID token claims — decode first, then verify required claims
     const payload = jwt.decode(tokens.id_token) as any;
     if (!payload?.email) return res.status(400).json({ error: 'No email in OIDC token' });
+
+    // Verify token has not expired
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      return res.status(401).json({ error: 'OIDC token expired' });
+    }
+
+    // Verify audience matches our client_id
+    const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (!aud.includes(provider.client_id)) {
+      return res.status(401).json({ error: 'OIDC token audience mismatch' });
+    }
+
+    // Verify issuer matches expected provider
+    if (payload.iss && payload.iss !== provider.issuer_url) {
+      return res.status(401).json({ error: 'OIDC token issuer mismatch' });
+    }
 
     let user = await rawGet<any>(db, 'SELECT * FROM users WHERE email=?', [payload.email.toLowerCase()]);
     if (!user) {
@@ -169,7 +210,8 @@ router.get('/oidc/:slug/callback', async (req, res) => {
 
     res.cookie('refresh_token', refreshRaw, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: REFRESH_EXPIRY_DAYS * 86400000 });
     const clientUrl = process.env.CLIENT_URL ?? 'http://localhost:5173';
-    res.redirect(`${clientUrl}?token=${jwtToken}`);
+    // Use URL fragment so the token is never sent to the server in logs/referer headers
+    res.redirect(`${clientUrl}#token=${jwtToken}`);
   } catch (e) {
     console.error('OIDC callback error:', e);
     res.status(500).json({ error: 'OIDC authentication failed' });

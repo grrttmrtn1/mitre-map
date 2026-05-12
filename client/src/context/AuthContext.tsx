@@ -40,8 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function init() {
-      // Check for OIDC callback token in URL
-      const urlToken = new URLSearchParams(window.location.search).get('token');
+      // Check for OIDC callback token in URL fragment (# prevents it reaching server logs)
+      const urlToken = new URLSearchParams(window.location.hash.slice(1)).get('token');
       if (urlToken) {
         setJwtToken(urlToken);
         window.history.replaceState({}, '', window.location.pathname);

@@ -853,8 +853,12 @@ const GROUPS: Group[] = [
   },
 ];
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function colorizeJson(json: string): string {
-  return json.replace(
+  return escapeHtml(json).replace(
     /("(?:\\.|[^"\\])*"(?:\s*:)?|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
     (m) => {
       if (m.endsWith(':')) return `<span class="text-blue-300">${m}</span>`;
