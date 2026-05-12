@@ -4,10 +4,12 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
 import http from 'http';
 import https from 'https';
 import path from 'path';
 import fs from 'fs';
+import { openapiSpec } from './openapi';
 import { runMigrations, getKnex, rawGet } from './db/database';
 import { seedDatabase } from './db/seed';
 import attackRouter from './routes/attack';
@@ -94,6 +96,25 @@ app.use('/api/motivations', motivationsRouter);
 app.use('/api/countries', countriesRouter);
 app.use('/api/data-sources', dataSourcesRouter);
 app.use('/api/atomic', atomicRouter);
+
+// OpenAPI spec — machine-readable, no auth required
+app.get('/api/openapi.json', (_req, res) => {
+  res.json(openapiSpec);
+});
+
+// Swagger UI — relax CSP only for this route
+app.use(
+  '/api/docs',
+  ((_req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
+    );
+    next();
+  }) as express.RequestHandler,
+  swaggerUi.serve,
+  swaggerUi.setup(openapiSpec, { customSiteTitle: 'MitreMap API Docs' }),
+);
 
 app.get('/api/health', async (_req, res) => {
   const db = getKnex();
