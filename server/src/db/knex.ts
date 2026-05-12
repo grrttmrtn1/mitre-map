@@ -9,7 +9,7 @@ const DB_PATH = path.join(DB_DIR, 'mitremap.db');
 const isPg = (process.env.DATABASE_URL ?? '').startsWith('postgres');
 
 const _knex = Knex({
-  client: isPg ? 'pg' : 'sqlite3',
+  client: isPg ? 'pg' : 'better-sqlite3',
   connection: isPg ? process.env.DATABASE_URL : { filename: DB_PATH },
   useNullAsDefault: true,
   migrations: {
@@ -26,10 +26,9 @@ const _knex = Knex({
       }
     : {
         afterCreate: (conn: any, cb: Function) => {
-          conn.run('PRAGMA journal_mode=WAL;', (err: any) => {
-            if (err) { cb(err, conn); return; }
-            conn.run('PRAGMA foreign_keys=ON;', cb);
-          });
+          conn.pragma('journal_mode = WAL');
+          conn.pragma('foreign_keys = ON');
+          cb(null, conn);
         },
       },
 });

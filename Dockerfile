@@ -45,7 +45,9 @@ COPY package*.json ./
 COPY client/package.json ./client/
 COPY server/package.json ./server/
 
-# Install only server production deps (hoisted to /app/node_modules)
+# Install only server production deps (hoisted to /app/node_modules).
+# better-sqlite3 ships pre-built binaries via prebuildify (glibc 2.17+),
+# so no CDN download or source compilation is needed at install time.
 RUN npm ci --workspace=server --omit=dev
 
 # Copy built artifacts from builder stages

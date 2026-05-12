@@ -4,7 +4,7 @@ import type { Request, Response, NextFunction } from 'express';
 
 export function createTestDb(): KnexType {
   return Knex({
-    client: 'sqlite3',
+    client: 'better-sqlite3',
     connection: { filename: ':memory:' },
     useNullAsDefault: true,
   });
