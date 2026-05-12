@@ -36,6 +36,7 @@ import authRouter from './routes/auth';
 import usersRouter from './routes/users';
 import dataSourcesRouter from './routes/data-sources';
 import atomicRouter from './routes/atomic';
+import exercisesRouter from './routes/exercises';
 import { requireApiKey } from './middleware/auth';
 
 const app = express();
@@ -96,6 +97,7 @@ app.use('/api/motivations', motivationsRouter);
 app.use('/api/countries', countriesRouter);
 app.use('/api/data-sources', dataSourcesRouter);
 app.use('/api/atomic', atomicRouter);
+app.use('/api/exercises', exercisesRouter);
 
 // OpenAPI spec — machine-readable, no auth required
 app.get('/api/openapi.json', (_req, res) => {

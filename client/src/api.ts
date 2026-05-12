@@ -1,6 +1,7 @@
 import type {
   ApiKey, ArtResult, ArtTest, Assignment, AttackVersion, AuditLogEntry, Comment, ComplianceFramework,
   CoverageSnapshot, CoverageStats, Country, DataSource, Detection, DetectionQualityScore, D3FendTechnique,
+  Exercise, ExerciseDetail, ExerciseFinding, ExerciseReport, ExerciseTestRun,
   ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
   RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
   Tool, ToolDetail, User,
@@ -295,6 +296,43 @@ export const api = {
   createCountry: (data: { name: string; color?: string; flag?: string }) => post<Country>('/countries', data),
   updateCountry: (id: number, data: { name?: string; color?: string; flag?: string }) => put<Country>(`/countries/${id}`, data),
   deleteCountry: (id: number) => del(`/countries/${id}`),
+
+  // Exercises (Red Team / Purple Team)
+  getExercises: () => get<Exercise[]>('/exercises'),
+  getExercise: (id: number) => get<ExerciseDetail>(`/exercises/${id}`),
+  createExercise: (data: {
+    name: string; description?: string; type?: string; status?: string;
+    threat_group_id?: string; scope_notes?: string; start_date?: string;
+    end_date?: string; lead?: string;
+  }) => post<Exercise>('/exercises', data),
+  updateExercise: (id: number, data: Partial<{
+    name: string; description: string; type: string; status: string;
+    threat_group_id: string; scope_notes: string; start_date: string;
+    end_date: string; lead: string;
+  }>) => put<Exercise>(`/exercises/${id}`, data),
+  deleteExercise: (id: number) => del(`/exercises/${id}`),
+  addExerciseTechniques: (id: number, technique_ids: string[]) =>
+    post<{ added: number }>(`/exercises/${id}/techniques`, { technique_ids }),
+  removeExerciseTechnique: (id: number, technique_id: string) =>
+    del(`/exercises/${id}/techniques/${technique_id}`),
+  addExerciseTestRun: (id: number, data: {
+    art_test_id: number; outcome?: string; notes?: string; ran_by?: string;
+  }) => post<ExerciseTestRun>(`/exercises/${id}/tests`, data),
+  updateExerciseTestRun: (id: number, run_id: number, data: {
+    outcome?: string; notes?: string; ran_by?: string;
+  }) => put<ExerciseTestRun>(`/exercises/${id}/tests/${run_id}`, data),
+  deleteExerciseTestRun: (id: number, run_id: number) => del(`/exercises/${id}/tests/${run_id}`),
+  addExerciseFinding: (id: number, data: {
+    title: string; technique_id?: string; finding_type?: string;
+    severity?: string; description?: string; recommendation?: string;
+  }) => post<ExerciseFinding>(`/exercises/${id}/findings`, data),
+  updateExerciseFinding: (id: number, finding_id: number, data: Partial<{
+    title: string; technique_id: string; finding_type: string;
+    severity: string; description: string; recommendation: string;
+  }>) => put<ExerciseFinding>(`/exercises/${id}/findings/${finding_id}`, data),
+  deleteExerciseFinding: (id: number, finding_id: number) =>
+    del(`/exercises/${id}/findings/${finding_id}`),
+  getExerciseReport: (id: number) => get<ExerciseReport>(`/exercises/${id}/report`),
 
   // Admin / Purge
   getPurgeableDatasets: () => get<{ datasets: Array<{ key: string; label: string; count: number }> }>('/admin/purgeable'),

@@ -370,6 +370,117 @@ export interface AttackVersion {
   is_active: number;
 }
 
+export type ExerciseType = 'red_team' | 'purple_team' | 'tabletop';
+export type ExerciseStatus = 'planning' | 'active' | 'completed' | 'cancelled';
+export type ExerciseOutcome = 'pending' | 'detected' | 'not_detected' | 'partial' | 'blocked' | 'n_a';
+export type FindingType = 'gap' | 'detection_validated' | 'detection_failed' | 'control_weakness' | 'new_ttp';
+export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low' | 'informational';
+
+export interface Exercise {
+  id: number;
+  name: string;
+  description: string | null;
+  type: ExerciseType;
+  status: ExerciseStatus;
+  threat_group_id: string | null;
+  threat_group_name: string | null;
+  scope_notes: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  lead: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  technique_count?: number;
+  test_run_count?: number;
+  detected_count?: number;
+  finding_count?: number;
+}
+
+export interface ExerciseTechnique {
+  technique_id: string;
+  technique_name: string;
+  tactic_ids: string[];
+  available_tests: number;
+}
+
+export interface ExerciseTestRun {
+  id: number;
+  exercise_id: number;
+  art_test_id: number;
+  test_name: string;
+  technique_id: string;
+  platform: string | null;
+  executor_type: string | null;
+  auto_generated_command: string | null;
+  test_description: string | null;
+  outcome: ExerciseOutcome;
+  ran_at: string | null;
+  ran_by: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExerciseFinding {
+  id: number;
+  exercise_id: number;
+  technique_id: string | null;
+  technique_name: string | null;
+  title: string;
+  finding_type: FindingType;
+  severity: FindingSeverity;
+  description: string | null;
+  recommendation: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExerciseDetail extends Exercise {
+  techniques: ExerciseTechnique[];
+  test_runs: ExerciseTestRun[];
+  findings: ExerciseFinding[];
+}
+
+export interface ExerciseReport {
+  generated_at: string;
+  exercise: {
+    id: number;
+    name: string;
+    type: ExerciseType;
+    status: ExerciseStatus;
+    threat_group_name: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    lead: string | null;
+    scope_notes: string | null;
+  };
+  summary: {
+    total_techniques: number;
+    total_runs: number;
+    detected: number;
+    not_detected: number;
+    partial: number;
+    blocked: number;
+    detection_rate: number;
+    total_findings: number;
+    critical_findings: number;
+  };
+  technique_breakdown: Array<{
+    technique_id: string;
+    technique_name: string;
+    tactic_ids: string[];
+    total_runs: number;
+    detected: number;
+    not_detected: number;
+    partial: number;
+    status: 'untested' | 'detected' | 'partial' | 'not_detected';
+  }>;
+  gaps: ExerciseTechnique[];
+  findings: ExerciseFinding[];
+  findings_by_severity: Array<{ severity: string; count: number }>;
+}
+
 export interface ExecutiveReport {
   generated_at: string;
   summary: {

@@ -13,6 +13,7 @@ const NAV = [
   { to: '/threats', label: 'Threat Groups', icon: '◈' },
   { to: '/data-sources', label: 'Data Sources', icon: '◫' },
   { to: '/atomic', label: 'Atomic Tests', icon: '⚗' },
+  { to: '/exercises', label: 'Exercises', icon: '⚔' },
   { to: '/reports', label: 'Reports & Exports', icon: '▦' },
   { to: '/settings', label: 'Settings', icon: '⚛' },
   { to: '/api', label: 'API Playground', icon: '⚡' },
