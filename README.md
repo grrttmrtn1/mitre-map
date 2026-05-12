@@ -84,6 +84,15 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **Test results** — record per-detection test outcomes (`untested` / `tested` / `validated` / `failed`) with notes and run attribution
 - **Coverage stats** — technique-level count of how many tests (ART + custom) exist per ATT&CK technique
 
+### Red Team / Purple Team Exercises
+Formal exercise management that closes the loop between offensive testing and defensive coverage. A four-tab workflow per exercise:
+
+- **Plan** — create an exercise (type: `red_team` / `purple_team` / `tabletop`), assign a target threat group, and define the technique scope. When a threat group is selected at creation time, all of its TTPs are auto-populated into the scope.
+- **Execute** — for each in-scope technique, browse available ART tests, record outcomes (`detected` / `partial` / `not_detected` / `blocked` / `n/a`), and attach inline notes per test run.
+- **Findings** — log structured findings (types: `gap` / `detection_validated` / `detection_failed` / `control_weakness` / `new_ttp`) with severity, related technique, description, and remediation recommendation.
+- **Report** — auto-generated purple team report: executive summary KPIs (detection rate, techniques scoped, tests executed, findings), technique-by-technique coverage breakdown, findings grouped by severity, and a detection-gap list.
+- **Exercise statuses** — `planning` / `active` / `completed` / `cancelled` with lead/operator, start/end dates, and scope/rules-of-engagement notes.
+
 ### ATT&CK Data Sources
 - **Source inventory** — track which log sources (Windows Event Logs, Sysmon, CloudTrail, etc.) your organization collects; categorized and searchable
 - **Collection status** — `collecting` / `partial` / `not_collecting` with a free-text collection-method and notes field per source
@@ -92,6 +101,10 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 
 ### API Playground
 - Interactive in-app API explorer — browse every endpoint grouped by resource, fill path/query/body params, and fire live requests authenticated with your stored API key. Responses are syntax-highlighted inline.
+
+### OpenAPI / Swagger Docs
+- **Machine-readable spec** — full OpenAPI 3.0 spec served at `GET /api/openapi.json`
+- **Swagger UI** — interactive documentation browser at `/api/docs`; no authentication required to browse
 
 ### Collaboration
 - **Tags** — color-coded labels applied to any entity (detections, techniques, tools, gaps)
@@ -142,6 +155,11 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  ├── /api/sigma          SIGMA rule import          │
 │  ├── /api/atomic         ART tests, custom tests    │
 │  │   └── /custom         Custom test CRUD           │
+│  ├── /api/exercises      Exercise management        │
+│  │   ├── /:id/techniques Technique scope CRUD       │
+│  │   ├── /:id/tests      Test run CRUD              │
+│  │   ├── /:id/findings   Finding CRUD               │
+│  │   └── /:id/report     Purple team report         │
 │  ├── /api/data-sources   ATT&CK data source mgmt   │
 │  ├── /api/exports        Navigator / CSV / JSON     │
 │  ├── /api/reports        Pre-computed reports       │
@@ -149,7 +167,9 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  ├── /api/api-keys       API key management         │
 │  ├── /api/admin          Data purge / admin ops     │
 │  ├── /api/motivations    Threat group motivations   │
-│  └── /api/countries      Threat group countries     │
+│  ├── /api/countries      Threat group countries     │
+│  ├── /api/openapi.json   OpenAPI 3.0 spec           │
+│  └── /api/docs           Swagger UI                 │
 │                                                     │
 │  Auth middleware: JWT Bearer · API key · bootstrap  │
 │  Knex.js query builder · versioned migrations       │
@@ -174,6 +194,8 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 │  data_sources · technique_data_sources              │
 │  org_data_sources · art_tests (source: atomic|custom)│
 │  detection_art_results                              │
+│  exercises · exercise_techniques                    │
+│  exercise_test_runs · exercise_findings             │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -513,6 +535,35 @@ Authorization: Bearer <raw-key>
 
 **Test result statuses:** `untested` · `tested` · `validated` · `failed`
 
+### Exercises
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/exercises` | List all exercises (with summary counts) |
+| `POST` | `/api/exercises` | Create exercise `{ name, type?, status?, threat_group_id?, lead?, start_date?, end_date?, scope_notes?, description? }` — threat group techniques auto-populated |
+| `GET` | `/api/exercises/:id` | Exercise detail with techniques, test runs, and findings |
+| `PUT` | `/api/exercises/:id` | Update exercise fields |
+| `DELETE` | `/api/exercises/:id` | Delete exercise and cascade |
+| `POST` | `/api/exercises/:id/techniques` | Add techniques `{ technique_ids }` |
+| `DELETE` | `/api/exercises/:id/techniques/:technique_id` | Remove technique from scope |
+| `POST` | `/api/exercises/:id/tests` | Add test run `{ art_test_id, outcome?, notes?, ran_by? }` |
+| `PUT` | `/api/exercises/:id/tests/:run_id` | Update test run outcome / notes |
+| `DELETE` | `/api/exercises/:id/tests/:run_id` | Delete test run |
+| `POST` | `/api/exercises/:id/findings` | Add finding `{ title, finding_type?, severity?, technique_id?, description?, recommendation? }` |
+| `PUT` | `/api/exercises/:id/findings/:finding_id` | Update finding |
+| `DELETE` | `/api/exercises/:id/findings/:finding_id` | Delete finding |
+| `GET` | `/api/exercises/:id/report` | Purple team report — detection rate, technique breakdown, gaps, findings by severity |
+
+**Exercise types:** `red_team` · `purple_team` · `tabletop`
+
+**Exercise statuses:** `planning` · `active` · `completed` · `cancelled`
+
+**Test run outcomes:** `pending` · `detected` · `partial` · `not_detected` · `blocked` · `n_a`
+
+**Finding types:** `gap` · `detection_validated` · `detection_failed` · `control_weakness` · `new_ttp`
+
+**Finding severities:** `critical` · `high` · `medium` · `low` · `informational`
+
 ### ATT&CK Data Sources
 
 | Method | Path | Description |
@@ -539,6 +590,13 @@ Authorization: Bearer <raw-key>
 | `GET` | `/api/exports/tools/csv` | Tools CSV (download) |
 | `GET` | `/api/exports/coverage/json` | Coverage matrix JSON (download) |
 
+### API Documentation
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/openapi.json` | OpenAPI 3.0 spec (machine-readable, no auth required) |
+| `GET` | `/api/docs` | Swagger UI (interactive browser, no auth required) |
+
 ---
 
 ## Tech Stack
@@ -551,6 +609,8 @@ Authorization: Bearer <raw-key>
 | Database | SQLite via `better-sqlite3` (WAL mode, foreign keys) |
 | Schema migrations | Knex.js (versioned migration files, run on startup) |
 | Authentication | JWT (`jsonwebtoken`), bcrypt (`bcryptjs`), OIDC (Authorization Code flow) |
+| API docs | OpenAPI 3.0 spec + Swagger UI (`swagger-ui-express`) |
+| Testing | Vitest (unit + integration tests, in-memory SQLite harness) |
 | TLS | `selfsigned` (auto self-signed cert) or BYO cert via `SSL_CERT_PATH`/`SSL_KEY_PATH` |
 | Runtime tooling | `tsx` (TS dev runner), `concurrently` |
 | Container | Docker (multi-stage Alpine build, non-root `mitremap` user, `gosu` privilege drop) |
@@ -573,7 +633,8 @@ mitremap/
 │       │   └── migrations/
 │       │       ├── 001_core_schema.ts   # Base schema
 │       │       ├── 002_new_features.ts  # Auth, ART, data sources, ATT&CK versioning
-│       │       └── 003_custom_tests.ts  # source column on art_tests
+│       │       ├── 003_custom_tests.ts  # source column on art_tests
+│       │       └── 004_exercises.ts     # Exercises, test runs, findings
 │       ├── data/
 │       │   ├── attack.ts           # ATT&CK tactics, techniques, mitigations
 │       │   ├── d3fend.ts           # D3FEND techniques + ATT&CK mappings
@@ -583,12 +644,21 @@ mitremap/
 │       │   ├── atomic-tests.ts     # Seed ART test data
 │       │   ├── data-sources.ts     # Seed ATT&CK data sources
 │       │   └── demo.ts             # Demo tools and detections
+│       ├── openapi.ts              # OpenAPI 3.0 spec definition
+│       ├── __tests__/              # Vitest unit/integration tests
+│       │   ├── auth.test.ts
+│       │   ├── coverage.test.ts
+│       │   ├── database.test.ts
+│       │   ├── detections.test.ts
+│       │   ├── risk.test.ts
+│       │   └── helpers/testDb.ts   # In-memory SQLite test harness
 │       └── routes/                 # One file per resource group
 │           ├── attack.ts             # Tactics, techniques, live updates, versioning
 │           ├── auth.ts               # Login, refresh, logout, OIDC
 │           ├── users.ts              # User CRUD + password reset
 │           ├── atomic.ts             # ART import, custom tests, coverage, results
 │           ├── data-sources.ts       # ATT&CK data source management
+│           ├── exercises.ts          # Exercise / purple team workflow
 │           ├── threat-groups.ts      # CRUD + technique assignment + procedures
 │           ├── api-keys.ts           # API key lifecycle (hash, mask, revoke)
 │           └── admin.ts              # Data purge endpoints
@@ -618,6 +688,7 @@ mitremap/
 │           ├── ThreatGroups.tsx    # Per-TTP procedure editor
 │           ├── AtomicTests.tsx     # ART + custom test browser/editor
 │           ├── DataSources.tsx     # ATT&CK data source management
+│           ├── Exercises.tsx       # Red/purple team exercise workflow
 │           ├── Reports.tsx
 │           ├── ApiPlayground.tsx   # Interactive API explorer
 │           └── Settings.tsx        # API keys · users · ATT&CK updates · data mgmt
