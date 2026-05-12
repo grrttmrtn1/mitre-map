@@ -26,6 +26,14 @@ services:
       # Optional: enterprise root CA for corporate environments.
       # Set to the in-container path of the cert and mount certs/ below.
       ENTERPRISE_CA_BUNDLE: ${ENTERPRISE_CA_BUNDLE:-}
+      # Optional: PostgreSQL connection string. When set, SQLite is bypassed entirely.
+      # Format: postgres://user:password@host:5432/dbname
+      DATABASE_URL: ${DATABASE_URL:-}
+      # Optional: connection pool tuning (PostgreSQL only).
+      DB_POOL_MIN: ${DB_POOL_MIN:-2}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-30000}
+      DB_POOL_ACQUIRE_TIMEOUT: ${DB_POOL_ACQUIRE_TIMEOUT:-30000}
 
     volumes:
       # Persist SQLite database across restarts/upgrades

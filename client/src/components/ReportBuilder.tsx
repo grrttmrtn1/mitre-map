@@ -5,6 +5,14 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line,
 } from 'recharts';
 
+function randomUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 // ─── Core types ───────────────────────────────────────────────────────────────
 
 type FieldType = 'string' | 'number' | 'enum' | 'date' | 'boolean';
@@ -172,7 +180,7 @@ function saveReports(reports: ReportDefinition[]) {
 
 function makeNewReport(): ReportDefinition {
   return {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     name: 'New Report',
     description: '',
     dataSource: 'detections',
@@ -269,7 +277,7 @@ export default function ReportBuilder() {
     if (!src) return;
     const dup: ReportDefinition = {
       ...src,
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       name: `${src.name} (copy)`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -308,7 +316,7 @@ export default function ReportBuilder() {
     update({
       filters: [
         ...editing.filters,
-        { id: crypto.randomUUID(), field: src.fields[0].key, operator: 'eq', value: '' },
+        { id: randomUUID(), field: src.fields[0].key, operator: 'eq', value: '' },
       ],
     });
   };
