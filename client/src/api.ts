@@ -316,10 +316,10 @@ export const api = {
   removeExerciseTechnique: (id: number, technique_id: string) =>
     del(`/exercises/${id}/techniques/${technique_id}`),
   addExerciseTestRun: (id: number, data: {
-    art_test_id: number; outcome?: string; notes?: string; ran_by?: string;
+    art_test_id: number; outcome?: string; blocked?: boolean; notes?: string; ran_by?: string;
   }) => post<ExerciseTestRun>(`/exercises/${id}/tests`, data),
   updateExerciseTestRun: (id: number, run_id: number, data: {
-    outcome?: string; notes?: string; ran_by?: string;
+    outcome?: string; blocked?: boolean; notes?: string; ran_by?: string;
   }) => put<ExerciseTestRun>(`/exercises/${id}/tests/${run_id}`, data),
   deleteExerciseTestRun: (id: number, run_id: number) => del(`/exercises/${id}/tests/${run_id}`),
   addExerciseFinding: (id: number, data: {

@@ -174,17 +174,17 @@ router.post('/:id/tests', async (req, res) => {
   const db = getKnex();
   if (!await rawGet(db, 'SELECT id FROM exercises WHERE id=?', [req.params.id]))
     return res.status(404).json({ error: 'Exercise not found' });
-  const { art_test_id, outcome = 'pending', notes, ran_by } = req.body;
+  const { art_test_id, outcome = 'pending', blocked = false, notes, ran_by } = req.body;
   if (!art_test_id) return res.status(400).json({ error: 'art_test_id is required' });
-  const validOutcomes = ['pending', 'detected', 'not_detected', 'partial', 'blocked', 'n_a'];
+  const validOutcomes = ['pending', 'detected', 'not_detected', 'partial', 'n_a'];
   if (!validOutcomes.includes(outcome)) return res.status(400).json({ error: 'Invalid outcome' });
   if (!await rawGet(db, 'SELECT id FROM art_tests WHERE id=?', [art_test_id]))
     return res.status(404).json({ error: 'ART test not found' });
 
   const rid = await rawInsert(db, `
-    INSERT INTO exercise_test_runs (exercise_id, art_test_id, outcome, notes, ran_by, ran_at)
-    VALUES (?, ?, ?, ?, ?, CASE WHEN ? != 'pending' THEN CURRENT_TIMESTAMP ELSE NULL END) RETURNING id
-  `, [req.params.id, art_test_id, outcome, notes ?? null, ran_by ?? null, outcome]);
+    INSERT INTO exercise_test_runs (exercise_id, art_test_id, outcome, blocked, notes, ran_by, ran_at)
+    VALUES (?, ?, ?, ?, ?, ?, CASE WHEN ? != 'pending' THEN CURRENT_TIMESTAMP ELSE NULL END) RETURNING id
+  `, [req.params.id, art_test_id, outcome, blocked ? 1 : 0, notes ?? null, ran_by ?? null, outcome]);
 
   await logAudit(db, 'exercise', req.params.id, 'test_run_added', (req as any).actor ?? 'user',
     { art_test_id, outcome }, (req as any).sourceIp);
@@ -196,17 +196,20 @@ router.put('/:id/tests/:run_id', async (req, res) => {
   if (!await rawGet(db, 'SELECT id FROM exercise_test_runs WHERE id=? AND exercise_id=?',
     [req.params.run_id, req.params.id]))
     return res.status(404).json({ error: 'Test run not found' });
-  const { outcome, notes, ran_by } = req.body;
-  const validOutcomes = ['pending', 'detected', 'not_detected', 'partial', 'blocked', 'n_a'];
+  const { outcome, blocked, notes, ran_by } = req.body;
+  const validOutcomes = ['pending', 'detected', 'not_detected', 'partial', 'n_a'];
   if (outcome && !validOutcomes.includes(outcome)) return res.status(400).json({ error: 'Invalid outcome' });
 
   await rawRun(db, `
     UPDATE exercise_test_runs SET
-      outcome=COALESCE(?,outcome), notes=COALESCE(?,notes), ran_by=COALESCE(?,ran_by),
+      outcome=COALESCE(?,outcome),
+      blocked=CASE WHEN ? IS NOT NULL THEN ? ELSE blocked END,
+      notes=COALESCE(?,notes), ran_by=COALESCE(?,ran_by),
       ran_at=CASE WHEN ? IS NOT NULL AND ? != 'pending' THEN CURRENT_TIMESTAMP ELSE ran_at END,
       updated_at=CURRENT_TIMESTAMP
     WHERE id=?
-  `, [outcome ?? null, notes ?? null, ran_by ?? null, outcome ?? null, outcome ?? 'pending', req.params.run_id]);
+  `, [outcome ?? null, blocked !== undefined ? 1 : null, blocked ? 1 : 0,
+    notes ?? null, ran_by ?? null, outcome ?? null, outcome ?? 'pending', req.params.run_id]);
 
   res.json(await rawGet(db, 'SELECT * FROM exercise_test_runs WHERE id=?', [req.params.run_id]));
 });
@@ -362,7 +365,7 @@ router.get('/:id/report', async (req, res) => {
     summary: {
       total_techniques: techniques.length, total_runs: totalRuns,
       detected: detectedCount, not_detected: notDetectedCount,
-      partial: partialCount, blocked: byOutcome['blocked'] ?? 0,
+      partial: partialCount, blocked: testRuns.filter((r: any) => r.blocked).length,
       detection_rate: detectionRate, total_findings: findings.length,
       critical_findings: findings.filter((f: any) => f.severity === 'critical').length,
     },

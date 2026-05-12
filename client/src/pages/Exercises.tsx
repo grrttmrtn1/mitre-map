@@ -26,12 +26,11 @@ const OUTCOME_COLORS: Record<string, string> = {
   detected: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   not_detected: 'bg-red-500/20 text-red-400 border-red-500/30',
   partial: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  blocked: 'bg-slate-700 text-slate-400 border-slate-600',
   n_a: 'bg-slate-800/50 text-slate-600 border-slate-800',
 };
 const OUTCOME_LABELS: Record<string, string> = {
   pending: 'Pending', detected: 'Detected', not_detected: 'Not Detected',
-  partial: 'Partial', blocked: 'Blocked', n_a: 'N/A',
+  partial: 'Partial', n_a: 'N/A',
 };
 const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-600/20 text-red-400 border-red-500/40',
@@ -392,6 +391,7 @@ function ExecuteTab({
   const [techTests, setTechTests] = useState<Record<string, ArtTestRow[]>>({});
   const [loadingTests, setLoadingTests] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedCmd, setExpandedCmd] = useState<Set<number>>(new Set());
   const [updating, setUpdating] = useState<number | null>(null);
   const [noteEditing, setNoteEditing] = useState<number | null>(null);
   const [noteValue, setNoteValue] = useState('');
@@ -431,6 +431,21 @@ function ExecuteTab({
     }
   }
 
+  async function handleBlocked(testId: number, blocked: boolean) {
+    setUpdating(testId);
+    try {
+      const existing = runsByTestId.get(testId);
+      if (existing) {
+        await api.updateExerciseTestRun(exercise.id, existing.id, { blocked });
+      } else {
+        await api.addExerciseTestRun(exercise.id, { art_test_id: testId, blocked });
+      }
+      onRefresh();
+    } finally {
+      setUpdating(null);
+    }
+  }
+
   async function handleNoteSave(testId: number) {
     const existing = runsByTestId.get(testId);
     if (existing) {
@@ -442,7 +457,15 @@ function ExecuteTab({
     onRefresh();
   }
 
-  const outcomes: ExerciseTestRun['outcome'][] = ['detected', 'partial', 'not_detected', 'blocked', 'n_a'];
+  function toggleCmd(testId: number) {
+    setExpandedCmd(prev => {
+      const next = new Set(prev);
+      if (next.has(testId)) next.delete(testId); else next.add(testId);
+      return next;
+    });
+  }
+
+  const outcomes: ExerciseTestRun['outcome'][] = ['detected', 'partial', 'not_detected', 'n_a'];
 
   if (exercise.techniques.length === 0) {
     return (
@@ -463,6 +486,7 @@ function ExecuteTab({
         const techRuns = exercise.test_runs.filter(r => r.technique_id?.split('.')[0] === tech.technique_id.split('.')[0]);
         const detected = techRuns.filter(r => r.outcome === 'detected').length;
         const total = techRuns.filter(r => r.outcome !== 'pending').length;
+        const blockedCount = techRuns.filter(r => r.blocked).length;
 
         return (
           <div key={tech.technique_id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
@@ -475,6 +499,11 @@ function ExecuteTab({
                 <span className="text-slate-300 text-sm truncate">{tech.technique_name}</span>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
+                {blockedCount > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">
+                    {blockedCount} blocked
+                  </span>
+                )}
                 {total > 0 && (
                   <span className={`text-xs px-2 py-0.5 rounded-full ${detected === total ? 'bg-emerald-500/20 text-emerald-300' : detected > 0 ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-400'}`}>
                     {detected}/{total} detected
@@ -495,7 +524,9 @@ function ExecuteTab({
                 ) : tests.map(test => {
                   const run = runsByTestId.get(test.id);
                   const outcome = run?.outcome ?? 'pending';
+                  const isBlocked = run?.blocked ?? false;
                   const isUpdating = updating === test.id;
+                  const cmdExpanded = expandedCmd.has(test.id);
 
                   return (
                     <div key={test.id} className="px-5 py-4">
@@ -513,22 +544,55 @@ function ExecuteTab({
                           {test.description && (
                             <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{test.description}</p>
                           )}
+                          {test.auto_generated_command && (
+                            <div className="mt-2">
+                              <button
+                                onClick={() => toggleCmd(test.id)}
+                                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                              >
+                                <svg className={`w-3 h-3 transition-transform ${cmdExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                {cmdExpanded ? 'Hide command' : 'Show command'}
+                              </button>
+                              {cmdExpanded && (
+                                <pre className="mt-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-xs text-emerald-300 font-mono whitespace-pre-wrap break-all overflow-x-auto">
+                                  {test.auto_generated_command}
+                                </pre>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                          {outcomes.map(o => (
-                            <button
-                              key={o}
-                              disabled={isUpdating}
-                              onClick={() => handleOutcome(test.id, o)}
-                              className={`text-xs px-2.5 py-1 rounded border transition-all ${
-                                outcome === o
-                                  ? OUTCOME_COLORS[o]
-                                  : 'bg-transparent text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'
-                              } disabled:opacity-50`}
-                            >
-                              {OUTCOME_LABELS[o]}
-                            </button>
-                          ))}
+                        <div className="flex flex-col gap-2 flex-shrink-0 items-end">
+                          {/* Blocked toggle */}
+                          <button
+                            disabled={isUpdating}
+                            onClick={() => handleBlocked(test.id, !isBlocked)}
+                            className={`text-xs px-2.5 py-1 rounded border transition-all disabled:opacity-50 ${
+                              isBlocked
+                                ? 'bg-slate-700 text-slate-200 border-slate-500'
+                                : 'bg-transparent text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            {isBlocked ? '⊘ Blocked' : '⊘ Block'}
+                          </button>
+                          {/* Detection outcome */}
+                          <div className="flex gap-1.5 flex-wrap justify-end">
+                            {outcomes.map(o => (
+                              <button
+                                key={o}
+                                disabled={isUpdating}
+                                onClick={() => handleOutcome(test.id, o)}
+                                className={`text-xs px-2.5 py-1 rounded border transition-all ${
+                                  outcome === o
+                                    ? OUTCOME_COLORS[o]
+                                    : 'bg-transparent text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'
+                                } disabled:opacity-50`}
+                              >
+                                {OUTCOME_LABELS[o]}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
 

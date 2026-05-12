@@ -372,7 +372,7 @@ export interface AttackVersion {
 
 export type ExerciseType = 'red_team' | 'purple_team' | 'tabletop';
 export type ExerciseStatus = 'planning' | 'active' | 'completed' | 'cancelled';
-export type ExerciseOutcome = 'pending' | 'detected' | 'not_detected' | 'partial' | 'blocked' | 'n_a';
+export type ExerciseOutcome = 'pending' | 'detected' | 'not_detected' | 'partial' | 'n_a';
 export type FindingType = 'gap' | 'detection_validated' | 'detection_failed' | 'control_weakness' | 'new_ttp';
 export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low' | 'informational';
 
@@ -415,6 +415,7 @@ export interface ExerciseTestRun {
   auto_generated_command: string | null;
   test_description: string | null;
   outcome: ExerciseOutcome;
+  blocked: boolean;
   ran_at: string | null;
   ran_by: string | null;
   notes: string | null;
