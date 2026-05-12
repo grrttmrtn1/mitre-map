@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet } from '../db/database';
+import { getKnex, rawAll, rawGet, logAudit } from '../db/database';
 import { fetchAndParseStix, GITHUB_RELEASES_API, GH_HEADERS } from '../data/stix-fetch';
 
 const router = Router();
@@ -169,6 +169,9 @@ router.post('/apply-update', async (req, res) => {
         [targetVersion, `ATT&CK v${targetVersion}`, new Date().toISOString().split('T')[0],
           `Enterprise ATT&CK v${targetVersion} — ${tactics.length} tactics, ${techniques.length} techniques`]
       );
+      await logAudit(trx, 'attack', targetVersion, 'framework_updated', (req as any).actor ?? 'user',
+        { version: targetVersion, tactics: tactics.length, techniques_new: newTechCount, techniques_updated: updatedTechCount, deprecated_added: newlyDeprecated.length },
+        (req as any).sourceIp);
     });
 
     res.json({

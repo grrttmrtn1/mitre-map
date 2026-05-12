@@ -33,6 +33,8 @@ router.put('/:id', async (req, res) => {
   const { body } = req.body;
   if (!body?.trim()) return res.status(400).json({ error: 'body is required' });
   await rawRun(db, 'UPDATE comments SET body=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', [body.trim(), req.params.id]);
+  await logAudit(db, (existing as any).entity_type, (existing as any).entity_id, 'comment_edited',
+    (req as any).actor ?? 'user', undefined, (req as any).sourceIp);
   res.json(await rawGet(db, 'SELECT * FROM comments WHERE id = ?', [req.params.id]));
 });
 

@@ -27,13 +27,16 @@ router.put('/:id', async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const { name, color, description } = req.body;
   await rawRun(db, 'UPDATE tags SET name=?, color=?, description=? WHERE id=?', [name, color, description ?? null, req.params.id]);
+  await logAudit(db, 'tag', req.params.id, 'updated', (req as any).actor ?? 'user', { name, color }, (req as any).sourceIp);
   res.json(await rawGet(db, 'SELECT * FROM tags WHERE id = ?', [req.params.id]));
 });
 
 router.delete('/:id', async (req, res) => {
   const db = getKnex();
-  if (!await rawGet(db, 'SELECT id FROM tags WHERE id = ?', [req.params.id])) return res.status(404).json({ error: 'Not found' });
+  const tag = await rawGet<any>(db, 'SELECT id, name FROM tags WHERE id = ?', [req.params.id]);
+  if (!tag) return res.status(404).json({ error: 'Not found' });
   await rawRun(db, 'DELETE FROM tags WHERE id = ?', [req.params.id]);
+  await logAudit(db, 'tag', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: tag.name }, (req as any).sourceIp);
   res.status(204).send();
 });
 
@@ -51,6 +54,8 @@ router.post('/:entityType/:entityId', async (req, res) => {
   if (!tag_id) return res.status(400).json({ error: 'tag_id required' });
   await rawRun(db, 'INSERT INTO entity_tags (entity_type, entity_id, tag_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
     [req.params.entityType, req.params.entityId, tag_id]);
+  await logAudit(db, req.params.entityType, req.params.entityId, 'tag_added',
+    (req as any).actor ?? 'user', { tag_id }, (req as any).sourceIp);
   res.status(201).json({ ok: true });
 });
 
@@ -58,6 +63,8 @@ router.delete('/:entityType/:entityId/:tagId', async (req, res) => {
   const db = getKnex();
   await rawRun(db, 'DELETE FROM entity_tags WHERE entity_type=? AND entity_id=? AND tag_id=?',
     [req.params.entityType, req.params.entityId, req.params.tagId]);
+  await logAudit(db, req.params.entityType, req.params.entityId, 'tag_removed',
+    (req as any).actor ?? 'user', { tag_id: req.params.tagId }, (req as any).sourceIp);
   res.status(204).send();
 });
 

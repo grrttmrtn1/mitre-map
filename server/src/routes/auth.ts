@@ -35,6 +35,7 @@ router.post('/login', async (req, res) => {
   const expiresAt = new Date(Date.now() + REFRESH_EXPIRY_DAYS * 86400000).toISOString();
   await rawRun(db, 'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)', [user.id, refreshHash, expiresAt]);
   await rawRun(db, 'UPDATE users SET last_login=CURRENT_TIMESTAMP WHERE id=?', [user.id]);
+  await logAudit(db, 'auth', 'login', 'success', user.email, { role: user.role }, sourceIp);
 
   res.cookie('refresh_token', refreshRaw, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: REFRESH_EXPIRY_DAYS * 86400000 });
   res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
@@ -54,10 +55,15 @@ router.post('/refresh', async (req, res) => {
 
 router.post('/logout', async (req, res) => {
   const rawToken = req.cookies?.refresh_token;
+  const db = getKnex();
   if (rawToken) {
-    const db = getKnex();
     const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
     await rawRun(db, 'DELETE FROM refresh_tokens WHERE token_hash=?', [hash]);
+  }
+  const actor = (req as any).actor;
+  if (actor) {
+    const sourceIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? null;
+    await logAudit(db, 'auth', 'logout', 'success', actor, undefined, sourceIp);
   }
   res.clearCookie('refresh_token');
   res.status(204).end();
@@ -86,6 +92,7 @@ router.post('/oidc/providers', async (req, res) => {
       'INSERT INTO oidc_providers (name, slug, issuer_url, client_id, client_secret, enabled) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
       [name.trim(), slug.trim(), issuer_url.trim(), client_id.trim(), client_secret, enabled !== false ? 1 : 0]);
     const provider = await rawGet<any>(db, 'SELECT id, name, slug, issuer_url, client_id, enabled FROM oidc_providers WHERE id=?', [id]);
+    await logAudit(db, 'oidc_provider', String(id), 'create', (req as any).actor ?? 'user', { name, slug, issuer_url }, (req as any).sourceIp);
     res.status(201).json(provider);
   } catch (e: any) {
     if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'A provider with this name or slug already exists' });
@@ -109,15 +116,20 @@ router.put('/oidc/providers/:id', async (req, res) => {
      enabled !== undefined ? (enabled ? 1 : 0) : null,
      req.params.id]);
   const provider = await rawGet<any>(db, 'SELECT id, name, slug, issuer_url, client_id, enabled FROM oidc_providers WHERE id=?', [req.params.id]);
+  await logAudit(db, 'oidc_provider', req.params.id, 'update', (req as any).actor ?? 'user',
+    { name, slug, issuer_url, client_id, enabled }, (req as any).sourceIp);
   res.json(provider);
 });
 
 router.delete('/oidc/providers/:id', async (req, res) => {
   const db = getKnex();
-  if (!await rawGet(db, 'SELECT id FROM oidc_providers WHERE id=?', [req.params.id])) {
+  const provider = await rawGet<any>(db, 'SELECT id, name, slug FROM oidc_providers WHERE id=?', [req.params.id]);
+  if (!provider) {
     return res.status(404).json({ error: 'Not found' });
   }
   await rawRun(db, 'DELETE FROM oidc_providers WHERE id=?', [req.params.id]);
+  await logAudit(db, 'oidc_provider', req.params.id, 'delete', (req as any).actor ?? 'user',
+    { name: provider.name, slug: provider.slug }, (req as any).sourceIp);
   res.status(204).end();
 });
 
@@ -193,15 +205,24 @@ router.get('/oidc/:slug/callback', async (req, res) => {
       return res.status(401).json({ error: 'OIDC token issuer mismatch' });
     }
 
+    const sourceIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? null;
     let user = await rawGet<any>(db, 'SELECT * FROM users WHERE email=?', [payload.email.toLowerCase()]);
     if (!user) {
       const id = await rawInsert(db, 'INSERT INTO users (email, name, role, oidc_provider, oidc_sub) VALUES (?, ?, ?, ?, ?) RETURNING id',
         [payload.email.toLowerCase(), payload.name ?? payload.email, 'analyst', provider.slug, payload.sub]);
       user = await rawGet<any>(db, 'SELECT * FROM users WHERE id=?', [id]);
+      await logAudit(db, 'user', String(id), 'create', payload.email.toLowerCase(),
+        { email: payload.email.toLowerCase(), role: 'analyst', via: 'oidc', provider: provider.slug }, sourceIp);
     }
-    if (!user.is_active) return res.status(403).json({ error: 'Account inactive' });
+    if (!user.is_active) {
+      await logAudit(db, 'auth', 'login', 'failed', payload.email.toLowerCase(),
+        { reason: 'account inactive', via: 'oidc', provider: provider.slug }, sourceIp);
+      return res.status(403).json({ error: 'Account inactive' });
+    }
 
     await rawRun(db, 'UPDATE users SET last_login=CURRENT_TIMESTAMP WHERE id=?', [user.id]);
+    await logAudit(db, 'auth', 'login', 'success', user.email,
+      { role: user.role, via: 'oidc', provider: provider.slug }, sourceIp);
     const jwtToken = signToken(user.id, user.email, user.role);
     const refreshRaw = crypto.randomBytes(48).toString('hex');
     const refreshHash = crypto.createHash('sha256').update(refreshRaw).digest('hex');

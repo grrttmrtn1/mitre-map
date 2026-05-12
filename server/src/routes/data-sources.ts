@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
 
 const router = Router();
 
@@ -24,6 +24,8 @@ router.post('/', async (req, res) => {
   try {
     const id = await rawInsert(db, 'INSERT INTO data_sources (name, category, description) VALUES (?, ?, ?) RETURNING id',
       [name.trim(), category.trim(), description?.trim() ?? null]);
+    await logAudit(db, 'data_source', String(id), 'created', (req as any).actor ?? 'user',
+      { name: name.trim(), category: category.trim() }, (req as any).sourceIp);
     const source = await rawGet<any>(db, `
       SELECT ds.*, ods.status as org_status, ods.collection_method, ods.notes as org_notes,
              0 as technique_count
@@ -45,6 +47,8 @@ router.put('/:id', async (req, res) => {
   const { name, category, description } = req.body;
   await rawRun(db, 'UPDATE data_sources SET name=COALESCE(?,name), category=COALESCE(?,category), description=? WHERE id=?',
     [name?.trim() ?? null, category?.trim() ?? null, description !== undefined ? (description?.trim() ?? null) : undefined, req.params.id]);
+  await logAudit(db, 'data_source', req.params.id, 'updated', (req as any).actor ?? 'user',
+    { name, category }, (req as any).sourceIp);
   const source = await rawGet<any>(db, `
     SELECT ds.*, ods.status as org_status, ods.collection_method, ods.notes as org_notes,
            COUNT(tds.technique_id) as technique_count
@@ -59,10 +63,13 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const db = getKnex();
-  if (!await rawGet(db, 'SELECT id FROM data_sources WHERE id=?', [req.params.id])) return res.status(404).json({ error: 'Not found' });
+  const ds = await rawGet<any>(db, 'SELECT id, name FROM data_sources WHERE id=?', [req.params.id]);
+  if (!ds) return res.status(404).json({ error: 'Not found' });
   await rawRun(db, 'DELETE FROM org_data_sources WHERE data_source_id=?', [req.params.id]);
   await rawRun(db, 'DELETE FROM technique_data_sources WHERE data_source_id=?', [req.params.id]);
   await rawRun(db, 'DELETE FROM data_sources WHERE id=?', [req.params.id]);
+  await logAudit(db, 'data_source', req.params.id, 'deleted', (req as any).actor ?? 'user',
+    { name: ds.name }, (req as any).sourceIp);
   res.status(204).end();
 });
 
@@ -75,12 +82,16 @@ router.post('/:id/techniques', async (req, res) => {
   const tech = await rawGet<any>(db, 'SELECT id FROM attack_techniques WHERE id=?', [technique_id]);
   if (!tech) return res.status(404).json({ error: 'Technique not found' });
   await rawRun(db, 'INSERT OR IGNORE INTO technique_data_sources (technique_id, data_source_id) VALUES (?, ?)', [technique_id, req.params.id]);
+  await logAudit(db, 'data_source', req.params.id, 'technique_linked', (req as any).actor ?? 'user',
+    { technique_id }, (req as any).sourceIp);
   res.json({ ok: true });
 });
 
 router.delete('/:id/techniques/:technique_id', async (req, res) => {
   const db = getKnex();
   await rawRun(db, 'DELETE FROM technique_data_sources WHERE data_source_id=? AND technique_id=?', [req.params.id, req.params.technique_id]);
+  await logAudit(db, 'data_source', req.params.id, 'technique_unlinked', (req as any).actor ?? 'user',
+    { technique_id: req.params.technique_id }, (req as any).sourceIp);
   res.status(204).end();
 });
 
@@ -116,6 +127,8 @@ router.put('/:id/status', async (req, res) => {
     await rawRun(db, 'INSERT INTO org_data_sources (data_source_id, status, collection_method, notes) VALUES (?, ?, ?, ?)',
       [req.params.id, status ?? 'not_collecting', collection_method ?? null, notes ?? null]);
   }
+  await logAudit(db, 'data_source', req.params.id, 'status_updated', (req as any).actor ?? 'user',
+    { status, collection_method }, (req as any).sourceIp);
   res.json(await rawGet(db, `SELECT ds.*, ods.status as org_status, ods.collection_method, ods.notes as org_notes FROM data_sources ds LEFT JOIN org_data_sources ods ON ds.id=ods.data_source_id WHERE ds.id=?`, [req.params.id]));
 });
 

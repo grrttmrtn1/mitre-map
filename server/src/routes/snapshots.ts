@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert, buildTechniqueGraph, resolveToParent } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, buildTechniqueGraph, resolveToParent, logAudit } from '../db/database';
 
 const router = Router();
 
@@ -38,7 +38,11 @@ router.post('/', async (req, res) => {
     total - coveredCount, Math.round((coveredCount / total) * 100),
     activeDetCount, toolCount, notes ?? null]);
 
-  res.status(201).json(await rawGet(db, 'SELECT * FROM coverage_snapshots WHERE id = ?', [id]));
+  const snapshot = await rawGet<any>(db, 'SELECT * FROM coverage_snapshots WHERE id = ?', [id]);
+  await logAudit(db, 'snapshot', String(id), 'created', (req as any).actor ?? 'user',
+    { coverage_pct: snapshot.coverage_pct, covered_techniques: snapshot.covered_techniques, total_techniques: snapshot.total_techniques },
+    (req as any).sourceIp);
+  res.status(201).json(snapshot);
 });
 
 router.delete('/:id', async (req, res) => {
@@ -47,6 +51,7 @@ router.delete('/:id', async (req, res) => {
     return res.status(404).json({ error: 'Not found' });
   }
   await rawRun(db, 'DELETE FROM coverage_snapshots WHERE id = ?', [req.params.id]);
+  await logAudit(db, 'snapshot', req.params.id, 'deleted', (req as any).actor ?? 'user', undefined, (req as any).sourceIp);
   res.status(204).send();
 });
 

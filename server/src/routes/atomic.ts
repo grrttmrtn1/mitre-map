@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
 
 const router = Router();
 
@@ -57,6 +57,8 @@ router.post('/results', async (req, res) => {
   if (!await rawGet(db, 'SELECT id FROM art_tests WHERE id=?', [art_test_id])) return res.status(404).json({ error: 'ART test not found' });
   const id = await rawInsert(db, 'INSERT INTO detection_art_results (detection_id, art_test_id, status, notes, run_by, run_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) RETURNING id',
     [detection_id, art_test_id, status, notes ?? null, run_by ?? (req as any).actor ?? null]);
+  await logAudit(db, 'detection', String(detection_id), 'test_result_added',
+    (req as any).actor ?? 'user', { art_test_id, status }, (req as any).sourceIp);
   res.status(201).json(await rawGet(db, 'SELECT * FROM detection_art_results WHERE id=?', [id]));
 });
 
@@ -68,13 +70,19 @@ router.put('/results/:id', async (req, res) => {
   if (status && !validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
   await rawRun(db, 'UPDATE detection_art_results SET status=COALESCE(?,status), notes=COALESCE(?,notes), run_by=COALESCE(?,run_by), updated_at=CURRENT_TIMESTAMP WHERE id=?',
     [status ?? null, notes ?? null, run_by ?? null, req.params.id]);
-  res.json(await rawGet(db, 'SELECT * FROM detection_art_results WHERE id=?', [req.params.id]));
+  const result = await rawGet<any>(db, 'SELECT * FROM detection_art_results WHERE id=?', [req.params.id]);
+  await logAudit(db, 'detection', String(result.detection_id), 'test_result_updated',
+    (req as any).actor ?? 'user', { art_result_id: req.params.id, status }, (req as any).sourceIp);
+  res.json(result);
 });
 
 router.delete('/results/:id', async (req, res) => {
   const db = getKnex();
-  if (!await rawGet(db, 'SELECT id FROM detection_art_results WHERE id=?', [req.params.id])) return res.status(404).json({ error: 'Not found' });
+  const result = await rawGet<any>(db, 'SELECT * FROM detection_art_results WHERE id=?', [req.params.id]);
+  if (!result) return res.status(404).json({ error: 'Not found' });
   await rawRun(db, 'DELETE FROM detection_art_results WHERE id=?', [req.params.id]);
+  await logAudit(db, 'detection', String(result.detection_id), 'test_result_deleted',
+    (req as any).actor ?? 'user', { art_result_id: req.params.id }, (req as any).sourceIp);
   res.status(204).end();
 });
 
@@ -86,6 +94,8 @@ router.post('/custom', async (req, res) => {
   const id = await rawInsert(db,
     'INSERT INTO art_tests (technique_id, test_guid, name, description, platform, executor_type, auto_generated_command, source) VALUES (?, NULL, ?, ?, ?, ?, ?, \'custom\') RETURNING id',
     [technique_id, name.trim(), description ?? null, platform ?? '', executor_type ?? '', command ?? null]);
+  await logAudit(db, 'art_test', String(id), 'created', (req as any).actor ?? 'user',
+    { technique_id, name: name.trim() }, (req as any).sourceIp);
   res.status(201).json(await rawGet(db, 'SELECT * FROM art_tests WHERE id=?', [id]));
 });
 
@@ -98,13 +108,18 @@ router.put('/custom/:id', async (req, res) => {
   await rawRun(db,
     'UPDATE art_tests SET name=COALESCE(?,name), description=COALESCE(?,description), platform=COALESCE(?,platform), executor_type=COALESCE(?,executor_type), auto_generated_command=COALESCE(?,auto_generated_command) WHERE id=?',
     [name?.trim() ?? null, description ?? null, platform ?? null, executor_type ?? null, command ?? null, req.params.id]);
+  await logAudit(db, 'art_test', req.params.id, 'updated', (req as any).actor ?? 'user',
+    { technique_id: test.technique_id, name: name?.trim() ?? test.name }, (req as any).sourceIp);
   res.json(await rawGet(db, 'SELECT * FROM art_tests WHERE id=?', [req.params.id]));
 });
 
 router.delete('/custom/:id', async (req, res) => {
   const db = getKnex();
-  if (!await rawGet(db, 'SELECT id FROM art_tests WHERE id=? AND source=\'custom\'', [req.params.id])) return res.status(404).json({ error: 'Custom test not found' });
+  const test = await rawGet<any>(db, 'SELECT * FROM art_tests WHERE id=? AND source=\'custom\'', [req.params.id]);
+  if (!test) return res.status(404).json({ error: 'Custom test not found' });
   await rawRun(db, 'DELETE FROM art_tests WHERE id=?', [req.params.id]);
+  await logAudit(db, 'art_test', req.params.id, 'deleted', (req as any).actor ?? 'user',
+    { technique_id: test.technique_id, name: test.name }, (req as any).sourceIp);
   res.status(204).end();
 });
 
@@ -156,6 +171,10 @@ router.post('/import', async (req, res) => {
     await rawRun(db, 'INSERT INTO art_tests (technique_id, test_guid, name, description, platform, executor_type, auto_generated_command) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [t.technique_id, t.test_guid, t.name || 'Unnamed', t.description || '', t.platform || '', t.executor_type || '', t.auto_generated_command || '']);
     imported++;
+  }
+  if (imported > 0) {
+    await logAudit(db, 'art_test', 'bulk', 'imported', (req as any).actor ?? 'user',
+      { imported, skipped }, (req as any).sourceIp);
   }
   res.json({ imported, skipped, total: tests.length });
 });

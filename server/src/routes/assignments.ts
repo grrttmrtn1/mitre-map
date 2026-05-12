@@ -46,9 +46,13 @@ router.put('/:id', async (req, res) => {
     UPDATE assignments SET assignee=?, status=?, priority=?, due_date=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
   `, [assignee ?? existing.assignee, status ?? existing.status, priority ?? existing.priority,
     due_date ?? existing.due_date, notes ?? existing.notes, req.params.id]);
-  if (status && status !== existing.status) {
-    await logAudit(db, existing.entity_type, existing.entity_id, 'assignment_status_changed',
-      (req as any).actor ?? 'user', { from: existing.status, to: status }, (req as any).sourceIp);
+  const changes: Record<string, unknown> = {};
+  if (status && status !== existing.status) changes.status = { from: existing.status, to: status };
+  if (assignee && assignee !== existing.assignee) changes.assignee = { from: existing.assignee, to: assignee };
+  if (priority && priority !== existing.priority) changes.priority = { from: existing.priority, to: priority };
+  if (Object.keys(changes).length > 0) {
+    await logAudit(db, existing.entity_type, existing.entity_id, 'assignment_updated',
+      (req as any).actor ?? 'user', changes, (req as any).sourceIp);
   }
   res.json(await rawGet(db, 'SELECT * FROM assignments WHERE id = ?', [req.params.id]));
 });

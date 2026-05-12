@@ -108,6 +108,10 @@ router.post('/import', async (req, res) => {
         d.status ?? 'active', d.severity ?? 'medium', d.confidence ?? 'medium', d.notes ?? null]);
       imported++;
     }
+    if (imported > 0) {
+      await logAudit(trx, 'detection', 'bulk', 'imported', (req as any).actor ?? 'user',
+        { count: imported }, (req as any).sourceIp);
+    }
   });
   res.json({ imported });
 });
