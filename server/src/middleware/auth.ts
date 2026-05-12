@@ -5,7 +5,7 @@ import { getKnex, rawGet } from '../db/database';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'mitremap-dev-secret-change-in-production';
 
-function requiredScope(method: string, path: string): 'read' | 'write' | 'admin' {
+export function requiredScope(method: string, path: string): 'read' | 'write' | 'admin' {
   const m = method.toUpperCase();
   if (m !== 'GET' && (path.startsWith('/api-keys') || path.startsWith('/admin'))) return 'admin';
   if (m !== 'GET' && path.startsWith('/users')) return 'admin';
@@ -13,7 +13,7 @@ function requiredScope(method: string, path: string): 'read' | 'write' | 'admin'
   return 'read';
 }
 
-function scopeGranted(scopes: string[], needed: 'read' | 'write' | 'admin'): boolean {
+export function scopeGranted(scopes: string[], needed: 'read' | 'write' | 'admin'): boolean {
   if (scopes.includes('admin')) return true;
   if (needed === 'write') return scopes.includes('write');
   if (needed === 'read') return scopes.includes('read') || scopes.includes('write');

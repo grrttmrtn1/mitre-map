@@ -17,9 +17,29 @@ router.get('/', async (req, res) => {
   res.json(rows.map((d: any) => ({ ...d, technique_ids: JSON.parse(d.technique_ids) })));
 });
 
-const SEVERITY_SCORES: Record<string, number> = { critical: 25, high: 20, medium: 15, low: 10, informational: 5 };
-const CONFIDENCE_SCORES: Record<string, number> = { high: 25, medium: 15, low: 5 };
-const FP_SCORES: Record<string, number> = { low: 15, medium: 8, high: 0 };
+export const SEVERITY_SCORES: Record<string, number> = { critical: 25, high: 20, medium: 15, low: 10, informational: 5 };
+export const CONFIDENCE_SCORES: Record<string, number> = { high: 25, medium: 15, low: 5 };
+export const FP_SCORES: Record<string, number> = { low: 15, medium: 8, high: 0 };
+
+export function computeQualityScore(
+  severity: string,
+  confidence: string,
+  falsePositiveRate: string | null,
+  techniqueIds: string[],
+  validated: number,
+  failed: number,
+  techCoverage: Map<string, number>,
+): { score: number; grade: string; components: { severity: number; confidence: number; fp_rate: number; tests: number; uniqueness: number } } {
+  const severityScore = SEVERITY_SCORES[severity] ?? 15;
+  const confidenceScore = CONFIDENCE_SCORES[confidence] ?? 15;
+  const fpScore = FP_SCORES[falsePositiveRate ?? 'medium'] ?? 8;
+  const testScore = Math.max(0, Math.min(30, validated * 10 - failed * 10));
+  const uniqueTechs = techniqueIds.filter(t => techCoverage.get(t) === 1).length;
+  const uniquenessScore = techniqueIds.length > 0 ? Math.round((uniqueTechs / techniqueIds.length) * 5) : 0;
+  const total = severityScore + confidenceScore + fpScore + testScore + uniquenessScore;
+  const grade = total >= 80 ? 'A' : total >= 60 ? 'B' : total >= 40 ? 'C' : total >= 20 ? 'D' : 'F';
+  return { score: total, grade, components: { severity: severityScore, confidence: confidenceScore, fp_rate: fpScore, tests: testScore, uniqueness: uniquenessScore } };
+}
 
 router.get('/quality-scores', async (_req, res) => {
   const db = getKnex();
@@ -46,23 +66,9 @@ router.get('/quality-scores', async (_req, res) => {
   const scores = detections.map((d: any) => {
     const techs = JSON.parse(d.technique_ids) as string[];
     const tests = testMap.get(d.id) ?? { validated: 0, failed: 0 };
-
-    const severityScore = SEVERITY_SCORES[d.severity] ?? 15;
-    const confidenceScore = CONFIDENCE_SCORES[d.confidence] ?? 15;
-    const fpScore = FP_SCORES[d.false_positive_rate ?? 'medium'] ?? 8;
-    const testScore = Math.max(0, Math.min(30, Number(tests.validated) * 10 - Number(tests.failed) * 10));
-    const uniqueTechs = techs.filter(t => techCoverage.get(t) === 1).length;
-    const uniquenessScore = techs.length > 0 ? Math.round((uniqueTechs / techs.length) * 5) : 0;
-
-    const total = severityScore + confidenceScore + fpScore + testScore + uniquenessScore;
-    const grade = total >= 80 ? 'A' : total >= 60 ? 'B' : total >= 40 ? 'C' : total >= 20 ? 'D' : 'F';
-
-    return {
-      detection_id: d.id,
-      score: total,
-      grade,
-      components: { severity: severityScore, confidence: confidenceScore, fp_rate: fpScore, tests: testScore, uniqueness: uniquenessScore },
-    };
+    const result = computeQualityScore(d.severity, d.confidence, d.false_positive_rate, techs,
+      Number(tests.validated), Number(tests.failed), techCoverage);
+    return { detection_id: d.id, ...result };
   });
 
   res.json(scores);
