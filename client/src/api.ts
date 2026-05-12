@@ -1,7 +1,7 @@
 import type {
   ApiKey, ArtResult, ArtTest, Assignment, AttackVersion, AuditLogEntry, Comment, ComplianceFramework,
-  CoverageSnapshot, CoverageStats, Country, DataSource, Detection, D3FendTechnique, ExecutiveReport,
-  GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
+  CoverageSnapshot, CoverageStats, Country, DataSource, Detection, DetectionQualityScore, D3FendTechnique,
+  ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
   RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
   Tool, ToolDetail, User,
 } from './types';
@@ -115,6 +115,7 @@ export const api = {
     const q = params.toString();
     return get<Detection[]>(`/detections${q ? `?${q}` : ''}`);
   },
+  getDetectionQualityScores: () => get<DetectionQualityScore[]>('/detections/quality-scores'),
   getDetection: (id: number) => get<Detection>(`/detections/${id}`),
   createDetection: (data: Partial<Detection>) => post<Detection>('/detections', data),
   updateDetection: (id: number, data: Partial<Detection>) => put<Detection>(`/detections/${id}`, data),

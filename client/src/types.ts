@@ -275,6 +275,19 @@ export interface RiskByTactic {
   risk_level: 'critical' | 'high' | 'medium' | 'low';
 }
 
+export interface DetectionQualityScore {
+  detection_id: number;
+  score: number;
+  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+  components: {
+    severity: number;
+    confidence: number;
+    fp_rate: number;
+    tests: number;
+    uniqueness: number;
+  };
+}
+
 export interface SigmaParseResult {
   title: string | undefined;
   rule_id: string | undefined;

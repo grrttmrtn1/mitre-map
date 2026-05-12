@@ -17,6 +17,57 @@ router.get('/', async (req, res) => {
   res.json(rows.map((d: any) => ({ ...d, technique_ids: JSON.parse(d.technique_ids) })));
 });
 
+const SEVERITY_SCORES: Record<string, number> = { critical: 25, high: 20, medium: 15, low: 10, informational: 5 };
+const CONFIDENCE_SCORES: Record<string, number> = { high: 25, medium: 15, low: 5 };
+const FP_SCORES: Record<string, number> = { low: 15, medium: 8, high: 0 };
+
+router.get('/quality-scores', async (_req, res) => {
+  const db = getKnex();
+
+  const detections = await rawAll<any>(db,
+    'SELECT id, technique_ids, severity, confidence, false_positive_rate FROM detections', []);
+
+  const testRows = await rawAll<any>(db, `
+    SELECT detection_id,
+      SUM(CASE WHEN status='validated' THEN 1 ELSE 0 END) AS validated,
+      SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed
+    FROM detection_art_results
+    GROUP BY detection_id
+  `, []);
+  const testMap = new Map(testRows.map((r: any) => [r.detection_id, r]));
+
+  // count how many detections cover each technique to compute uniqueness
+  const techCoverage = new Map<string, number>();
+  for (const d of detections) {
+    const techs = JSON.parse(d.technique_ids) as string[];
+    for (const t of techs) techCoverage.set(t, (techCoverage.get(t) ?? 0) + 1);
+  }
+
+  const scores = detections.map((d: any) => {
+    const techs = JSON.parse(d.technique_ids) as string[];
+    const tests = testMap.get(d.id) ?? { validated: 0, failed: 0 };
+
+    const severityScore = SEVERITY_SCORES[d.severity] ?? 15;
+    const confidenceScore = CONFIDENCE_SCORES[d.confidence] ?? 15;
+    const fpScore = FP_SCORES[d.false_positive_rate ?? 'medium'] ?? 8;
+    const testScore = Math.max(0, Math.min(30, Number(tests.validated) * 10 - Number(tests.failed) * 10));
+    const uniqueTechs = techs.filter(t => techCoverage.get(t) === 1).length;
+    const uniquenessScore = techs.length > 0 ? Math.round((uniqueTechs / techs.length) * 5) : 0;
+
+    const total = severityScore + confidenceScore + fpScore + testScore + uniquenessScore;
+    const grade = total >= 80 ? 'A' : total >= 60 ? 'B' : total >= 40 ? 'C' : total >= 20 ? 'D' : 'F';
+
+    return {
+      detection_id: d.id,
+      score: total,
+      grade,
+      components: { severity: severityScore, confidence: confidenceScore, fp_rate: fpScore, tests: testScore, uniqueness: uniquenessScore },
+    };
+  });
+
+  res.json(scores);
+});
+
 router.get('/:id', async (req, res) => {
   const db = getKnex();
   const detection = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);

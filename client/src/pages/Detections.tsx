@@ -1,9 +1,17 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../api';
-import type { Detection, Technique } from '../types';
+import type { Detection, DetectionQualityScore, Technique } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
+
+const GRADE_COLORS: Record<string, string> = {
+  A: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  B: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  C: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+  D: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  F: 'bg-red-500/20 text-red-400 border-red-500/30',
+};
 
 const SOURCES = ['Microsoft Sentinel', 'Microsoft Defender for Endpoint', 'Splunk', 'QRadar', 'CrowdStrike', 'Palo Alto NGFW', 'Proofpoint Email Security', 'Other'];
 const STATUSES = ['active', 'disabled', 'tuning', 'planned', 'archived'];
@@ -40,13 +48,19 @@ export default function Detections() {
   const [importing, setImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState('');
+  const [qualityScores, setQualityScores] = useState<Map<number, DetectionQualityScore>>(new Map());
+  const [filterQuality, setFilterQuality] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = () => api.getDetections({ status: filterStatus || undefined, severity: filterSeverity || undefined, source: filterSource || undefined })
     .then(setDetections).finally(() => setLoading(false));
 
+  const loadQuality = () => api.getDetectionQualityScores()
+    .then(scores => setQualityScores(new Map(scores.map(s => [s.detection_id, s]))));
+
   useEffect(() => { load(); }, [filterStatus, filterSeverity, filterSource]);
   useEffect(() => { api.getTechniques(undefined, true).then(setTechniques); }, []);
+  useEffect(() => { loadQuality(); }, []);
 
   const openCreate = () => { setEditDetection(null); setForm({ ...EMPTY_FORM }); setModalOpen(true); };
   const openEdit = (d: Detection, e?: React.MouseEvent) => {
@@ -71,6 +85,7 @@ export default function Detections() {
       }
       setModalOpen(false);
       load();
+      loadQuality();
     } finally { setSaving(false); }
   };
 
@@ -185,10 +200,17 @@ export default function Detections() {
   ).slice(0, 150);
 
   const displayed = detections.filter(d => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return d.name.toLowerCase().includes(q) || d.rule_id?.toLowerCase().includes(q) ||
-      d.technique_ids.some(t => t.toLowerCase().includes(q));
+    if (search) {
+      const q = search.toLowerCase();
+      if (!d.name.toLowerCase().includes(q) && !d.rule_id?.toLowerCase().includes(q) &&
+          !d.technique_ids.some(t => t.toLowerCase().includes(q))) return false;
+    }
+    if (filterQuality) {
+      const qs = qualityScores.get(d.id);
+      if (filterQuality === 'low' && qs && qs.grade !== 'D' && qs.grade !== 'F') return false;
+      if (filterQuality !== 'low' && qs?.grade !== filterQuality) return false;
+    }
+    return true;
   });
 
   const sources = [...new Set(detections.map(d => d.source).filter(Boolean))];
@@ -200,7 +222,13 @@ export default function Detections() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold text-slate-100">SIEM Detections</h1>
-              <p className="text-sm text-slate-400 mt-0.5">{detections.length} detections mapped to ATT&CK techniques</p>
+              <p className="text-sm text-slate-400 mt-0.5">
+                {detections.length} detections mapped to ATT&CK techniques
+                {(() => {
+                  const low = [...qualityScores.values()].filter(s => s.grade === 'D' || s.grade === 'F').length;
+                  return low > 0 ? <span className="ml-2 px-1.5 py-0.5 text-xs bg-red-500/20 text-red-400 border border-red-500/30 rounded">{low} low quality</span> : null;
+                })()}
+              </p>
             </div>
             {canWrite && <div className="flex gap-2">
               <button onClick={() => setImportModalOpen(true)} className="px-3 py-1.5 text-sm bg-slate-700 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
@@ -233,6 +261,16 @@ export default function Detections() {
                 {f.opts.filter(Boolean).map(o => <option key={o as string} value={o as string}>{o}</option>)}
               </select>
             ))}
+            <select value={filterQuality} onChange={e => setFilterQuality(e.target.value)}
+              className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
+              <option value="">Quality: All</option>
+              <option value="A">Grade A (80+)</option>
+              <option value="B">Grade B (60–79)</option>
+              <option value="C">Grade C (40–59)</option>
+              <option value="D">Grade D (20–39)</option>
+              <option value="F">Grade F (&lt;20)</option>
+              <option value="low">Low Quality (D/F)</option>
+            </select>
           </div>
         </div>
 
@@ -296,6 +334,15 @@ export default function Detections() {
                       <div className="flex items-center gap-2 flex-wrap mt-2">
                         <StatusBadge value={d.status} variant="detection_status" />
                         <StatusBadge value={d.severity} variant="severity" />
+                        {qualityScores.get(d.id) && (() => {
+                          const qs = qualityScores.get(d.id)!;
+                          return (
+                            <span className={`px-1.5 py-0.5 text-xs font-semibold border rounded ${GRADE_COLORS[qs.grade]}`}
+                              title={`Quality score: ${qs.score}/100`}>
+                              {qs.grade} {qs.score}
+                            </span>
+                          );
+                        })()}
                         {d.rule_id && <span className="font-mono text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{d.rule_id}</span>}
                         {d.source && <span className="text-xs text-slate-500">{d.source}</span>}
                         <span className="text-xs text-slate-600">{d.confidence} confidence</span>
@@ -336,6 +383,39 @@ export default function Detections() {
           </div>
 
           <div className="p-4 space-y-4">
+            {qualityScores.get(selectedDetection.id) && (() => {
+              const qs = qualityScores.get(selectedDetection.id)!;
+              const barColor = qs.grade === 'A' ? 'bg-emerald-500' : qs.grade === 'B' ? 'bg-blue-500' : qs.grade === 'C' ? 'bg-yellow-500' : qs.grade === 'D' ? 'bg-orange-500' : 'bg-red-500';
+              const rows: [string, number, number][] = [
+                ['Severity', qs.components.severity, 25],
+                ['Confidence', qs.components.confidence, 25],
+                ['FP Rate', qs.components.fp_rate, 15],
+                ['Test Results', qs.components.tests, 30],
+                ['Uniqueness', qs.components.uniqueness, 5],
+              ];
+              return (
+                <div className="p-3 bg-slate-800/60 border border-slate-700 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-300">Detection Quality</span>
+                    <span className={`px-2 py-0.5 text-sm font-bold border rounded ${GRADE_COLORS[qs.grade]}`}>{qs.grade} — {qs.score}/100</span>
+                  </div>
+                  <div className="w-full bg-slate-700 rounded-full h-1.5 mb-3">
+                    <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${qs.score}%` }} />
+                  </div>
+                  <div className="space-y-1.5">
+                    {rows.map(([label, val, max]) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 w-24 flex-shrink-0">{label}</span>
+                        <div className="flex-1 bg-slate-700 rounded-full h-1">
+                          <div className={`h-1 rounded-full ${barColor} opacity-70`} style={{ width: `${(val / max) * 100}%` }} />
+                        </div>
+                        <span className="text-xs text-slate-400 w-8 text-right">{val}/{max}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="grid grid-cols-2 gap-3 text-xs">
               {selectedDetection.source && (
                 <div>
