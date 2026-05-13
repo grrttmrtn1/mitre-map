@@ -14,6 +14,7 @@ router.post('/', async (req, res) => {
   const db = getKnex();
   const { email, name, password, role = 'analyst' } = req.body;
   if (!email?.trim() || !password) return res.status(400).json({ error: 'email and password are required' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
   if (!['admin', 'analyst', 'readonly'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
   const hash = await bcrypt.hash(password, 12);
   try {

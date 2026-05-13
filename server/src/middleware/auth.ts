@@ -7,8 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET ?? 'mitremap-dev-secret-change-in-prod
 
 export function requiredScope(method: string, path: string): 'read' | 'write' | 'admin' {
   const m = method.toUpperCase();
-  if (m !== 'GET' && (path.startsWith('/api-keys') || path.startsWith('/admin'))) return 'admin';
-  if (m !== 'GET' && path.startsWith('/users')) return 'admin';
+  if (path.startsWith('/api-keys') || path.startsWith('/admin') || path.startsWith('/users')) return 'admin';
   if (m !== 'GET') return 'write';
   return 'read';
 }

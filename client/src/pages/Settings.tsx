@@ -30,6 +30,7 @@ export default function Settings() {
   const [userError, setUserError] = useState('');
   const [savingUser, setSavingUser] = useState(false);
   const [savingRoleId, setSavingRoleId] = useState<number | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
 
   // ATT&CK Version state
   const [attackVersion, setAttackVersion] = useState<AttackVersion | null>(null);
@@ -272,7 +273,7 @@ export default function Settings() {
     { id: 'audit', label: 'Audit Log' },
     { id: 'api_keys', label: 'API Keys' },
     { id: 'data', label: 'Data Management' },
-    { id: 'users', label: 'Users', adminOnly: true, disabled: true },
+    { id: 'users', label: 'Users', adminOnly: true },
     { id: 'sso', label: 'SSO / OIDC', adminOnly: true, disabled: true },
     { id: 'attack_version', label: 'ATT&CK Version', adminOnly: true },
   ];
@@ -795,18 +796,16 @@ export default function Settings() {
         )}
 
         {/* ── Under Construction ── */}
-        {(activeTab === 'users' || activeTab === 'sso') && (
+        {activeTab === 'sso' && (
           <div className="max-w-lg flex flex-col items-center justify-center py-20 text-center">
             <div className="text-4xl mb-4">🚧</div>
             <h2 className="text-lg font-semibold text-slate-300 mb-2">Under Construction</h2>
-            <p className="text-sm text-slate-500">
-              {activeTab === 'users' ? 'User management' : 'SSO / OIDC configuration'} is not yet available.
-            </p>
+            <p className="text-sm text-slate-500">SSO / OIDC configuration is not yet available.</p>
           </div>
         )}
 
-        {/* ── Users (disabled) ── */}
-        {false && activeTab === 'users' && (
+        {/* ── Users ── */}
+        {activeTab === 'users' && (
           <div className="max-w-3xl space-y-6">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <h2 className="text-sm font-medium text-slate-300 mb-4">Create User</h2>
@@ -918,6 +917,18 @@ export default function Settings() {
                         }}
                         className="text-xs px-2.5 py-1 border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors">
                         Reset PW
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Delete ${u.name ?? u.email}? This cannot be undone.`)) return;
+                          setDeletingUserId(u.id);
+                          try { await api.deleteUser(u.id); loadUsers(); }
+                          finally { setDeletingUserId(null); }
+                        }}
+                        disabled={deletingUserId === u.id || u.id === currentUser?.id}
+                        title={u.id === currentUser?.id ? 'You cannot delete yourself' : 'Delete user'}
+                        className="text-xs px-2.5 py-1 border border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/60 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                        {deletingUserId === u.id ? '…' : 'Delete'}
                       </button>
                     </div>
                   </div>
