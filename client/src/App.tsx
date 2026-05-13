@@ -17,6 +17,7 @@ import LoginPage from './pages/LoginPage';
 import DataSources from './pages/DataSources';
 import AtomicTests from './pages/AtomicTests';
 import Exercises from './pages/Exercises';
+import TaxiiIngest from './pages/TaxiiIngest';
 
 function AuthBanner({ onDismiss }: { onDismiss: () => void }) {
   const navigate = useNavigate();
@@ -76,6 +77,7 @@ function AppShell() {
                   <Route path="/data-sources" element={<DataSources />} />
                   <Route path="/atomic" element={<AtomicTests />} />
                   <Route path="/exercises" element={<Exercises />} />
+                  <Route path="/taxii" element={<TaxiiIngest />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/api" element={<ApiPlayground />} />

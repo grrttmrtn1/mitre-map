@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 
-const NAV = [
+const NAV: { to: string; label: string; icon: string; beta?: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: '⬡' },
   { to: '/matrix', label: 'ATT&CK Matrix', icon: '⊞' },
   { to: '/detections', label: 'Detections', icon: '◉' },
@@ -14,6 +14,7 @@ const NAV = [
   { to: '/data-sources', label: 'Data Sources', icon: '◫' },
   { to: '/atomic', label: 'Atomic Tests', icon: '⚗' },
   { to: '/exercises', label: 'Exercises', icon: '⚔' },
+  { to: '/taxii', label: 'TAXII Ingest', icon: '⇌', beta: true },
   { to: '/reports', label: 'Reports & Exports', icon: '▦' },
   { to: '/settings', label: 'Settings', icon: '⚛' },
   { to: '/api', label: 'API Playground', icon: '⚡' },
@@ -46,7 +47,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ to, label, icon }) => (
+        {NAV.map(({ to, label, icon, beta }) => (
           <NavLink
             key={to}
             to={to}
@@ -59,7 +60,12 @@ export default function Sidebar() {
             }
           >
             <span className="text-base w-4 text-center leading-none">{icon}</span>
-            <span>{label}</span>
+            <span className="flex-1">{label}</span>
+            {beta && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 leading-none">
+                beta
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

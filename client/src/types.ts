@@ -498,3 +498,86 @@ export interface ExecutiveReport {
   tactic_coverage: Array<{ id: string; name: string; total: number; covered: number; pct: number }>;
   top_gaps: Technique[];
 }
+
+// ── TAXII 2.1 Ingest ─────────────────────────────────────────────────────────
+
+export type TaxiiAuthType = 'none' | 'basic' | 'bearer';
+
+export interface TaxiiServer {
+  id: number;
+  name: string;
+  url: string;
+  api_root: string | null;
+  collection_id: string | null;
+  auth_type: TaxiiAuthType;
+  ssl_verify: number;
+  notes: string | null;
+  last_fetch_status: 'running' | 'success' | 'error' | null;
+  last_fetch_error: string | null;
+  last_fetch_items: number | null;
+  last_fetch_skipped: number | null;
+  last_fetch_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaxiiCollection {
+  id: string;
+  title: string;
+  description?: string;
+  can_read: boolean;
+  can_write: boolean;
+}
+
+export interface TaxiiJob {
+  id: number;
+  server_id: number;
+  server_name: string;
+  name: string;
+  schedule: string;
+  enabled: number;
+  last_run: string | null;
+  last_status: 'success' | 'error' | 'running' | 'pending' | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TaxiiPendingAction = 'create_group' | 'update_group' | 'create_technique' | 'link_technique';
+export type TaxiiPendingStatus = 'pending' | 'approved' | 'rejected';
+
+export interface TaxiiPendingItem {
+  id: number;
+  job_id: number | null;
+  server_id: number;
+  batch_id: string;
+  stix_id: string;
+  stix_type: string;
+  name: string | null;
+  proposed_action: TaxiiPendingAction;
+  proposed_data: Record<string, unknown>;
+  status: TaxiiPendingStatus;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export interface TaxiiBatch {
+  batch_id: string;
+  server_id: number;
+  server_name: string;
+  created_at: string;
+  total: number;
+  pending_count: number;
+  approved_count: number;
+  rejected_count: number;
+}
+
+export interface TaxiiFetchResult {
+  batch_id: string;
+  items_created: number;
+  groups_found: number;
+  techniques_found: number;
+  relationships_found: number;
+  skipped: number;
+}

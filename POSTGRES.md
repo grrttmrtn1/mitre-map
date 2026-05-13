@@ -133,3 +133,21 @@ There is no automated data migration tool included. For a new deployment, run mi
 - Raw SQL in route handlers uses `?` parameter placeholders, which knex translates to `$1, $2, ...` for PostgreSQL at query time.
 - `RETURNING id` clauses (used by `rawInsert`) work on PostgreSQL and SQLite ≥ 3.35. Both are supported.
 - Boolean-like columns (`is_subtechnique`, `is_active`, etc.) are stored as integers (`0`/`1`) rather than native `BOOLEAN` — queries comparing against `0` and `1` work on both drivers.
+- Migration `005_exercises_blocked` uses `t.boolean()` on PostgreSQL and a raw `INTEGER` column on SQLite for the `blocked` column; the application checks it with a truthy comparison (`if (run.blocked)`), which handles both `1` and `true`.
+
+### TAXII tables (migration 006)
+
+Three tables are added by `006_taxii.ts`:
+
+| Table | Purpose |
+|---|---|
+| `taxii_servers` | Connection config for external TAXII 2.1 servers |
+| `taxii_ingest_jobs` | Scheduled fetch jobs linked to a server |
+| `taxii_pending_ingests` | Staging area for ingested STIX objects awaiting analyst review |
+
+Compatibility notes specific to these tables:
+
+- `taxii_servers.password` and `taxii_servers.token` are `TEXT` columns (not `VARCHAR(255)`) to accommodate long bearer tokens and hashed credentials.
+- `taxii_servers.ssl_verify` and `taxii_ingest_jobs.enabled` are stored as `INTEGER` (`0`/`1`) on both drivers; application code reads them with `=== 1` comparisons.
+- Indexes on `taxii_pending_ingests(batch_id)` and `taxii_pending_ingests(status)` are created by the migration to support the batch-review query patterns used by the TAXII routes.
+- `ON CONFLICT DO NOTHING` clauses in the ingest apply path are supported by both SQLite and PostgreSQL.

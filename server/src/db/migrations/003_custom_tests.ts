@@ -10,5 +10,10 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 export async function down(knex: Knex): Promise<void> {
-  // SQLite doesn't support DROP COLUMN before 3.35 — no-op on down
+  const isSqlite = knex.client.config.client === 'better-sqlite3';
+  if (!isSqlite) {
+    await knex.schema.alterTable('art_tests', t => {
+      t.dropColumn('source');
+    });
+  }
 }

@@ -4,6 +4,7 @@ import type {
   Exercise, ExerciseDetail, ExerciseFinding, ExerciseReport, ExerciseTestRun,
   ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
   RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
+  TaxiiBatch, TaxiiJob, TaxiiPendingItem, TaxiiServer, TaxiiCollection,
   Tool, ToolDetail, User,
 } from './types';
 
@@ -36,10 +37,19 @@ function handleUnauth(status: number) {
   if (status === 401) _authErrorHandler?.();
 }
 
+async function errorMessage(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    return body.error ?? `${res.status} ${res.statusText}`;
+  } catch {
+    return `${res.status} ${res.statusText}`;
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   handleUnauth(res.status);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json();
 }
 
@@ -50,7 +60,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   handleUnauth(res.status);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json();
 }
 
@@ -61,7 +71,7 @@ async function put<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   handleUnauth(res.status);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json();
 }
 
@@ -72,7 +82,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   handleUnauth(res.status);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(await errorMessage(res));
   return res.json();
 }
 
@@ -83,7 +93,7 @@ async function del(path: string, body?: unknown): Promise<any> {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   handleUnauth(res.status);
-  if (!res.ok && res.status !== 204) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok && res.status !== 204) throw new Error(await errorMessage(res));
   if (res.status === 204) return;
   const ct = res.headers.get('content-type') ?? '';
   return ct.includes('application/json') ? res.json() : undefined;
@@ -338,4 +348,35 @@ export const api = {
   getPurgeableDatasets: () => get<{ datasets: Array<{ key: string; label: string; count: number }> }>('/admin/purgeable'),
   purgeDataset: (dataset: string) => del(`/admin/purge/${dataset}`) as Promise<any>,
   purgeAll: () => del('/admin/purge-all') as Promise<any>,
+
+  // TAXII 2.1 Ingest
+  getTaxiiServers: () => get<TaxiiServer[]>('/taxii/servers'),
+  createTaxiiServer: (data: {
+    name: string; url: string; api_root?: string; collection_id?: string;
+    auth_type?: string; username?: string; password?: string; token?: string;
+    ssl_verify?: number; notes?: string;
+  }) => post<TaxiiServer>('/taxii/servers', data),
+  updateTaxiiServer: (id: number, data: Partial<{
+    name: string; url: string; api_root: string; collection_id: string;
+    auth_type: string; username: string; password: string; token: string;
+    ssl_verify: number; notes: string;
+  }>) => put<TaxiiServer>(`/taxii/servers/${id}`, data),
+  deleteTaxiiServer: (id: number) => del(`/taxii/servers/${id}`),
+  testTaxiiServer: (id: number) => post<{ ok: boolean; collections?: TaxiiCollection[]; error?: string }>(`/taxii/servers/${id}/test`, {}),
+  fetchTaxiiServer: (id: number) => post<{ ok: boolean; message: string }>(`/taxii/servers/${id}/fetch`, {}),
+
+  getTaxiiBatches: () => get<TaxiiBatch[]>('/taxii/batches'),
+  getTaxiiBatchItems: (batchId: string) => get<TaxiiPendingItem[]>(`/taxii/batches/${batchId}/items`),
+  approveTaxiiBatch: (batchId: string) => post<{ approved: number; errors: string[] }>(`/taxii/batches/${batchId}/approve`, {}),
+  rejectTaxiiBatch: (batchId: string) => post<{ ok: boolean }>(`/taxii/batches/${batchId}/reject`, {}),
+  approveTaxiiItem: (id: number) => post<{ ok: boolean }>(`/taxii/pending/${id}/approve`, {}),
+  rejectTaxiiItem: (id: number) => post<{ ok: boolean }>(`/taxii/pending/${id}/reject`, {}),
+
+  getTaxiiJobs: () => get<TaxiiJob[]>('/taxii/jobs'),
+  createTaxiiJob: (data: { server_id: number; name: string; schedule: string; enabled?: number }) =>
+    post<TaxiiJob>('/taxii/jobs', data),
+  updateTaxiiJob: (id: number, data: Partial<{ name: string; schedule: string; enabled: number }>) =>
+    put<TaxiiJob>(`/taxii/jobs/${id}`, data),
+  deleteTaxiiJob: (id: number) => del(`/taxii/jobs/${id}`),
+  runTaxiiJob: (id: number) => post<{ ok: boolean; message: string }>(`/taxii/jobs/${id}/run`, {}),
 };

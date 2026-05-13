@@ -37,6 +37,8 @@ import usersRouter from './routes/users';
 import dataSourcesRouter from './routes/data-sources';
 import atomicRouter from './routes/atomic';
 import exercisesRouter from './routes/exercises';
+import taxiiRouter from './routes/taxii';
+import { initScheduler } from './taxii/scheduler';
 import { requireApiKey } from './middleware/auth';
 
 const app = express();
@@ -98,6 +100,7 @@ app.use('/api/countries', countriesRouter);
 app.use('/api/data-sources', dataSourcesRouter);
 app.use('/api/atomic', atomicRouter);
 app.use('/api/exercises', exercisesRouter);
+app.use('/api/taxii', taxiiRouter);
 
 // OpenAPI spec — machine-readable, no auth required
 app.get('/api/openapi.json', (_req, res) => {
@@ -119,13 +122,17 @@ app.use(
 );
 
 app.get('/api/health', async (_req, res) => {
-  const db = getKnex();
-  const [keyCount, userCount] = await Promise.all([
-    rawGet<{ n: number }>(db, 'SELECT COUNT(*) as n FROM api_keys', []),
-    rawGet<{ n: number }>(db, 'SELECT COUNT(*) as n FROM users', []),
-  ]);
-  const totalAuthEntities = ((keyCount as any)?.n ?? 0) + ((userCount as any)?.n ?? 0);
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), bootstrap: totalAuthEntities === 0 });
+  try {
+    const db = getKnex();
+    const [keyCount, userCount] = await Promise.all([
+      rawGet<{ n: number }>(db, 'SELECT COUNT(*) as n FROM api_keys', []),
+      rawGet<{ n: number }>(db, 'SELECT COUNT(*) as n FROM users', []),
+    ]);
+    const totalAuthEntities = ((keyCount as any)?.n ?? 0) + ((userCount as any)?.n ?? 0);
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), bootstrap: totalAuthEntities === 0 });
+  } catch {
+    res.status(503).json({ status: 'error', timestamp: new Date().toISOString() });
+  }
 });
 
 const clientDist = path.join(__dirname, '../../client/dist');
@@ -162,6 +169,7 @@ async function start() {
   await runMigrations();
   const db = getKnex();
   await seedDatabase(db);
+  await initScheduler();
 
   if (process.env.NODE_ENV === 'production') {
     const tlsOptions = await loadTlsOptions();
