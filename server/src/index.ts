@@ -165,12 +165,12 @@ async function start() {
 
   if (process.env.NODE_ENV === 'production') {
     const tlsOptions = await loadTlsOptions();
-    https.createServer(tlsOptions, app).listen(PORT, () => {
-      console.log(`MitreMap server running on https://localhost:${PORT}`);
+    https.createServer(tlsOptions, app).listen(PORT, '0.0.0.0', () => {
+      console.log(`MitreMap server running on https://0.0.0.0:${PORT}`);
     });
   } else {
-    http.createServer(app).listen(PORT, () => {
-      console.log(`MitreMap server running on http://localhost:${PORT}`);
+    http.createServer(app).listen(PORT, '0.0.0.0', () => {
+      console.log(`MitreMap server running on http://0.0.0.0:${PORT}`);
     });
   }
 }
