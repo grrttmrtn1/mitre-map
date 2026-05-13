@@ -96,6 +96,7 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 
 ### Atomic Red Team & Custom Tests
 - **ART test library** — browse imported Atomic Red Team tests grouped by technique; each test shows name, GUID, platform, executor type, and the generated command
+- **Live ART seeding** — on first run the server fetches the full Atomic Red Team index from GitHub and seeds all tests automatically; falls back to a static baseline if the network is unavailable
 - **YAML import** — paste any `atomics/*.yaml` file from the Red Canary Atomic Red Team repository; duplicates are skipped by GUID
 - **Custom tests** — full CRUD for your own detection tests not sourced from ART; each test is marked `source: custom` and managed separately from imported ART tests
 - **Test results** — record per-detection test outcomes (`untested` / `tested` / `validated` / `failed`) with notes and run attribution
@@ -115,6 +116,18 @@ Formal exercise management that closes the loop between offensive testing and de
 - **Collection status** — `collecting` / `partial` / `not_collecting` with a free-text collection-method and notes field per source
 - **Technique mapping** — link each data source to the ATT&CK techniques it enables detection for; detection coverage shown inline
 - **Gap analysis** — identifies undetected techniques and classifies the gap: no data source known, has a collecting source but no rule, or unknown
+
+### TAXII Threat Intelligence Feeds
+Ingest external threat intelligence from any TAXII 2.1 server directly into MitreMap — with analyst review before anything touches your data.
+
+- **Server management** — register TAXII 2.1 servers by URL with `none`, `basic`, or `bearer` authentication; SSL verification toggle for internal/self-signed endpoints
+- **Connection test** — list available collections from a server without committing to a full fetch
+- **Scheduled jobs** — create cron-based ingest jobs (hourly, daily, weekly, or custom expression) that fetch automatically in the background
+- **Manual fetch** — trigger an ad-hoc fetch from any configured server at any time
+- **Analyst review queue** — ingested STIX objects (intrusion sets, attack patterns, relationships) are staged as pending items; analysts approve or reject each item individually or approve/reject an entire batch at once
+- **Proposed actions** — each pending item is pre-classified: `create_group`, `update_group`, `create_technique`, or `link_technique`; approved items are applied atomically to the threat-group and technique tables
+- **Batch history** — browse all past ingest batches grouped by server with pending/approved/rejected counts and timestamps
+- **Fetch status** — each server shows last fetch status (`running` / `success` / `error`), item count, skipped-duplicate count, and error message on failure
 
 ### API Playground
 - Interactive in-app API explorer — browse every endpoint grouped by resource, fill path/query/body params, and fire live requests authenticated with your stored API key. Responses are syntax-highlighted inline.
@@ -185,6 +198,11 @@ Formal exercise management that closes the loop between offensive testing and de
 │  ├── /api/admin          Data purge / admin ops     │
 │  ├── /api/motivations    Threat group motivations   │
 │  ├── /api/countries      Threat group countries     │
+│  ├── /api/taxii          TAXII 2.1 feed management  │
+│  │   ├── /servers        Server CRUD + test/fetch   │
+│  │   ├── /jobs           Scheduled ingest jobs      │
+│  │   ├── /batches        Ingest batch review        │
+│  │   └── /pending        Per-item approve/reject    │
 │  ├── /api/openapi.json   OpenAPI 3.0 spec           │
 │  └── /api/docs           Swagger UI                 │
 │                                                     │
@@ -213,11 +231,13 @@ Formal exercise management that closes the loop between offensive testing and de
 │  detection_art_results                              │
 │  exercises · exercise_techniques                    │
 │  exercise_test_runs · exercise_findings             │
+│  taxii_servers · taxii_ingest_jobs                  │
+│  taxii_pending_ingests                              │
 └─────────────────────────────────────────────────────┘
 ```
 
 **Key design choices:**
-- **SQLite + WAL mode** — zero-dependency persistence; WAL journal gives concurrent reads without blocking writes. Sufficient for a team of analysts; swap to Postgres if you need horizontal scale.
+- **SQLite + WAL mode** — zero-dependency persistence; WAL journal gives concurrent reads without blocking writes. Sufficient for a team of analysts; swap to PostgreSQL if you need horizontal scale (see [POSTGRES.md](POSTGRES.md)).
 - **HTTPS everywhere** — production always runs TLS. The server generates a `selfsigned` certificate automatically if no `SSL_CERT_PATH`/`SSL_KEY_PATH` are provided, so there's no plain-HTTP fallback.
 - **Polymorphic entity model** — `entity_tags`, `comments`, and `assignments` all use `(entity_type, entity_id)` keys so the same schema handles detections, techniques, tools, and gaps without separate junction tables.
 - **Synchronous DB layer** — `better-sqlite3` is synchronous, eliminating async waterfall bugs on the server while keeping the API simple.
@@ -254,10 +274,12 @@ Open [http://localhost:3000](http://localhost:3000). The Vite dev server proxies
 > Development mode runs plain HTTP. HTTPS is only enabled when `NODE_ENV=production`.
 
 The database is created automatically at `server/data/mitremap.db` on first run and seeded with:
-- Full MITRE ATT&CK Enterprise (14 tactics, techniques + subtechniques, mitigations)
+- Full MITRE ATT&CK Enterprise (14 tactics, techniques + subtechniques, mitigations) — fetched live from GitHub on first run; falls back to a static v14.1 baseline if offline
 - 68 D3FEND countermeasures with ATT&CK mappings
 - 18 major threat groups with technique associations
 - NIST CSF 2.0 and CIS Controls v8 compliance mappings
+- ATT&CK data source catalogue with technique mappings
+- Full Atomic Red Team test library — fetched live from GitHub on first run; falls back to a static baseline if offline
 - 30+ demo detections and 10 security tools
 - 8 demo tags pre-applied to detections
 
@@ -376,6 +398,14 @@ docker compose up -d
 ```
 
 The existing database volume is preserved across rebuilds; the schema is migrated automatically on startup.
+
+### PostgreSQL
+
+MitreMap defaults to SQLite. Set `DATABASE_URL` to a `postgres://` connection string to switch to PostgreSQL — no code changes required. See [POSTGRES.md](POSTGRES.md) for full setup instructions, Docker Compose examples, and schema compatibility notes.
+
+```env
+DATABASE_URL=postgres://mitremap:changeme@localhost:5432/mitremap
+```
 
 ---
 
@@ -598,6 +628,34 @@ Authorization: Bearer <raw-key>
 
 **Collection statuses:** `collecting` · `partial` · `not_collecting`
 
+### TAXII Feed Integration
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/taxii/servers` | List all TAXII servers (credentials excluded) |
+| `POST` | `/api/taxii/servers` | Register server `{ name, url, api_root?, collection_id?, auth_type?, username?, password?, token?, ssl_verify?, notes? }` |
+| `PUT` | `/api/taxii/servers/:id` | Update server fields |
+| `DELETE` | `/api/taxii/servers/:id` | Delete server and cascade jobs |
+| `POST` | `/api/taxii/servers/:id/test` | Test connection — returns available collections |
+| `POST` | `/api/taxii/servers/:id/fetch` | Trigger ad-hoc fetch (runs in background, returns immediately) |
+| `GET` | `/api/taxii/batches` | List ingest batches with pending/approved/rejected counts |
+| `GET` | `/api/taxii/batches/:batch_id/items` | Items in a batch with proposed data |
+| `POST` | `/api/taxii/batches/:batch_id/approve` | Approve all pending items in batch |
+| `POST` | `/api/taxii/batches/:batch_id/reject` | Reject all pending items in batch |
+| `POST` | `/api/taxii/pending/:id/approve` | Approve single pending item |
+| `POST` | `/api/taxii/pending/:id/reject` | Reject single pending item |
+| `GET` | `/api/taxii/jobs` | List all scheduled ingest jobs |
+| `POST` | `/api/taxii/jobs` | Create job `{ server_id, name, schedule }` — `schedule` is a cron expression |
+| `PUT` | `/api/taxii/jobs/:id` | Update job name, schedule, or enabled flag |
+| `DELETE` | `/api/taxii/jobs/:id` | Delete job and stop its schedule |
+| `POST` | `/api/taxii/jobs/:id/run` | Manually trigger a scheduled job |
+
+**Auth types:** `none` · `basic` · `bearer`
+
+**Proposed actions:** `create_group` · `update_group` · `create_technique` · `link_technique`
+
+**Pending item statuses:** `pending` · `approved` · `rejected`
+
 ### Exports
 
 | Method | Path | Description |
@@ -623,9 +681,10 @@ Authorization: Bearer <raw-key>
 | Frontend | React 18, TypeScript, React Router v6, Recharts, Tailwind CSS |
 | Build tool | Vite 5 |
 | Backend | Node.js 20, Express 4, TypeScript |
-| Database | SQLite via `better-sqlite3` (WAL mode, foreign keys) |
-| Schema migrations | Knex.js (versioned migration files, run on startup) |
+| Database | SQLite via `better-sqlite3` (WAL mode) or PostgreSQL 14+ via `pg` — set `DATABASE_URL` |
+| Schema migrations | Knex.js (versioned migration files, run on startup or via `npm run migrate`) |
 | Authentication | JWT (`jsonwebtoken`), bcrypt (`bcryptjs`), OIDC (Authorization Code flow) |
+| TAXII | TAXII 2.1 client (native `http`/`https`); `node-cron` for scheduled ingest jobs |
 | API docs | OpenAPI 3.0 spec + Swagger UI (`swagger-ui-express`) |
 | Testing | Vitest (unit + integration tests, in-memory SQLite harness) |
 | TLS | `selfsigned` (auto self-signed cert) or BYO cert via `SSL_CERT_PATH`/`SSL_KEY_PATH` |
@@ -648,19 +707,30 @@ mitremap/
 │       │   ├── knex.ts         # Knex connection + migration runner
 │       │   ├── seed.ts         # Idempotent seeding
 │       │   └── migrations/
-│       │       ├── 001_core_schema.ts   # Base schema
-│       │       ├── 002_new_features.ts  # Auth, ART, data sources, ATT&CK versioning
-│       │       ├── 003_custom_tests.ts  # source column on art_tests
-│       │       └── 004_exercises.ts     # Exercises, test runs, findings
+│       │       ├── 001_core_schema.ts       # Base schema
+│       │       ├── 002_new_features.ts      # Auth, ART, data sources, ATT&CK versioning
+│       │       ├── 003_custom_tests.ts      # source column on art_tests
+│       │       ├── 004_exercises.ts         # Exercises, test runs, findings
+│       │       ├── 005_exercises_blocked.ts # blocked column on exercise_test_runs
+│       │       ├── 006_taxii.ts             # TAXII servers, jobs, pending ingests
+│       │       ├── 007_taxii_fetch_status.ts# last_fetch_* columns on taxii_servers
+│       │       └── 008_taxii_skipped.ts     # last_fetch_skipped column
 │       ├── data/
 │       │   ├── attack.ts           # ATT&CK tactics, techniques, mitigations
 │       │   ├── d3fend.ts           # D3FEND techniques + ATT&CK mappings
 │       │   ├── stix-fetch.ts       # Live ATT&CK STIX fetcher (GitHub)
 │       │   ├── threat-groups.ts
 │       │   ├── compliance.ts       # NIST CSF 2.0, CIS Controls v8
-│       │   ├── atomic-tests.ts     # Seed ART test data
+│       │   ├── atomic-tests.ts     # Live ART fetch + static baseline
 │       │   ├── data-sources.ts     # Seed ATT&CK data sources
 │       │   └── demo.ts             # Demo tools and detections
+│       ├── taxii/
+│       │   ├── client.ts           # TAXII 2.1 HTTP client (basic + bearer auth)
+│       │   ├── parser.ts           # STIX bundle → proposed-action records
+│       │   ├── ingest.ts           # runFetch(), applyPendingItem(), rejectPendingItem()
+│       │   └── scheduler.ts        # node-cron job lifecycle
+│       ├── scripts/
+│       │   └── migrate.ts          # Standalone migration runner (dist/scripts/migrate.js)
 │       ├── openapi.ts              # OpenAPI 3.0 spec definition
 │       ├── __tests__/              # Vitest unit/integration tests
 │       │   ├── auth.test.ts
@@ -676,6 +746,7 @@ mitremap/
 │           ├── atomic.ts             # ART import, custom tests, coverage, results
 │           ├── data-sources.ts       # ATT&CK data source management
 │           ├── exercises.ts          # Exercise / purple team workflow
+│           ├── taxii.ts              # TAXII servers, jobs, pending-item review
 │           ├── threat-groups.ts      # CRUD + technique assignment + procedures
 │           ├── api-keys.ts           # API key lifecycle (hash, mask, revoke)
 │           └── admin.ts              # Data purge endpoints
@@ -706,6 +777,7 @@ mitremap/
 │           ├── AtomicTests.tsx     # ART + custom test browser/editor
 │           ├── DataSources.tsx     # ATT&CK data source management
 │           ├── Exercises.tsx       # Red/purple team exercise workflow
+│           ├── TaxiiIngest.tsx     # TAXII feed management + review queue
 │           ├── Reports.tsx
 │           ├── ApiPlayground.tsx   # Interactive API explorer
 │           └── Settings.tsx        # API keys · users · ATT&CK updates · data mgmt
@@ -714,6 +786,7 @@ mitremap/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example                # Copy to .env before running docker compose
+├── POSTGRES.md                 # PostgreSQL setup and compatibility guide
 └── package.json                # npm workspaces root
 ```
 
