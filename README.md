@@ -12,6 +12,10 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 <img width="1433" height="785" alt="image" src="https://github.com/user-attachments/assets/0ddb2106-ecb6-4f84-a88d-64455728f9b6" />
 <img width="1438" height="780" alt="image" src="https://github.com/user-attachments/assets/2bace4bc-3ad9-4407-9584-3def9d560afa" />
 <img width="1440" height="783" alt="image" src="https://github.com/user-attachments/assets/67d01a20-c0d6-47c5-bc8c-9055d2dfd19f" />
+<img width="1436" height="784" alt="image" src="https://github.com/user-attachments/assets/a71ec9dd-61ba-4c1e-84ef-7c76dec5ed4d" />
+<img width="1435" height="780" alt="image" src="https://github.com/user-attachments/assets/8dce8524-3ecf-4f6f-87c0-d90d8380e28f" />
+
+
 
 
 
