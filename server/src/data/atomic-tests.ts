@@ -1,3 +1,6 @@
+import https from 'https';
+import http from 'http';
+
 export interface ArtTest {
   technique_id: string;
   test_guid: string;
@@ -6,6 +9,204 @@ export interface ArtTest {
   platform: string;
   executor_type: string;
   auto_generated_command: string;
+}
+
+export interface ParsedArtTest {
+  technique_id: string;
+  test_guid: string;
+  name: string;
+  description: string;
+  platform: string;
+  executor_type: string;
+  auto_generated_command: string;
+}
+
+function fetchUrl(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    const req = client.get(url, { headers: { 'User-Agent': 'mitremap/1.0' } }, res => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        resolve(fetchUrl(res.headers.location!));
+        return;
+      }
+      if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => resolve(body));
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error('timeout')); });
+  });
+}
+
+// Parses per-technique YAML files (attack_technique: header format)
+export function parseArtYaml(yaml: string): ParsedArtTest[] {
+  const tests: ParsedArtTest[] = [];
+  let current: ParsedArtTest | null = null;
+  let inTests = false;
+  let inExecutor = false;
+  let commandLines: string[] = [];
+
+  for (const rawLine of yaml.split('\n')) {
+    const stripped = rawLine.trim();
+
+    if (stripped.startsWith('attack_technique:')) {
+      if (current) {
+        if (commandLines.length) current.auto_generated_command = commandLines.join('\n').trim();
+        tests.push(current);
+        commandLines = [];
+      }
+      current = {
+        technique_id: stripped.replace('attack_technique:', '').trim(),
+        test_guid: '', name: '', description: '', platform: '', executor_type: '', auto_generated_command: '',
+      };
+      inTests = false; inExecutor = false;
+    }
+    if (!current) continue;
+    if (stripped.startsWith('- name:') && inTests) {
+      if (current.test_guid) {
+        if (commandLines.length) current.auto_generated_command = commandLines.join('\n').trim();
+        tests.push({ ...current });
+        commandLines = [];
+      }
+      current.name = stripped.replace('- name:', '').trim();
+      current.test_guid = ''; current.description = ''; current.platform = '';
+      current.executor_type = ''; current.auto_generated_command = '';
+      inExecutor = false;
+    }
+    if (stripped.startsWith('atomic_tests:')) inTests = true;
+    if (stripped.startsWith('auto_generated_guid:') && inTests) current.test_guid = stripped.replace('auto_generated_guid:', '').trim();
+    if (stripped.startsWith('description:') && inTests && !inExecutor) current.description = stripped.replace('description:', '').trim().replace(/\|$/, '');
+    if (stripped.startsWith('supported_platforms:') && inTests) current.platform = stripped.replace('supported_platforms:', '').trim().replace(/[\[\]]/g, '');
+    if (stripped.startsWith('executor:') && inTests) inExecutor = true;
+    if (stripped.startsWith('name:') && inExecutor) current.executor_type = stripped.replace('name:', '').trim();
+    if (stripped.startsWith('command:') && inExecutor) { commandLines = []; }
+    else if (inExecutor && current.executor_type && !stripped.startsWith('name:') && !stripped.startsWith('elevation_required:') && !stripped.startsWith('cleanup_command:') && !stripped.startsWith('executor:')) {
+      if (rawLine.startsWith('        ') || rawLine.startsWith('\t\t\t\t')) commandLines.push(stripped);
+    }
+  }
+  if (current?.name) {
+    if (commandLines.length) current.auto_generated_command = commandLines.join('\n').trim();
+    tests.push(current);
+  }
+  return tests;
+}
+
+// Parses the ART index.yaml (organized by tactic → technique_id → atomic_tests)
+function parseArtIndexYaml(yaml: string): ParsedArtTest[] {
+  const tests: ParsedArtTest[] = [];
+  let currentTechId = '';
+  let currentTest: ParsedArtTest | null = null;
+  let inAtomicTests = false;
+  let inExecutor = false;
+  let inCommand = false;
+  let inPlatforms = false;
+  let commandLines: string[] = [];
+  let platformParts: string[] = [];
+
+  function finishTest() {
+    if (!currentTest) return;
+    if (commandLines.length) currentTest.auto_generated_command = commandLines.join('\n').trim();
+    if (platformParts.length) currentTest.platform = platformParts.join(', ');
+    if (currentTest.test_guid && currentTest.name) tests.push({ ...currentTest });
+    currentTest = null;
+    commandLines = [];
+    platformParts = [];
+    inExecutor = false;
+    inCommand = false;
+    inPlatforms = false;
+  }
+
+  for (const rawLine of yaml.split('\n')) {
+    const indent = rawLine.match(/^( *)/)?.[1].length ?? 0;
+    const stripped = rawLine.trim();
+    if (!stripped || stripped === '---') continue;
+
+    // Technique ID: indent 2, matches T\d pattern
+    if (indent === 2 && /^T\d/.test(stripped) && stripped.endsWith(':')) {
+      finishTest();
+      currentTechId = stripped.slice(0, -1);
+      inAtomicTests = false;
+      continue;
+    }
+
+    // atomic_tests section start
+    if (indent === 4 && stripped === 'atomic_tests:') {
+      inAtomicTests = true;
+      continue;
+    }
+
+    if (!inAtomicTests || !currentTechId) continue;
+
+    // New test entry: indent 4, starts with "- name:"
+    if (indent === 4 && stripped.startsWith('- name:')) {
+      finishTest();
+      currentTest = {
+        technique_id: currentTechId,
+        test_guid: '', name: stripped.replace('- name:', '').trim(),
+        description: '', platform: '', executor_type: '', auto_generated_command: '',
+      };
+      continue;
+    }
+
+    if (!currentTest) continue;
+
+    // Test-level fields at indent 6
+    if (indent === 6) {
+      inCommand = false;
+      if (inPlatforms && stripped.startsWith('- ')) {
+        // platform list item
+        platformParts.push(stripped.slice(2).trim());
+      } else if (stripped.startsWith('auto_generated_guid:')) {
+        inPlatforms = false;
+        currentTest.test_guid = stripped.replace('auto_generated_guid:', '').trim();
+      } else if (stripped.startsWith('description:')) {
+        inPlatforms = false;
+        currentTest.description = stripped.replace('description:', '').trim().replace(/^\|[-]?\s*/, '');
+      } else if (stripped.startsWith('supported_platforms:')) {
+        inPlatforms = true;
+        const inline = stripped.replace('supported_platforms:', '').trim();
+        if (inline) platformParts = inline.replace(/[\[\]]/g, '').split(',').map(s => s.trim()).filter(Boolean);
+      } else if (stripped.startsWith('executor:')) {
+        inPlatforms = false;
+        inExecutor = true;
+      } else {
+        inPlatforms = false;
+      }
+    } else if (inExecutor && indent === 8) {
+      inCommand = false;
+      if (stripped.startsWith('name:')) {
+        currentTest.executor_type = stripped.replace('name:', '').trim();
+      } else if (stripped.startsWith('command:')) {
+        commandLines = [];
+        inCommand = true;
+        // inline value: command: 'foo' or command: foo (no block indicator)
+        const val = stripped.replace(/^command:\s*/, '');
+        if (val && val !== '|' && val !== '|-' && val !== '>-' && val !== '>') {
+          commandLines.push(val.replace(/^['"]|['"]$/g, ''));
+          inCommand = false;
+        }
+      } else if (stripped.startsWith('cleanup_command:') || stripped.startsWith('elevation_required:')) {
+        inCommand = false;
+      }
+    } else if (inCommand && indent >= 10) {
+      commandLines.push(stripped);
+    }
+  }
+  finishTest();
+  return tests;
+}
+
+const ART_INDEX_URL = 'https://raw.githubusercontent.com/redcanaryco/atomic-red-team/master/atomics/Indexes/index.yaml';
+
+export async function fetchArtFromGithub(): Promise<ParsedArtTest[] | null> {
+  try {
+    const yaml = await fetchUrl(ART_INDEX_URL);
+    const tests = parseArtIndexYaml(yaml);
+    return tests.length > 0 ? tests : null;
+  } catch {
+    return null;
+  }
 }
 
 export const ART_TESTS: ArtTest[] = [

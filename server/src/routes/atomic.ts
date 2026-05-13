@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
+import { parseArtYaml, fetchArtFromGithub } from '../data/atomic-tests';
 
 const router = Router();
 
@@ -128,40 +129,7 @@ router.post('/import', async (req, res) => {
   const { yaml } = req.body;
   if (!yaml?.trim()) return res.status(400).json({ error: 'yaml is required' });
 
-  const tests: any[] = [];
-  let current: any = null;
-  let inTests = false;
-  let inExecutor = false;
-  let commandLines: string[] = [];
-
-  for (const rawLine of yaml.split('\n')) {
-    const line = rawLine;
-    const stripped = line.trim();
-
-    if (stripped.startsWith('attack_technique:')) {
-      if (current) { if (commandLines.length) current.auto_generated_command = commandLines.join('\n').trim(); tests.push(current); commandLines = []; }
-      current = { technique_id: stripped.replace('attack_technique:', '').trim(), test_guid: '', name: '', description: '', platform: '', executor_type: '', auto_generated_command: '' };
-      inTests = false; inExecutor = false;
-    }
-    if (!current) continue;
-    if (stripped.startsWith('- name:') && inTests) {
-      if (current.test_guid) { if (commandLines.length) current.auto_generated_command = commandLines.join('\n').trim(); tests.push({ ...current }); commandLines = []; }
-      current.name = stripped.replace('- name:', '').trim(); current.test_guid = ''; current.description = ''; current.platform = ''; current.executor_type = ''; current.auto_generated_command = '';
-      inExecutor = false;
-    }
-    if (stripped.startsWith('atomic_tests:')) inTests = true;
-    if (stripped.startsWith('auto_generated_guid:') && inTests) current.test_guid = stripped.replace('auto_generated_guid:', '').trim();
-    if (stripped.startsWith('description:') && inTests && !inExecutor) current.description = stripped.replace('description:', '').trim().replace(/\|$/, '');
-    if (stripped.startsWith('supported_platforms:') && inTests) current.platform = stripped.replace('supported_platforms:', '').trim().replace(/[\[\]]/g, '');
-    if (stripped.startsWith('executor:') && inTests) inExecutor = true;
-    if (stripped.startsWith('name:') && inExecutor) current.executor_type = stripped.replace('name:', '').trim();
-    if (stripped.startsWith('command:') && inExecutor) { commandLines = []; }
-    else if (inExecutor && current.executor_type && !stripped.startsWith('name:') && !stripped.startsWith('elevation_required:') && !stripped.startsWith('cleanup_command:') && !stripped.startsWith('executor:')) {
-      if (line.startsWith('        ') || line.startsWith('\t\t\t\t')) commandLines.push(stripped);
-    }
-  }
-  if (current?.name) { if (commandLines.length) current.auto_generated_command = commandLines.join('\n').trim(); tests.push(current); }
-
+  const tests = parseArtYaml(yaml);
   let imported = 0;
   let skipped = 0;
   for (const t of tests) {
@@ -175,6 +143,30 @@ router.post('/import', async (req, res) => {
   if (imported > 0) {
     await logAudit(db, 'art_test', 'bulk', 'imported', (req as any).actor ?? 'user',
       { imported, skipped }, (req as any).sourceIp);
+  }
+  res.json({ imported, skipped, total: tests.length });
+});
+
+router.post('/sync', async (req, res) => {
+  const db = getKnex();
+  const tests = await fetchArtFromGithub();
+  if (!tests) return res.status(502).json({ error: 'Failed to fetch ART index from GitHub' });
+
+  let imported = 0;
+  let skipped = 0;
+  for (const t of tests) {
+    if (!t.test_guid || !t.technique_id) { skipped++; continue; }
+    const techExists = await rawGet(db, 'SELECT id FROM attack_techniques WHERE id=?', [t.technique_id]);
+    if (!techExists) { skipped++; continue; }
+    const exists = await rawGet(db, 'SELECT id FROM art_tests WHERE test_guid=?', [t.test_guid]);
+    if (exists) { skipped++; continue; }
+    await rawRun(db, 'INSERT INTO art_tests (technique_id, test_guid, name, description, platform, executor_type, auto_generated_command) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [t.technique_id, t.test_guid, t.name || 'Unnamed', t.description || '', t.platform || '', t.executor_type || '', t.auto_generated_command || '']);
+    imported++;
+  }
+  if (imported > 0) {
+    await logAudit(db, 'art_test', 'bulk', 'synced', (req as any).actor ?? 'user',
+      { imported, skipped, source: 'github' }, (req as any).sourceIp);
   }
   res.json({ imported, skipped, total: tests.length });
 });

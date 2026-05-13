@@ -269,6 +269,7 @@ export const api = {
   updateArtResult: (id: number, data: { status?: string; notes?: string; run_by?: string }) => put<ArtResult>(`/atomic/results/${id}`, data),
   deleteArtResult: (id: number) => del(`/atomic/results/${id}`),
   importArtYaml: (yaml: string) => post<{ imported: number; skipped: number; total: number }>('/atomic/import', { yaml }),
+  syncArtTests: () => post<{ imported: number; skipped: number; total: number }>('/atomic/sync', {}),
   createCustomTest: (data: { technique_id: string; name: string; description?: string; platform?: string; executor_type?: string; command?: string }) => post<ArtTest>('/atomic/custom', data),
   updateCustomTest: (id: number, data: { name?: string; description?: string; platform?: string; executor_type?: string; command?: string }) => put<ArtTest>(`/atomic/custom/${id}`, data),
   deleteCustomTest: (id: number) => del(`/atomic/custom/${id}`),

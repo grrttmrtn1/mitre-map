@@ -7,7 +7,7 @@ import { DEMO_TOOLS, DEMO_DETECTIONS } from '../data/demo';
 import { THREAT_GROUPS } from '../data/threat-groups';
 import { COMPLIANCE_FRAMEWORKS, COMPLIANCE_CONTROLS, TECHNIQUE_COMPLIANCE, DEMO_TAGS } from '../data/compliance';
 import { DATA_SOURCES, TECHNIQUE_DATA_SOURCES } from '../data/data-sources';
-import { ART_TESTS } from '../data/atomic-tests';
+import { ART_TESTS, fetchArtFromGithub } from '../data/atomic-tests';
 
 const SEED_MOTIVATIONS = [
   { name: 'Espionage',              color: '#3b82f6' },
@@ -307,9 +307,16 @@ async function seedNewTables(db: Knex, isFirstRun: boolean): Promise<void> {
     });
   }
 
-  // Atomic Red Team tests (idempotent via ON CONFLICT DO NOTHING on test_guid)
+  // Atomic Red Team tests — try live GitHub index first, fall back to static baseline
+  const liveArt = await fetchArtFromGithub();
+  const artSource = liveArt ?? ART_TESTS;
+  if (liveArt) {
+    console.log(`Fetched ${liveArt.length} ART tests from GitHub`);
+  } else {
+    console.log('ART GitHub fetch unavailable — using static baseline');
+  }
   await db.transaction(async trx => {
-    for (const test of ART_TESTS) {
+    for (const test of artSource) {
       const techExists = await trx('attack_techniques').where('id', test.technique_id).first();
       if (!techExists) continue;
       await trx.raw(

@@ -47,10 +47,26 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
   const [showImport, setShowImport] = useState(false);
   const [yamlInput, setYamlInput] = useState('');
   const [importing, setImporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
   const [allTests, setAllTests] = useState<ArtTest[]>(tests);
 
   useEffect(() => { setAllTests(tests); }, [tests]);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const result = await api.syncArtTests();
+      setSyncResult(result);
+      if (result.imported > 0) setAllTests(await api.getArtTests().then(ts => ts.filter(t => t.source !== 'custom')));
+    } catch {
+      setSyncResult({ imported: 0, skipped: 0, total: 0 });
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const grouped = allTests.reduce<Record<string, ArtTest[]>>((acc, t) => {
     const base = t.technique_id.split('.')[0];
@@ -82,16 +98,35 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
   return (
     <>
       <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-        <div className="flex items-start justify-between">
-          <p className="text-sm text-slate-400">
-            {loading ? 'Loading…' : `${allTests.length} tests across ${Object.keys(grouped).length} techniques`}
-          </p>
-          <button
-            onClick={() => setShowImport(v => !v)}
-            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
-          >
-            Import YAML
-          </button>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-400">
+              {loading ? 'Loading…' : `${allTests.length} tests across ${Object.keys(grouped).length} techniques`}
+            </p>
+            {syncResult && (
+              <p className="text-xs mt-1 text-slate-500">
+                Synced: <span className="text-emerald-400 font-medium">{syncResult.imported}</span> new,{' '}
+                <span className="text-slate-500">{syncResult.skipped}</span> already present
+                {' '}({syncResult.total} in index)
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              title="Fetch the full Atomic Red Team test suite from GitHub"
+              className="px-3 py-1.5 text-sm bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 disabled:opacity-50 transition-colors"
+            >
+              {syncing ? 'Syncing…' : 'Sync from GitHub'}
+            </button>
+            <button
+              onClick={() => setShowImport(v => !v)}
+              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+            >
+              Import YAML
+            </button>
+          </div>
         </div>
 
         {showImport && (
