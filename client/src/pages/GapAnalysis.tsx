@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { CoveredTechnique, GapTechnique } from '../types';
 
+const SECTORS = [
+  'Financial', 'Healthcare', 'Energy', 'Government', 'Defense', 'Technology',
+  'Retail', 'Manufacturing', 'Education', 'Transportation', 'Telecommunications', 'Media',
+];
+
 const D3FEND_COLORS: Record<string, string> = {
   Harden: 'bg-blue-500/15 text-blue-400',
   Detect: 'bg-emerald-500/15 text-emerald-400',
@@ -26,6 +31,25 @@ const STATUS_BADGE: Record<string, string> = {
 
 type View = 'gaps' | 'covered';
 
+function PriorityBar({ score, components }: { score: number; components: GapTechnique['priority_components'] }) {
+  const level = score >= 70 ? 'critical' : score >= 45 ? 'high' : score >= 20 ? 'medium' : 'low';
+  const colors = { critical: 'text-red-400 bg-red-500/15 border-red-500/30', high: 'text-orange-400 bg-orange-500/15 border-orange-500/30', medium: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30', low: 'text-slate-400 bg-slate-700 border-slate-600' };
+  return (
+    <span className="group relative">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-mono cursor-default ${colors[level]}`}>
+        P{score}
+      </span>
+      <div className="hidden group-hover:block absolute right-0 top-6 z-10 bg-slate-800 border border-slate-700 rounded-lg p-2.5 shadow-xl text-xs w-44 space-y-1">
+        <div className="text-slate-300 font-semibold mb-1.5">Priority breakdown</div>
+        <div className="flex justify-between text-slate-400"><span>Threat groups</span><span className="text-slate-200">{components.group}/40</span></div>
+        <div className="flex justify-between text-slate-400"><span>Industry targeting</span><span className="text-slate-200">{components.industry}/30</span></div>
+        <div className="flex justify-between text-slate-400"><span>Data readiness</span><span className="text-slate-200">{components.data_sources}/20</span></div>
+        <div className="flex justify-between text-slate-400"><span>Mitigation guidance</span><span className="text-slate-200">{components.mitigation_guidance}/10</span></div>
+      </div>
+    </span>
+  );
+}
+
 export default function GapAnalysis() {
   const [view, setView] = useState<View>('gaps');
   const [gaps, setGaps] = useState<GapTechnique[]>([]);
@@ -34,13 +58,22 @@ export default function GapAnalysis() {
   const [search, setSearch] = useState('');
   const [filterTactic, setFilterTactic] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'tactic' | 'd3fend' | 'mitigations' | 'detections' | 'tools'>('tactic');
+  const [sortBy, setSortBy] = useState<'priority' | 'tactic' | 'd3fend' | 'mitigations' | 'detections' | 'tools'>('priority');
+  const [orgSector, setOrgSector] = useState('');
+  const [savingSector, setSavingSector] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.getCoverageGaps(), api.getCoveredTechniques()])
-      .then(([g, c]) => { setGaps(g); setCovered(c); })
+    Promise.all([api.getCoverageGaps(), api.getCoveredTechniques(), api.getSetting('org_sector')])
+      .then(([g, c, s]) => { setGaps(g); setCovered(c); setOrgSector(s.value ?? ''); })
       .finally(() => setLoading(false));
   }, []);
+
+  const saveSector = async (val: string) => {
+    setSavingSector(true);
+    await api.setSetting('org_sector', val || null).finally(() => setSavingSector(false));
+    // Reload gaps so priority scores reflect new sector
+    api.getCoverageGaps().then(setGaps);
+  };
 
   const allTactics = [...new Set([
     ...gaps.flatMap(g => g.tactic_names),
@@ -52,6 +85,7 @@ export default function GapAnalysis() {
     const matchTactic = !filterTactic || g.tactic_names.includes(filterTactic);
     return matchSearch && matchTactic;
   }).sort((a, b) => {
+    if (sortBy === 'priority') return b.priority_score - a.priority_score;
     if (sortBy === 'tactic') return a.tactic_names[0]?.localeCompare(b.tactic_names[0] ?? '') ?? 0;
     if (sortBy === 'd3fend') return b.recommended_d3fend.length - a.recommended_d3fend.length;
     return b.recommended_mitigations.length - a.recommended_mitigations.length;
@@ -102,7 +136,7 @@ export default function GapAnalysis() {
   const handleViewChange = (v: View) => {
     setView(v);
     setExpanded(null);
-    setSortBy('tactic');
+    setSortBy(v === 'gaps' ? 'priority' : 'tactic');
   };
 
   if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Loading gap analysis...</div>;
@@ -151,6 +185,7 @@ export default function GapAnalysis() {
           {view === 'gaps' ? (
             <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
               className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
+              <option value="priority">Sort: Priority Score</option>
               <option value="tactic">Sort: Tactic</option>
               <option value="d3fend">Sort: D3FEND coverage</option>
               <option value="mitigations">Sort: Mitigations</option>
@@ -164,6 +199,21 @@ export default function GapAnalysis() {
             </select>
           )}
         </div>
+        {view === 'gaps' && (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs text-slate-500">Industry sector:</span>
+            <select
+              value={orgSector}
+              onChange={e => { setOrgSector(e.target.value); saveSector(e.target.value); }}
+              disabled={savingSector}
+              className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded text-slate-300 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+            >
+              <option value="">Not set (industry targeting N/A)</option>
+              {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <span className="text-xs text-slate-600">Used to weigh industry-relevant threat groups in priority score.</span>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -205,7 +255,11 @@ export default function GapAnalysis() {
                       {g.recommended_mitigations.length > 0 && (
                         <span className="text-purple-400">{g.recommended_mitigations.length} mitigations</span>
                       )}
+                      {g.group_count > 0 && (
+                        <span className="text-amber-400">{g.group_count} group{g.group_count !== 1 ? 's' : ''}</span>
+                      )}
                     </div>
+                    {g.priority_components && <PriorityBar score={g.priority_score} components={g.priority_components} />}
                     <span className="text-slate-600 text-sm">{expanded === g.id ? '▲' : '▼'}</span>
                   </div>
                 </button>
@@ -246,6 +300,30 @@ export default function GapAnalysis() {
                         </div>
                       )}
                     </div>
+
+                    {g.priority_components && (
+                      <div className="col-span-2 bg-slate-800/50 rounded-lg p-3">
+                        <div className="text-xs font-semibold text-slate-400 mb-2">Priority Score: <span className="text-slate-200">{g.priority_score}/100</span></div>
+                        <div className="grid grid-cols-4 gap-2 text-xs">
+                          <div className="bg-slate-900 rounded p-2 text-center">
+                            <div className="text-amber-400 font-bold text-base">{g.priority_components.group}</div>
+                            <div className="text-slate-500 mt-0.5">Threat groups<br/><span className="text-slate-600">/40</span></div>
+                          </div>
+                          <div className="bg-slate-900 rounded p-2 text-center">
+                            <div className="text-sky-400 font-bold text-base">{g.priority_components.industry}</div>
+                            <div className="text-slate-500 mt-0.5">Industry targeting<br/><span className="text-slate-600">/30</span></div>
+                          </div>
+                          <div className="bg-slate-900 rounded p-2 text-center">
+                            <div className="text-emerald-400 font-bold text-base">{g.priority_components.data_sources}</div>
+                            <div className="text-slate-500 mt-0.5">Data readiness<br/><span className="text-slate-600">/20</span></div>
+                          </div>
+                          <div className="bg-slate-900 rounded p-2 text-center">
+                            <div className="text-purple-400 font-bold text-base">{g.priority_components.mitigation_guidance}</div>
+                            <div className="text-slate-500 mt-0.5">Mit. guidance<br/><span className="text-slate-600">/10</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="col-span-2 pt-2 border-t border-slate-800 flex items-center justify-between">
                       <div className="flex gap-2">

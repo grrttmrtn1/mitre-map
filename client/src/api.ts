@@ -1,6 +1,6 @@
 import type {
   ApiKey, ArtResult, ArtTest, Assignment, AttackVersion, AuditLogEntry, Comment, ComplianceFramework,
-  CoverageSnapshot, CoverageStats, Country, CoveredTechnique, DataSource, Detection, DetectionQualityScore, D3FendTechnique,
+  CoverageSnapshot, CoverageStats, Country, CoveredTechnique, DataSource, Detection, DetectionHistory, DetectionQualityScore, D3FendTechnique,
   Exercise, ExerciseDetail, ExerciseFinding, ExerciseReport, ExerciseTestRun,
   ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
   RiskByTactic, RiskScore, SigmaLibrarySearch, SigmaParseResult, SigmaRuleDetail, SigmaTemplate,
@@ -129,6 +129,7 @@ export const api = {
   },
   getDetectionQualityScores: () => get<DetectionQualityScore[]>('/detections/quality-scores'),
   getDetection: (id: number) => get<Detection>(`/detections/${id}`),
+  getDetectionHistory: (id: number) => get<DetectionHistory>(`/detections/${id}/history`),
   createDetection: (data: Partial<Detection>) => post<Detection>('/detections', data),
   updateDetection: (id: number, data: Partial<Detection>) => put<Detection>(`/detections/${id}`, data),
   deleteDetection: (id: number) => del(`/detections/${id}`),
@@ -358,7 +359,7 @@ export const api = {
 
   // Settings
   getSettingStatus: (key: string) => get<{ key: string; configured: boolean; value?: string | null }>(`/settings/${key}`),
-  setSetting: (key: string, value: string) => put<{ key: string; configured: boolean }>(`/settings/${key}`, { value }),
+  setSetting: (key: string, value: string | null) => put<{ key: string; configured: boolean }>(`/settings/${key}`, { value }),
   clearSetting: (key: string) => del(`/settings/${key}`),
 
   // Admin / Purge
@@ -412,4 +413,7 @@ export const api = {
   updateAlertRule: (id: number, data: Partial<{ name: string; type: string; threshold: number; webhook_config_id: number; enabled: boolean }>) =>
     put<AlertRule>(`/webhooks/rules/${id}`, data),
   deleteAlertRule: (id: number) => del(`/webhooks/rules/${id}`),
+
+  // Settings (key lookup)
+  getSetting: (key: string) => get<{ key: string; value: string | null }>(`/settings/${key}`),
 };

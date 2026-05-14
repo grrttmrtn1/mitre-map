@@ -1,8 +1,18 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, type DB } from '../db/database';
 import { checkCoverageAlerts } from '../webhooks/service';
 
 const router = Router();
+
+const VERSIONED_FIELDS = ['name', 'description', 'rule_id', 'source', 'technique_ids', 'status', 'severity', 'confidence', 'false_positive_rate', 'notes'];
+
+async function saveVersion(db: DB, detectionId: number | string, snapshot: any, changedBy: string, summary?: string) {
+  const last = await rawGet<{ v: number }>(db, 'SELECT MAX(version_number) as v FROM detection_versions WHERE detection_id=?', [detectionId]);
+  const versionNumber = (Number(last?.v) || 0) + 1;
+  await rawRun(db,
+    'INSERT INTO detection_versions (detection_id, version_number, snapshot, changed_by, change_summary) VALUES (?, ?, ?, ?, ?)',
+    [detectionId, versionNumber, JSON.stringify(snapshot), changedBy, summary ?? null]);
+}
 
 router.get('/', async (req, res) => {
   const db = getKnex();
@@ -85,6 +95,28 @@ router.get('/quality-scores', async (_req, res) => {
   res.json(scores);
 });
 
+router.get('/:id/history', async (req, res) => {
+  const db = getKnex();
+  const detection = await rawGet(db, 'SELECT id FROM detections WHERE id=?', [req.params.id]);
+  if (!detection) return res.status(404).json({ error: 'Not found' });
+  const versions = await rawAll<any>(db,
+    'SELECT * FROM detection_versions WHERE detection_id=? ORDER BY version_number ASC', [req.params.id]);
+  const result = versions.map((v, i) => {
+    const snapshot = JSON.parse(v.snapshot);
+    const diff: { field: string; from: unknown; to: unknown }[] = [];
+    if (i > 0) {
+      const prev = JSON.parse(versions[i - 1].snapshot);
+      for (const field of VERSIONED_FIELDS) {
+        if (JSON.stringify(prev[field]) !== JSON.stringify(snapshot[field])) {
+          diff.push({ field, from: prev[field], to: snapshot[field] });
+        }
+      }
+    }
+    return { id: v.id, version_number: v.version_number, changed_by: v.changed_by, changed_at: v.changed_at, change_summary: v.change_summary, snapshot, diff };
+  });
+  res.json({ detection_id: Number(req.params.id), versions: result.reverse() });
+});
+
 router.get('/:id', async (req, res) => {
   const db = getKnex();
   const detection = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
@@ -102,7 +134,9 @@ router.post('/', async (req, res) => {
   `, [name, description ?? null, rule_id ?? null, source ?? null, JSON.stringify(technique_ids),
     status ?? 'active', severity ?? 'medium', confidence ?? 'medium', false_positive_rate ?? null, notes ?? null]);
   const created = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [id]);
-  await logAudit(db, 'detection', String(id), 'created', (req as any).actor ?? 'user', { name }, (req as any).sourceIp);
+  const actor = (req as any).actor ?? 'user';
+  await saveVersion(db, id, { ...created, technique_ids: JSON.parse(created.technique_ids) }, actor, 'created');
+  await logAudit(db, 'detection', String(id), 'created', actor, { name }, (req as any).sourceIp);
   checkCoverageAlerts(db).catch(() => {});
   res.status(201).json({ ...created, technique_ids: JSON.parse(created.technique_ids) });
 });
@@ -120,7 +154,14 @@ router.put('/:id', async (req, res) => {
     status ?? 'active', severity ?? 'medium', confidence ?? 'medium',
     false_positive_rate ?? null, notes ?? null, req.params.id]);
   const updated = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
-  await logAudit(db, 'detection', req.params.id, 'updated', (req as any).actor ?? 'user', { status, severity }, (req as any).sourceIp);
+  const actor = (req as any).actor ?? 'user';
+  const prevSnap = { ...existing, technique_ids: JSON.parse((existing as any).technique_ids) };
+  const newSnap = { ...updated, technique_ids: JSON.parse(updated.technique_ids) };
+  const changedFields = VERSIONED_FIELDS.filter(f => JSON.stringify(prevSnap[f]) !== JSON.stringify(newSnap[f]));
+  if (changedFields.length > 0) {
+    await saveVersion(db, req.params.id, newSnap, actor, changedFields.join(', ') + ' changed');
+  }
+  await logAudit(db, 'detection', req.params.id, 'updated', actor, { status, severity }, (req as any).sourceIp);
   checkCoverageAlerts(db).catch(() => {});
   res.json({ ...updated, technique_ids: JSON.parse(updated.technique_ids) });
 });

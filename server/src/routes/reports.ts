@@ -110,16 +110,21 @@ router.get('/threat-landscape', async (_req, res) => {
 
 router.get('/gaps', async (_req, res) => {
   const db = getKnex();
+
+  const orgSectorRow = await rawGet<{ value: string | null }>(db, "SELECT value FROM settings WHERE key='org_sector'");
+  const orgSector = orgSectorRow?.value ?? null;
+
   const gaps = await rawAll<any>(db, `
     SELECT t.id, t.name, t.tactic_ids,
       (SELECT COUNT(*) FROM group_techniques gt WHERE gt.technique_id=t.id) as group_count,
+      (SELECT COUNT(*) FROM technique_compliance tc WHERE tc.technique_id=t.id) as compliance_impact,
+      (SELECT COUNT(*) FROM technique_mitigations tm2 WHERE tm2.technique_id=t.id) as mitigation_guidance,
       CASE WHEN EXISTS (
         SELECT 1 FROM technique_mitigations tm
         JOIN tool_mitigations tlm ON tm.mitigation_id=tlm.mitigation_id
         JOIN tools tl ON tlm.tool_id=tl.id
         WHERE tm.technique_id=t.id AND tl.status='active'
-      ) THEN 1 ELSE 0 END as mitigated,
-      (SELECT COUNT(*) FROM technique_compliance tc WHERE tc.technique_id=t.id) as compliance_impact
+      ) THEN 1 ELSE 0 END as tool_mitigated
     FROM attack_techniques t
     WHERE t.is_subtechnique=0
       AND NOT EXISTS (SELECT 1 FROM detections d WHERE d.status='active' AND d.technique_ids LIKE '%"' || t.id || '"%')
@@ -131,12 +136,56 @@ router.get('/gaps', async (_req, res) => {
     ORDER BY t.id
   `);
 
+  // Batch-fetch industry targeting data
+  const industryGroupMap = new Map<string, number>();
+  if (orgSector) {
+    const industryRows = await rawAll<{ technique_id: string; cnt: number }>(db, `
+      SELECT gt.technique_id, COUNT(*) as cnt
+      FROM group_techniques gt
+      JOIN threat_groups tg ON gt.group_id = tg.id
+      WHERE tg.targeted_sectors LIKE ?
+      GROUP BY gt.technique_id
+    `, [`%${orgSector}%`]);
+    industryRows.forEach(r => industryGroupMap.set(r.technique_id, Number(r.cnt)));
+  }
+
+  const dsRequiredRows = await rawAll<{ technique_id: string; cnt: number }>(db,
+    'SELECT technique_id, COUNT(*) as cnt FROM technique_data_sources GROUP BY technique_id');
+  const dsRequiredMap = new Map(dsRequiredRows.map(r => [r.technique_id, Number(r.cnt)]));
+
+  const dsCollectingRows = await rawAll<{ technique_id: string; cnt: number }>(db, `
+    SELECT tds.technique_id, COUNT(*) as cnt
+    FROM technique_data_sources tds
+    JOIN org_data_sources ods ON tds.data_source_id = ods.data_source_id
+    WHERE ods.status = 'collecting'
+    GROUP BY tds.technique_id
+  `);
+  const dsCollectingMap = new Map(dsCollectingRows.map(r => [r.technique_id, Number(r.cnt)]));
+
   const enriched = gaps.map(g => {
     const groupCount = Number(g.group_count);
-    const mitigated = Boolean(g.mitigated);
-    const complianceImpact = Number(g.compliance_impact);
-    const priority_score = groupCount * 3 + complianceImpact * 2 + (mitigated ? 0 : 1);
-    return { ...g, tactic_ids: JSON.parse(g.tactic_ids), group_count: groupCount, mitigated, compliance_impact: complianceImpact, priority_score };
+    const industryGroups = industryGroupMap.get(g.id) ?? 0;
+    const required = dsRequiredMap.get(g.id) ?? 0;
+    const collecting = dsCollectingMap.get(g.id) ?? 0;
+    const hasGuidance = Number(g.mitigation_guidance) > 0;
+
+    const groupScore = Math.min(40, groupCount * 8);
+    const industryScore = Math.round((industryGroups / Math.max(1, groupCount)) * 30);
+    const dsScore = Math.round((collecting / Math.max(1, required)) * 20);
+    const guidanceScore = hasGuidance ? 10 : 0;
+    const priority_score = groupScore + industryScore + dsScore + guidanceScore;
+
+    return {
+      ...g,
+      tactic_ids: JSON.parse(g.tactic_ids),
+      group_count: groupCount,
+      industry_group_count: industryGroups,
+      compliance_impact: Number(g.compliance_impact),
+      tool_mitigated: Boolean(g.tool_mitigated),
+      has_mitigation_guidance: hasGuidance,
+      priority_score,
+      priority_components: { group: groupScore, industry: industryScore, data_sources: dsScore, mitigation_guidance: guidanceScore },
+    };
   });
 
   res.json({ generated_at: new Date().toISOString(), total_gaps: enriched.length, gaps: enriched.sort((a, b) => b.priority_score - a.priority_score) });

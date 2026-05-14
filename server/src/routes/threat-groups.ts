@@ -7,26 +7,30 @@ const router = Router();
 router.get('/', async (_req, res) => {
   const db = getKnex();
   const groups = await rawAll(db, 'SELECT * FROM threat_groups ORDER BY name');
-  res.json(groups.map((g: any) => ({ ...g, aliases: JSON.parse(g.aliases) })));
+  res.json(groups.map((g: any) => ({
+    ...g,
+    aliases: JSON.parse(g.aliases),
+    targeted_sectors: JSON.parse(g.targeted_sectors ?? '[]'),
+  })));
 });
 
 router.post('/', async (req, res) => {
   const db = getKnex();
-  const { id, name, aliases = [], description, country, motivation, url, technique_ids = [] } = req.body;
+  const { id, name, aliases = [], description, country, motivation, url, technique_ids = [], targeted_sectors = [] } = req.body;
   if (!id || !name) return res.status(400).json({ error: 'id and name are required' });
   if (await rawGet(db, 'SELECT id FROM threat_groups WHERE id=?', [id])) {
     return res.status(409).json({ error: 'Threat group with this ID already exists' });
   }
   await db.transaction(async trx => {
-    await rawRun(trx, 'INSERT INTO threat_groups (id, name, aliases, description, country, motivation, url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, name, JSON.stringify(aliases), description ?? null, country ?? null, motivation ?? null, url ?? null]);
+    await rawRun(trx, 'INSERT INTO threat_groups (id, name, aliases, description, country, motivation, url, targeted_sectors) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, name, JSON.stringify(aliases), description ?? null, country ?? null, motivation ?? null, url ?? null, JSON.stringify(targeted_sectors)]);
     for (const tid of technique_ids) {
       await rawRun(trx, 'INSERT INTO group_techniques (group_id, technique_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [id, tid]);
     }
     await logAudit(trx, 'threat_group', id, 'create', (req as any).actor ?? 'user', { name, country, motivation }, (req as any).sourceIp);
   });
   const group = await rawGet<any>(db, 'SELECT * FROM threat_groups WHERE id=?', [id]);
-  res.status(201).json({ ...group, aliases: JSON.parse(group.aliases) });
+  res.status(201).json({ ...group, aliases: JSON.parse(group.aliases), targeted_sectors: JSON.parse(group.targeted_sectors ?? '[]') });
 });
 
 router.get('/:id', async (req, res) => {
@@ -47,7 +51,9 @@ router.get('/:id', async (req, res) => {
   const coveredCount = detectionCoverage.filter(t => t.detected).length;
 
   res.json({
-    ...group, aliases: JSON.parse(group.aliases),
+    ...group,
+    aliases: JSON.parse(group.aliases),
+    targeted_sectors: JSON.parse(group.targeted_sectors ?? '[]'),
     techniques: techniques.map((t: any) => ({ ...t, tactic_ids: JSON.parse(t.tactic_ids) })),
     coverage: { total: techniques.length, covered: coveredCount, pct: techniques.length ? Math.round((coveredCount / techniques.length) * 100) : 0, details: detectionCoverage },
   });
@@ -57,15 +63,18 @@ router.put('/:id', async (req, res) => {
   const db = getKnex();
   const group = await rawGet<any>(db, 'SELECT * FROM threat_groups WHERE id=?', [req.params.id]);
   if (!group) return res.status(404).json({ error: 'Not found' });
-  const { name, aliases, description, country, motivation, url, technique_ids } = req.body;
+  const { name, aliases, description, country, motivation, url, technique_ids, targeted_sectors } = req.body;
   await db.transaction(async trx => {
     await rawRun(trx, `UPDATE threat_groups SET
-      name=COALESCE(?,name), aliases=COALESCE(?,aliases), description=?, country=?, motivation=?, url=? WHERE id=?`,
+      name=COALESCE(?,name), aliases=COALESCE(?,aliases), description=?, country=?, motivation=?, url=?,
+      targeted_sectors=COALESCE(?,targeted_sectors) WHERE id=?`,
       [name ?? null, aliases !== undefined ? JSON.stringify(aliases) : null,
         description !== undefined ? description : group.description,
         country !== undefined ? country : group.country,
         motivation !== undefined ? motivation : group.motivation,
-        url !== undefined ? url : group.url, req.params.id]);
+        url !== undefined ? url : group.url,
+        targeted_sectors !== undefined ? JSON.stringify(targeted_sectors) : null,
+        req.params.id]);
     if (Array.isArray(technique_ids)) {
       await rawRun(trx, 'DELETE FROM group_techniques WHERE group_id=?', [req.params.id]);
       for (const tid of technique_ids) {
@@ -76,7 +85,7 @@ router.put('/:id', async (req, res) => {
   });
   const updated = await rawGet<any>(db, 'SELECT * FROM threat_groups WHERE id=?', [req.params.id]);
   if (Array.isArray(technique_ids)) checkUncoveredGroupTechniqueAlerts(db).catch(() => {});
-  res.json({ ...updated, aliases: JSON.parse(updated.aliases) });
+  res.json({ ...updated, aliases: JSON.parse(updated.aliases), targeted_sectors: JSON.parse(updated.targeted_sectors ?? '[]') });
 });
 
 router.delete('/:id', async (req, res) => {

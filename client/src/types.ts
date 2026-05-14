@@ -127,6 +127,25 @@ export interface GapTechnique extends Technique {
   tactic_names: string[];
   recommended_d3fend: Array<{ id: string; name: string; category: string }>;
   recommended_mitigations: Array<{ id: string; name: string }>;
+  group_count: number;
+  industry_group_count: number;
+  priority_score: number;
+  priority_components: { group: number; industry: number; data_sources: number; mitigation_guidance: number };
+}
+
+export interface DetectionVersion {
+  id: number;
+  version_number: number;
+  changed_by: string;
+  changed_at: string;
+  change_summary: string | null;
+  snapshot: Detection;
+  diff: Array<{ field: string; from: unknown; to: unknown }>;
+}
+
+export interface DetectionHistory {
+  detection_id: number;
+  versions: DetectionVersion[];
 }
 
 export interface CoveredTechnique extends Technique {
@@ -229,6 +248,7 @@ export interface ThreatGroup {
   country: string | null;
   motivation: string | null;
   url: string | null;
+  targeted_sectors: string[];
 }
 
 export interface ThreatGroupDetail extends ThreatGroup {

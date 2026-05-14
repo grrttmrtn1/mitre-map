@@ -3,8 +3,13 @@ import { api } from '../api';
 import type { Country, Motivation, Procedure, ProcedureType, ThreatGroup, Technique } from '../types';
 
 const BLANK_FORM = {
-  id: '', name: '', country: '', motivation: '', description: '', url: '', aliases: '',
+  id: '', name: '', country: '', motivation: '', description: '', url: '', aliases: '', targeted_sectors: [] as string[],
 };
+
+const SECTORS = [
+  'Financial', 'Healthcare', 'Energy', 'Government', 'Defense', 'Technology',
+  'Retail', 'Manufacturing', 'Education', 'Transportation', 'Telecommunications', 'Media',
+];
 
 interface GroupDetail {
   techniques: any[];
@@ -13,7 +18,7 @@ interface GroupDetail {
 
 interface GroupFormData {
   id: string; name: string; country: string; motivation: string;
-  description: string; url: string; aliases: string;
+  description: string; url: string; aliases: string; targeted_sectors: string[];
 }
 
 export default function ThreatGroups() {
@@ -81,6 +86,7 @@ export default function ThreatGroups() {
       description: g.description ?? '',
       url: g.url ?? '',
       aliases: g.aliases.join(', '),
+      targeted_sectors: g.targeted_sectors ?? [],
     });
     api.getThreatGroup(g.id).then(d => {
       setSelectedTechIds(new Set((d as any).techniques?.map((t: any) => t.id) ?? []));
@@ -107,6 +113,7 @@ export default function ThreatGroups() {
         url: form.url.trim() || null,
         aliases: form.aliases.split(',').map(a => a.trim()).filter(Boolean),
         technique_ids: Array.from(selectedTechIds),
+        targeted_sectors: form.targeted_sectors,
       };
       if (editGroup) {
         await api.updateThreatGroup(editGroup.id, payload);
@@ -418,6 +425,33 @@ function GroupModal({
               <label className="text-xs text-slate-400 block mb-1">Aliases <span className="text-slate-600">(comma-separated)</span></label>
               <input value={form.aliases} onChange={e => f('aliases', e.target.value)} placeholder="Cozy Bear, Midnight Blizzard"
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-slate-400 block mb-1">Targeted Industry Sectors <span className="text-slate-600">(used in gap priority scoring)</span></label>
+              <div className="flex flex-wrap gap-1.5">
+                {SECTORS.map(s => {
+                  const active = form.targeted_sectors.includes(s);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setForm((prev: GroupFormData) => ({
+                        ...prev,
+                        targeted_sectors: active
+                          ? prev.targeted_sectors.filter((x: string) => x !== s)
+                          : [...prev.targeted_sectors, s],
+                      }))}
+                      className={`px-2.5 py-1 rounded text-xs border transition-colors ${
+                        active
+                          ? 'bg-blue-600/20 text-blue-400 border-blue-500/50'
+                          : 'bg-slate-800 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="col-span-2">
               <label className="text-xs text-slate-400 block mb-1">MITRE ATT&CK URL</label>

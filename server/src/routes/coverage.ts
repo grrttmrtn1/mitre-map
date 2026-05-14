@@ -242,6 +242,45 @@ router.get('/gaps', async (_req, res) => {
     if (p) mitigatedIds.add(p);
   }
 
+  // --- Priority scoring data (batch queries) ---
+  const orgSectorRow = await rawGet<{ value: string | null }>(db, "SELECT value FROM settings WHERE key='org_sector'");
+  const orgSector = orgSectorRow?.value ?? null;
+
+  const groupCountRows = await rawAll<{ technique_id: string; cnt: number }>(db,
+    'SELECT technique_id, COUNT(*) as cnt FROM group_techniques GROUP BY technique_id');
+  const groupCountMap = new Map(groupCountRows.map(r => [r.technique_id, Number(r.cnt)]));
+
+  const industryGroupMap = new Map<string, number>();
+  if (orgSector) {
+    const industryRows = await rawAll<{ technique_id: string; cnt: number }>(db, `
+      SELECT gt.technique_id, COUNT(*) as cnt
+      FROM group_techniques gt
+      JOIN threat_groups tg ON gt.group_id = tg.id
+      WHERE tg.targeted_sectors LIKE ?
+      GROUP BY gt.technique_id
+    `, [`%${orgSector}%`]);
+    industryRows.forEach(r => industryGroupMap.set(r.technique_id, Number(r.cnt)));
+  }
+
+  const dsRequiredRows = await rawAll<{ technique_id: string; cnt: number }>(db,
+    'SELECT technique_id, COUNT(*) as cnt FROM technique_data_sources GROUP BY technique_id');
+  const dsRequiredMap = new Map(dsRequiredRows.map(r => [r.technique_id, Number(r.cnt)]));
+
+  const dsCollectingRows = await rawAll<{ technique_id: string; cnt: number }>(db, `
+    SELECT tds.technique_id, COUNT(*) as cnt
+    FROM technique_data_sources tds
+    JOIN org_data_sources ods ON tds.data_source_id = ods.data_source_id
+    WHERE ods.status = 'collecting'
+    GROUP BY tds.technique_id
+  `);
+  const dsCollectingMap = new Map(dsCollectingRows.map(r => [r.technique_id, Number(r.cnt)]));
+
+  // Techniques that have ATT&CK mitigation guidance defined (even if no tool implements it)
+  const mitigationGuidanceRows = await rawAll<{ technique_id: string }>(db,
+    'SELECT DISTINCT technique_id FROM technique_mitigations');
+  const hasMitigationGuidance = new Set(mitigationGuidanceRows.map(r => r.technique_id));
+  // ---
+
   const allTechniques = await rawAll<any>(db, 'SELECT * FROM attack_techniques WHERE is_subtechnique=0');
   const gaps = await Promise.all(
     allTechniques
@@ -253,11 +292,28 @@ router.get('/gaps', async (_req, res) => {
           rawAll(db, `SELECT d.id, d.name, d.category FROM d3fend_techniques d JOIN attack_d3fend ad ON d.id = ad.d3fend_id WHERE ad.attack_id = ? ORDER BY d.category`, [t.id]),
           rawAll(db, `SELECT m.id, m.name FROM attack_mitigations m JOIN technique_mitigations tm ON m.id = tm.mitigation_id WHERE tm.technique_id = ?`, [t.id]),
         ]);
+
+        const groupCount = groupCountMap.get(t.id) ?? 0;
+        const industryGroups = industryGroupMap.get(t.id) ?? 0;
+        const required = dsRequiredMap.get(t.id) ?? 0;
+        const collecting = dsCollectingMap.get(t.id) ?? 0;
+        const hasGuidance = hasMitigationGuidance.has(t.id);
+
+        const groupScore = Math.min(40, groupCount * 8);
+        const industryScore = Math.round((industryGroups / Math.max(1, groupCount)) * 30);
+        const dsScore = Math.round((collecting / Math.max(1, required)) * 20);
+        const guidanceScore = hasGuidance ? 10 : 0;
+        const priority_score = groupScore + industryScore + dsScore + guidanceScore;
+
         return {
           ...t, tactic_ids: tacticIds,
           tactic_names: tactics.map((ta: any) => ta.name),
           recommended_d3fend: d3fend,
           recommended_mitigations: mitigations,
+          group_count: groupCount,
+          industry_group_count: industryGroups,
+          priority_score,
+          priority_components: { group: groupScore, industry: industryScore, data_sources: dsScore, mitigation_guidance: guidanceScore },
         };
       })
   );

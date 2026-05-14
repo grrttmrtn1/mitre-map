@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../api';
-import type { Detection, DetectionQualityScore, Technique } from '../types';
+import type { Detection, DetectionHistory, DetectionQualityScore, Technique } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
@@ -55,6 +55,9 @@ export default function Detections() {
   const [logFireOpen, setLogFireOpen] = useState(false);
   const [logFireOutcome, setLogFireOutcome] = useState<'true_positive' | 'false_positive' | 'suppressed' | ''>('');
   const [loggingFire, setLoggingFire] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyData, setHistoryData] = useState<DetectionHistory | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = () => api.getDetections({ status: filterStatus || undefined, severity: filterSeverity || undefined, source: filterSource || undefined })
@@ -207,6 +210,18 @@ export default function Detections() {
     const updated = await api.reviewDetection(detectionId);
     setSelectedDetection(updated);
     load();
+  };
+
+  const openHistory = async (detectionId: number) => {
+    setHistoryOpen(true);
+    setHistoryData(null);
+    setHistoryLoading(true);
+    try {
+      const data = await api.getDetectionHistory(detectionId);
+      setHistoryData(data);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const toggleTechId = (id: string) => {
@@ -617,6 +632,13 @@ export default function Detections() {
                 Edit
               </button>
               <button
+                onClick={() => openHistory(selectedDetection.id)}
+                className="px-3 py-2 text-xs bg-slate-700 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-600 transition-colors"
+                title="View change history"
+              >
+                History
+              </button>
+              <button
                 onClick={e => del(selectedDetection.id, e)}
                 className="px-3 py-2 text-xs bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors"
               >
@@ -784,6 +806,56 @@ export default function Detections() {
               </button>
             </div>
           </>
+        )}
+      </Modal>
+
+      <Modal open={historyOpen} onClose={() => { setHistoryOpen(false); setHistoryData(null); }} title="Detection Change History" width="max-w-2xl">
+        {historyLoading && (
+          <div className="flex items-center justify-center h-24 text-slate-500 text-sm">Loading history...</div>
+        )}
+        {!historyLoading && historyData && historyData.versions.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-24 text-slate-500">
+            <div className="text-sm">No version history yet.</div>
+            <div className="text-xs mt-1 text-slate-600">History is recorded from the next save onward.</div>
+          </div>
+        )}
+        {!historyLoading && historyData && historyData.versions.length > 0 && (
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {historyData.versions.map((v, idx) => (
+              <div key={v.id} className="border border-slate-700 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 bg-slate-800/50">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded">v{v.version_number}</span>
+                    {idx === 0 && <span className="text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded">current</span>}
+                    <span className="text-xs text-slate-400">{v.change_summary ?? 'No summary'}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-400">{new Date(v.changed_at).toLocaleString()}</div>
+                    <div className="text-xs text-slate-600">by {v.changed_by}</div>
+                  </div>
+                </div>
+                {v.diff.length > 0 ? (
+                  <div className="divide-y divide-slate-800">
+                    {v.diff.map(d => (
+                      <div key={d.field} className="px-3 py-2 grid grid-cols-[120px_1fr_1fr] gap-2 text-xs">
+                        <span className="text-slate-500 font-medium truncate">{d.field}</span>
+                        <div className="bg-red-500/10 border border-red-500/20 rounded px-2 py-1 text-red-400 font-mono break-all">
+                          {Array.isArray(d.from) ? (d.from as string[]).join(', ') || '—' : String(d.from ?? '—')}
+                        </div>
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1 text-emerald-400 font-mono break-all">
+                          {Array.isArray(d.to) ? (d.to as string[]).join(', ') || '—' : String(d.to ?? '—')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-3 py-2 text-xs text-slate-600 italic">
+                    {v.version_number === 1 ? 'Initial creation' : 'No tracked field changes'}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </Modal>
     </div>
