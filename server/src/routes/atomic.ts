@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
 import { parseArtYaml, fetchArtFromGithub } from '../data/atomic-tests';
+import { checkValidationFailedAlerts } from '../webhooks/service';
 
 const router = Router();
 
@@ -60,6 +61,13 @@ router.post('/results', async (req, res) => {
     [detection_id, art_test_id, status, notes ?? null, run_by ?? (req as any).actor ?? null]);
   await logAudit(db, 'detection', String(detection_id), 'test_result_added',
     (req as any).actor ?? 'user', { art_test_id, status }, (req as any).sourceIp);
+  if (status === 'failed') {
+    const [det, test] = await Promise.all([
+      rawGet<any>(db, 'SELECT name FROM detections WHERE id=?', [detection_id]),
+      rawGet<any>(db, 'SELECT name FROM art_tests WHERE id=?', [art_test_id]),
+    ]);
+    checkValidationFailedAlerts(db, detection_id, det?.name ?? String(detection_id), test?.name ?? String(art_test_id)).catch(() => {});
+  }
   res.status(201).json(await rawGet(db, 'SELECT * FROM detection_art_results WHERE id=?', [id]));
 });
 

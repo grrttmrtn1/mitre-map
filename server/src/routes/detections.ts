@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
+import { checkCoverageAlerts } from '../webhooks/service';
 
 const router = Router();
 
@@ -102,6 +103,7 @@ router.post('/', async (req, res) => {
     status ?? 'active', severity ?? 'medium', confidence ?? 'medium', false_positive_rate ?? null, notes ?? null]);
   const created = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [id]);
   await logAudit(db, 'detection', String(id), 'created', (req as any).actor ?? 'user', { name }, (req as any).sourceIp);
+  checkCoverageAlerts(db).catch(() => {});
   res.status(201).json({ ...created, technique_ids: JSON.parse(created.technique_ids) });
 });
 
@@ -119,6 +121,7 @@ router.put('/:id', async (req, res) => {
     false_positive_rate ?? null, notes ?? null, req.params.id]);
   const updated = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
   await logAudit(db, 'detection', req.params.id, 'updated', (req as any).actor ?? 'user', { status, severity }, (req as any).sourceIp);
+  checkCoverageAlerts(db).catch(() => {});
   res.json({ ...updated, technique_ids: JSON.parse(updated.technique_ids) });
 });
 
@@ -128,6 +131,7 @@ router.delete('/:id', async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Not found' });
   await logAudit(db, 'detection', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: existing.name }, (req as any).sourceIp);
   await rawRun(db, 'DELETE FROM detections WHERE id = ?', [req.params.id]);
+  checkCoverageAlerts(db).catch(() => {});
   res.status(204).send();
 });
 

@@ -313,24 +313,29 @@ export default function Detections() {
               <option value="low">Low Quality (D/F)</option>
               <option value="unvalidated">Unvalidated (never fired)</option>
             </select>
-            <div className="flex items-center gap-1">
-              <select value={sortField} onChange={e => setSortField(e.target.value)}
-                className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
-                <option value="name">Name</option>
-                <option value="severity">Severity</option>
-                <option value="status">Status</option>
-                <option value="quality">Quality</option>
-                <option value="last_fired_at">Last Fired</option>
-                <option value="created_at">Created</option>
-              </select>
-              <button
-                onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-                className="px-2 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
-                title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
-              >
-                {sortDir === 'asc' ? '↑' : '↓'}
-              </button>
-            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 mt-2">
+            <span className="text-xs text-slate-500 font-medium">Sort by</span>
+            <select value={sortField} onChange={e => setSortField(e.target.value)}
+              className="px-3 py-1 text-xs bg-slate-800/80 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
+              <option value="name">Name</option>
+              <option value="severity">Severity</option>
+              <option value="status">Status</option>
+              <option value="quality">Quality</option>
+              <option value="last_fired_at">Last Fired</option>
+              <option value="created_at">Created</option>
+            </select>
+            <button
+              onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs bg-slate-800/80 border border-slate-700 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+              title={sortDir === 'asc' ? 'Ascending — click to reverse' : 'Descending — click to reverse'}
+            >
+              {sortDir === 'asc' ? (
+                <><span>↑</span><span>A–Z</span></>
+              ) : (
+                <><span>↓</span><span>Z–A</span></>
+              )}
+            </button>
           </div>
         </div>
 

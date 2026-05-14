@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
+import { checkUncoveredGroupTechniqueAlerts } from '../webhooks/service';
 
 const router = Router();
 
@@ -74,6 +75,7 @@ router.put('/:id', async (req, res) => {
     await logAudit(trx, 'threat_group', req.params.id, 'update', (req as any).actor ?? 'user', req.body, (req as any).sourceIp);
   });
   const updated = await rawGet<any>(db, 'SELECT * FROM threat_groups WHERE id=?', [req.params.id]);
+  if (Array.isArray(technique_ids)) checkUncoveredGroupTechniqueAlerts(db).catch(() => {});
   res.json({ ...updated, aliases: JSON.parse(updated.aliases) });
 });
 
@@ -94,6 +96,7 @@ router.post('/:id/techniques', async (req, res) => {
   const { technique_ids = [] } = req.body;
   for (const tid of technique_ids) await rawRun(db, 'INSERT INTO group_techniques (group_id, technique_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [req.params.id, tid]);
   const { c } = await rawGet<{ c: number }>(db, 'SELECT COUNT(*) as c FROM group_techniques WHERE group_id=?', [req.params.id]) as any;
+  checkUncoveredGroupTechniqueAlerts(db).catch(() => {});
   res.json({ group_id: req.params.id, total_techniques: c });
 });
 

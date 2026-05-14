@@ -586,3 +586,30 @@ export interface TaxiiFetchResult {
   relationships_found: number;
   skipped: number;
 }
+
+export interface WebhookConfig {
+  id: number;
+  name: string;
+  url: string;
+  secret: string | null;
+  custom_headers: string | null;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AlertRuleType = 'coverage_threshold' | 'detection_validation_failed' | 'new_uncovered_group_technique';
+
+export interface AlertRule {
+  id: number;
+  name: string;
+  type: AlertRuleType;
+  threshold: number | null;
+  webhook_config_id: number;
+  webhook_name: string;
+  webhook_url: string;
+  enabled: boolean;
+  last_notified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}

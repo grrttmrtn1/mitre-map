@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, getStoredApiKey, setStoredApiKey, clearStoredApiKey } from '../api';
-import type { Country, Motivation, Tag, AuditLogEntry, ApiKey, User, AttackVersion } from '../types';
+import type { Country, Motivation, Tag, AuditLogEntry, ApiKey, User, AttackVersion, WebhookConfig, AlertRule, AlertRuleType } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_INFO: Record<string, { label: string; description: string; color: string }> = {
@@ -9,7 +9,7 @@ const ROLE_INFO: Record<string, { label: string; description: string; color: str
   admin:     { label: 'Admin',      description: 'Full access — includes user management, API key management, data purge, and all write operations.', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
 };
 
-type TabId = 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data' | 'users' | 'attack_version' | 'sso';
+type TabId = 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data' | 'users' | 'attack_version' | 'sso' | 'webhooks';
 
 const SCOPES = ['read', 'write', 'admin'];
 const SCOPE_DESC: Record<string, string> = {
@@ -108,6 +108,27 @@ export default function Settings() {
   const [purging, setPurging] = useState(false);
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
 
+  // Webhook state
+  const BLANK_WEBHOOK = { name: '', url: '', secret: '', custom_headers: '' };
+  const BLANK_RULE = { name: '', type: 'coverage_threshold' as AlertRuleType, threshold: '80', webhook_config_id: '' };
+  const [webhookConfigs, setWebhookConfigs] = useState<WebhookConfig[]>([]);
+  const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
+  const [webhookForm, setWebhookForm] = useState(BLANK_WEBHOOK);
+  const [editWebhookId, setEditWebhookId] = useState<number | null>(null);
+  const [savingWebhook, setSavingWebhook] = useState(false);
+  const [webhookError, setWebhookError] = useState('');
+  const [testingWebhookId, setTestingWebhookId] = useState<number | null>(null);
+  const [testResult, setTestResult] = useState<{ id: number; ok: boolean; msg: string } | null>(null);
+  const [ruleForm, setRuleForm] = useState(BLANK_RULE);
+  const [editRuleId, setEditRuleId] = useState<number | null>(null);
+  const [savingRule, setSavingRule] = useState(false);
+  const [ruleError, setRuleError] = useState('');
+
+  const loadWebhooks = () => Promise.all([
+    api.getWebhookConfigs().then(setWebhookConfigs),
+    api.getAlertRules().then(setAlertRules),
+  ]).catch(() => {});
+
   const loadTags = () => api.getTags().then(setTags);
   const loadMotivations = () => api.getMotivations().then(setMotivations);
   const loadCountries = () => api.getCountries().then(setCountries);
@@ -117,7 +138,7 @@ export default function Settings() {
   const loadDatasets = () => api.getPurgeableDatasets().then(r => setDatasets(r.datasets));
 
   useEffect(() => {
-    loadTags(); loadMotivations(); loadCountries(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets();
+    loadTags(); loadMotivations(); loadCountries(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets(); loadWebhooks();
     if (isAdmin) { loadUsers(); loadAttackVersion(); loadOidcProviders(); }
   }, [isAdmin]);
 
@@ -281,6 +302,7 @@ export default function Settings() {
     { id: 'users', label: 'Users', adminOnly: true },
     { id: 'sso', label: 'SSO / OIDC', adminOnly: true, disabled: true },
     { id: 'attack_version', label: 'ATT&CK Version', adminOnly: true },
+    { id: 'webhooks', label: 'Webhooks' },
   ];
   const TABS = ALL_TABS.filter(t => !t.adminOnly || isAdmin);
 
@@ -1317,6 +1339,261 @@ export default function Settings() {
             )}
           </div>
         )}
+
+        {/* ── Webhooks ── */}
+        {activeTab === 'webhooks' && (
+          <div className="max-w-3xl space-y-6">
+            {/* Webhook Endpoints */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-4">
+                {editWebhookId !== null ? 'Edit Webhook Endpoint' : 'Add Webhook Endpoint'}
+              </h2>
+              {canWrite && (
+                <div className="space-y-3 mb-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Name</label>
+                      <input value={webhookForm.name} onChange={e => setWebhookForm(f => ({ ...f, name: e.target.value }))}
+                        placeholder="e.g. Slack SOC Channel"
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">URL</label>
+                      <input value={webhookForm.url} onChange={e => setWebhookForm(f => ({ ...f, url: e.target.value }))}
+                        placeholder="https://hooks.example.com/..."
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500 font-mono" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Secret (optional — for HMAC signature)</label>
+                      <input value={webhookForm.secret} onChange={e => setWebhookForm(f => ({ ...f, secret: e.target.value }))}
+                        placeholder="my-signing-secret"
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500 font-mono" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Custom Headers (optional — JSON)</label>
+                      <input value={webhookForm.custom_headers} onChange={e => setWebhookForm(f => ({ ...f, custom_headers: e.target.value }))}
+                        placeholder='{"Authorization":"Bearer token"}'
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500 font-mono" />
+                    </div>
+                  </div>
+                  {webhookError && <p className="text-xs text-red-400">{webhookError}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={async () => {
+                      if (!webhookForm.name.trim() || !webhookForm.url.trim()) { setWebhookError('Name and URL are required'); return; }
+                      setSavingWebhook(true); setWebhookError('');
+                      try {
+                        const payload = {
+                          name: webhookForm.name.trim(),
+                          url: webhookForm.url.trim(),
+                          secret: webhookForm.secret.trim() || undefined,
+                          custom_headers: webhookForm.custom_headers.trim() || undefined,
+                        };
+                        if (editWebhookId !== null) {
+                          await api.updateWebhookConfig(editWebhookId, payload);
+                        } else {
+                          await api.createWebhookConfig(payload);
+                        }
+                        setWebhookForm(BLANK_WEBHOOK); setEditWebhookId(null); loadWebhooks();
+                      } catch (e: any) { setWebhookError(e.message ?? 'Failed to save'); }
+                      setSavingWebhook(false);
+                    }} disabled={savingWebhook}
+                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
+                      {savingWebhook ? 'Saving...' : editWebhookId !== null ? 'Update' : 'Add Endpoint'}
+                    </button>
+                    {editWebhookId !== null && (
+                      <button onClick={() => { setWebhookForm(BLANK_WEBHOOK); setEditWebhookId(null); setWebhookError(''); }}
+                        className="px-3 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                {webhookConfigs.length === 0 && <p className="text-slate-500 text-sm">No webhook endpoints configured.</p>}
+                {webhookConfigs.map(w => (
+                  <div key={w.id} className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-200">{w.name}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${w.enabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700 text-slate-500'}`}>
+                          {w.enabled ? 'enabled' : 'disabled'}
+                        </span>
+                        {w.secret && <span className="text-xs text-slate-500">signed</span>}
+                      </div>
+                      <div className="text-xs text-slate-500 font-mono truncate">{w.url}</div>
+                      {testResult?.id === w.id && (
+                        <div className={`text-xs mt-1 ${testResult.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                          Test: {testResult.msg}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={async () => {
+                      setTestingWebhookId(w.id); setTestResult(null);
+                      const r = await api.testWebhookConfig(w.id);
+                      setTestResult({ id: w.id, ok: r.ok, msg: r.ok ? `HTTP ${r.status} OK` : (r.error ?? `HTTP ${r.status}`) });
+                      setTestingWebhookId(null);
+                    }} disabled={testingWebhookId === w.id}
+                      className="px-2.5 py-1.5 text-xs text-slate-400 border border-slate-700 rounded hover:text-slate-200 hover:border-slate-500 disabled:opacity-50">
+                      {testingWebhookId === w.id ? 'Testing...' : 'Test'}
+                    </button>
+                    {canWrite && (
+                      <>
+                        <button onClick={() => { setEditWebhookId(w.id); setWebhookForm({ name: w.name, url: w.url, secret: w.secret ?? '', custom_headers: w.custom_headers ?? '' }); setWebhookError(''); }}
+                          className="text-xs text-slate-400 hover:text-blue-400">Edit</button>
+                        <button onClick={async () => { await api.deleteWebhookConfig(w.id); loadWebhooks(); }}
+                          className="text-xs text-slate-400 hover:text-red-400">Delete</button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Alert Rules */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-1">Alert Rules</h2>
+              <p className="text-xs text-slate-500 mb-4">
+                Define conditions that trigger webhook notifications. Each rule fires to a specific endpoint.
+              </p>
+              {canWrite && (
+                <div className="space-y-3 mb-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Rule Name</label>
+                      <input value={ruleForm.name} onChange={e => setRuleForm(f => ({ ...f, name: e.target.value }))}
+                        placeholder="e.g. Low coverage alert"
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Event Type</label>
+                      <select value={ruleForm.type} onChange={e => setRuleForm(f => ({ ...f, type: e.target.value as AlertRuleType }))}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="coverage_threshold">Coverage drops below threshold</option>
+                        <option value="detection_validation_failed">Detection validation fails</option>
+                        <option value="new_uncovered_group_technique">New uncovered threat group technique</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {ruleForm.type === 'coverage_threshold' && (
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">Minimum coverage % (alert below this)</label>
+                        <input type="number" min="0" max="100" value={ruleForm.threshold}
+                          onChange={e => setRuleForm(f => ({ ...f, threshold: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Webhook Endpoint</label>
+                      <select value={ruleForm.webhook_config_id} onChange={e => setRuleForm(f => ({ ...f, webhook_config_id: e.target.value }))}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="">Select endpoint...</option>
+                        {webhookConfigs.filter(w => w.enabled).map(w => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {ruleError && <p className="text-xs text-red-400">{ruleError}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={async () => {
+                      if (!ruleForm.name.trim() || !ruleForm.webhook_config_id) { setRuleError('Name and endpoint are required'); return; }
+                      if (ruleForm.type === 'coverage_threshold' && !ruleForm.threshold) { setRuleError('Threshold is required'); return; }
+                      setSavingRule(true); setRuleError('');
+                      try {
+                        const payload = {
+                          name: ruleForm.name.trim(),
+                          type: ruleForm.type,
+                          threshold: ruleForm.type === 'coverage_threshold' ? Number(ruleForm.threshold) : undefined,
+                          webhook_config_id: Number(ruleForm.webhook_config_id),
+                        };
+                        if (editRuleId !== null) {
+                          await api.updateAlertRule(editRuleId, payload);
+                        } else {
+                          await api.createAlertRule(payload);
+                        }
+                        setRuleForm(BLANK_RULE); setEditRuleId(null); loadWebhooks();
+                      } catch (e: any) { setRuleError(e.message ?? 'Failed to save'); }
+                      setSavingRule(false);
+                    }} disabled={savingRule}
+                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
+                      {savingRule ? 'Saving...' : editRuleId !== null ? 'Update' : 'Add Rule'}
+                    </button>
+                    {editRuleId !== null && (
+                      <button onClick={() => { setRuleForm(BLANK_RULE); setEditRuleId(null); setRuleError(''); }}
+                        className="px-3 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                {alertRules.length === 0 && <p className="text-slate-500 text-sm">No alert rules configured.</p>}
+                {alertRules.map(r => {
+                  const typeLabel: Record<string, string> = {
+                    coverage_threshold: `Coverage < ${r.threshold}%`,
+                    detection_validation_failed: 'Detection validation failed',
+                    new_uncovered_group_technique: 'New uncovered group technique',
+                  };
+                  return (
+                    <div key={r.id} className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-slate-200">{r.name}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${r.enabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700 text-slate-500'}`}>
+                            {r.enabled ? 'enabled' : 'disabled'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500">{typeLabel[r.type]} → {r.webhook_name}</div>
+                        {r.last_notified_at && (
+                          <div className="text-xs text-slate-600">Last fired: {new Date(r.last_notified_at).toLocaleString()}</div>
+                        )}
+                      </div>
+                      {canWrite && (
+                        <>
+                          <button onClick={() => {
+                            setEditRuleId(r.id);
+                            setRuleForm({ name: r.name, type: r.type, threshold: String(r.threshold ?? ''), webhook_config_id: String(r.webhook_config_id) });
+                            setRuleError('');
+                          }} className="text-xs text-slate-400 hover:text-blue-400">Edit</button>
+                          <button onClick={async () => { await api.deleteAlertRule(r.id); loadWebhooks(); }}
+                            className="text-xs text-slate-400 hover:text-red-400">Delete</button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Payload reference */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <h2 className="text-sm font-medium text-slate-300 mb-3">Payload Format</h2>
+              <p className="text-xs text-slate-500 mb-2">All events POST JSON with this envelope. A <code className="text-slate-400">X-MitreMap-Signature: sha256=...</code> header is added when a secret is set.</p>
+              <pre className="text-xs text-slate-400 bg-slate-800 rounded p-3 overflow-x-auto">{`{
+  "event": "coverage.threshold_breached",
+  "timestamp": "2026-05-13T12:00:00.000Z",
+  "data": {
+    // coverage.threshold_breached
+    "coverage_pct": 45,
+    "threshold": 50,
+
+    // detection.validation_failed
+    "detection_id": 12,
+    "detection_name": "Suspicious PowerShell",
+    "test_name": "Atomic T1059.001 Test",
+
+    // threat_group.new_uncovered_technique
+    "group_id": 3,
+    "group_name": "APT28",
+    "technique_id": "T1059.001",
+    "technique_name": "PowerShell"
+  }
+}`}</pre>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Purge single dataset confirm */}

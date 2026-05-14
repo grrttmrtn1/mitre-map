@@ -5,7 +5,7 @@ import type {
   ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
   RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
   TaxiiBatch, TaxiiJob, TaxiiPendingItem, TaxiiServer, TaxiiCollection,
-  Tool, ToolDetail, User,
+  Tool, ToolDetail, User, WebhookConfig, AlertRule,
 } from './types';
 
 const BASE = '/api';
@@ -385,4 +385,20 @@ export const api = {
     put<TaxiiJob>(`/taxii/jobs/${id}`, data),
   deleteTaxiiJob: (id: number) => del(`/taxii/jobs/${id}`),
   runTaxiiJob: (id: number) => post<{ ok: boolean; message: string }>(`/taxii/jobs/${id}/run`, {}),
+
+  // Webhooks
+  getWebhookConfigs: () => get<WebhookConfig[]>('/webhooks/configs'),
+  createWebhookConfig: (data: { name: string; url: string; secret?: string; custom_headers?: string; enabled?: boolean }) =>
+    post<WebhookConfig>('/webhooks/configs', data),
+  updateWebhookConfig: (id: number, data: Partial<{ name: string; url: string; secret: string; custom_headers: string; enabled: boolean }>) =>
+    put<WebhookConfig>(`/webhooks/configs/${id}`, data),
+  deleteWebhookConfig: (id: number) => del(`/webhooks/configs/${id}`),
+  testWebhookConfig: (id: number) => post<{ ok: boolean; status?: number; error?: string }>(`/webhooks/configs/${id}/test`, {}),
+
+  getAlertRules: () => get<AlertRule[]>('/webhooks/rules'),
+  createAlertRule: (data: { name: string; type: string; threshold?: number; webhook_config_id: number; enabled?: boolean }) =>
+    post<AlertRule>('/webhooks/rules', data),
+  updateAlertRule: (id: number, data: Partial<{ name: string; type: string; threshold: number; webhook_config_id: number; enabled: boolean }>) =>
+    put<AlertRule>(`/webhooks/rules/${id}`, data),
+  deleteAlertRule: (id: number) => del(`/webhooks/rules/${id}`),
 };
