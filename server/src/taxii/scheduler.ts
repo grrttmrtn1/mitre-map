@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import { getKnex, rawAll, rawRun } from '../db/database';
 import { runFetch } from './ingest';
+import { takeSnapshot } from '../routes/snapshots';
 
 const activeTasks = new Map<number, ScheduledTask>();
 
@@ -11,6 +12,18 @@ export async function initScheduler(): Promise<void> {
     scheduleJob(job);
   }
   console.log(`[taxii] Scheduled ${jobs.length} ingest job(s)`);
+
+  // Nightly coverage snapshot at 02:00
+  cron.schedule('0 2 * * *', async () => {
+    console.log('[snapshot] Taking nightly auto-snapshot');
+    try {
+      const snap = await takeSnapshot('Auto-snapshot (nightly)', 'system');
+      console.log(`[snapshot] Done — ${snap.coverage_pct}% coverage, ${snap.covered_techniques}/${snap.total_techniques} techniques`);
+    } catch (err: any) {
+      console.error('[snapshot] Auto-snapshot failed:', err?.message ?? err);
+    }
+  });
+  console.log('[snapshot] Nightly auto-snapshot scheduled (02:00)');
 }
 
 export function scheduleJob(job: { id: number; server_id: number; schedule: string; name: string }): void {

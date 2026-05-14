@@ -29,10 +29,19 @@ export function computeQualityScore(
   validated: number,
   failed: number,
   techCoverage: Map<string, number>,
+  truePositiveCount: number = 0,
+  falsePositiveCount: number = 0,
 ): { score: number; grade: string; components: { severity: number; confidence: number; fp_rate: number; tests: number; uniqueness: number } } {
   const severityScore = SEVERITY_SCORES[severity] ?? 15;
   const confidenceScore = CONFIDENCE_SCORES[confidence] ?? 15;
-  const fpScore = FP_SCORES[falsePositiveRate ?? 'medium'] ?? 8;
+  const totalFires = truePositiveCount + falsePositiveCount;
+  let fpScore: number;
+  if (totalFires > 0) {
+    const empiricalFpRate = falsePositiveCount / totalFires;
+    fpScore = empiricalFpRate < 0.1 ? 15 : empiricalFpRate < 0.3 ? 8 : 0;
+  } else {
+    fpScore = FP_SCORES[falsePositiveRate ?? 'medium'] ?? 8;
+  }
   const testScore = Math.max(0, Math.min(30, validated * 10 - failed * 10));
   const uniqueTechs = techniqueIds.filter(t => techCoverage.get(t) === 1).length;
   const uniquenessScore = techniqueIds.length > 0 ? Math.round((uniqueTechs / techniqueIds.length) * 5) : 0;
@@ -45,7 +54,7 @@ router.get('/quality-scores', async (_req, res) => {
   const db = getKnex();
 
   const detections = await rawAll<any>(db,
-    'SELECT id, technique_ids, severity, confidence, false_positive_rate FROM detections', []);
+    'SELECT id, technique_ids, severity, confidence, false_positive_rate, true_positive_count, false_positive_count FROM detections', []);
 
   const testRows = await rawAll<any>(db, `
     SELECT detection_id,
@@ -67,7 +76,8 @@ router.get('/quality-scores', async (_req, res) => {
     const techs = JSON.parse(d.technique_ids) as string[];
     const tests = testMap.get(d.id) ?? { validated: 0, failed: 0 };
     const result = computeQualityScore(d.severity, d.confidence, d.false_positive_rate, techs,
-      Number(tests.validated), Number(tests.failed), techCoverage);
+      Number(tests.validated), Number(tests.failed), techCoverage,
+      Number(d.true_positive_count ?? 0), Number(d.false_positive_count ?? 0));
     return { detection_id: d.id, ...result };
   });
 
@@ -119,6 +129,37 @@ router.delete('/:id', async (req, res) => {
   await logAudit(db, 'detection', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: existing.name }, (req as any).sourceIp);
   await rawRun(db, 'DELETE FROM detections WHERE id = ?', [req.params.id]);
   res.status(204).send();
+});
+
+router.patch('/:id/fire', async (req, res) => {
+  const db = getKnex();
+  const existing = await rawGet(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const { outcome } = req.body;
+  const outcomeColumns: Record<string, string> = {
+    true_positive: 'true_positive_count',
+    false_positive: 'false_positive_count',
+    suppressed: 'suppressed_count',
+  };
+  const col = outcomeColumns[outcome];
+  if (!col) return res.status(400).json({ error: 'outcome must be true_positive, false_positive, or suppressed' });
+  await rawRun(db,
+    `UPDATE detections SET ${col} = ${col} + 1, last_fired_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [req.params.id]);
+  const updated = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
+  await logAudit(db, 'detection', req.params.id, 'fire_logged', (req as any).actor ?? 'user', { outcome }, (req as any).sourceIp);
+  res.json({ ...updated, technique_ids: JSON.parse(updated.technique_ids) });
+});
+
+router.patch('/:id/review', async (req, res) => {
+  const db = getKnex();
+  const existing = await rawGet(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  await rawRun(db,
+    'UPDATE detections SET last_reviewed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [req.params.id]);
+  const updated = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
+  res.json({ ...updated, technique_ids: JSON.parse(updated.technique_ids) });
 });
 
 router.patch('/bulk', async (req, res) => {

@@ -50,6 +50,11 @@ export default function Detections() {
   const [bulkStatus, setBulkStatus] = useState('');
   const [qualityScores, setQualityScores] = useState<Map<number, DetectionQualityScore>>(new Map());
   const [filterQuality, setFilterQuality] = useState('');
+  const [sortField, setSortField] = useState('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [logFireOpen, setLogFireOpen] = useState(false);
+  const [logFireOutcome, setLogFireOutcome] = useState<'true_positive' | 'false_positive' | 'suppressed' | ''>('');
+  const [loggingFire, setLoggingFire] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = () => api.getDetections({ status: filterStatus || undefined, severity: filterSeverity || undefined, source: filterSource || undefined })
@@ -166,7 +171,7 @@ export default function Detections() {
   };
 
   const selectAll = () => {
-    setSelectedIds(displayed.length > 0 && selectedIds.size === displayed.length ? new Set() : new Set(displayed.map(d => d.id)));
+    setSelectedIds(displayed.length > 0 && selectedIds.size === displayed.length ? new Set() : new Set(displayed.map((d: Detection) => d.id)));
   };
 
   const bulkUpdate = async () => {
@@ -182,6 +187,25 @@ export default function Detections() {
     await api.bulkDeleteDetections([...selectedIds]);
     setSelectedIds(new Set());
     if (selectedDetection && selectedIds.has(selectedDetection.id)) setSelectedDetection(null);
+    load();
+  };
+
+  const logFire = async (detectionId: number) => {
+    if (!logFireOutcome) return;
+    setLoggingFire(true);
+    try {
+      const updated = await api.logDetectionFire(detectionId, logFireOutcome);
+      setSelectedDetection(updated);
+      setLogFireOpen(false);
+      setLogFireOutcome('');
+      load();
+      loadQuality();
+    } finally { setLoggingFire(false); }
+  };
+
+  const markReviewed = async (detectionId: number) => {
+    const updated = await api.reviewDetection(detectionId);
+    setSelectedDetection(updated);
     load();
   };
 
@@ -208,9 +232,26 @@ export default function Detections() {
     if (filterQuality) {
       const qs = qualityScores.get(d.id);
       if (filterQuality === 'low' && qs && qs.grade !== 'D' && qs.grade !== 'F') return false;
-      if (filterQuality !== 'low' && qs?.grade !== filterQuality) return false;
+      if (filterQuality === 'unvalidated' && d.last_fired_at !== null) return false;
+      if (filterQuality !== 'low' && filterQuality !== 'unvalidated' && qs?.grade !== filterQuality) return false;
     }
     return true;
+  });
+
+  const SEVERITY_ORDER: Record<string, number> = { critical: 5, high: 4, medium: 3, low: 2, informational: 1 };
+  const STATUS_ORDER: Record<string, number> = { active: 5, tuning: 4, planned: 3, disabled: 2, archived: 1 };
+
+  const sorted = [...displayed].sort((a, b) => {
+    let cmp = 0;
+    switch (sortField) {
+      case 'name': cmp = a.name.localeCompare(b.name); break;
+      case 'severity': cmp = (SEVERITY_ORDER[a.severity] ?? 0) - (SEVERITY_ORDER[b.severity] ?? 0); break;
+      case 'status': cmp = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0); break;
+      case 'quality': cmp = (qualityScores.get(a.id)?.score ?? -1) - (qualityScores.get(b.id)?.score ?? -1); break;
+      case 'last_fired_at': cmp = (a.last_fired_at ?? '').localeCompare(b.last_fired_at ?? ''); break;
+      case 'created_at': cmp = a.created_at.localeCompare(b.created_at); break;
+    }
+    return sortDir === 'asc' ? cmp : -cmp;
   });
 
   const sources = [...new Set(detections.map(d => d.source).filter(Boolean))];
@@ -270,7 +311,26 @@ export default function Detections() {
               <option value="D">Grade D (20–39)</option>
               <option value="F">Grade F (&lt;20)</option>
               <option value="low">Low Quality (D/F)</option>
+              <option value="unvalidated">Unvalidated (never fired)</option>
             </select>
+            <div className="flex items-center gap-1">
+              <select value={sortField} onChange={e => setSortField(e.target.value)}
+                className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
+                <option value="name">Name</option>
+                <option value="severity">Severity</option>
+                <option value="status">Status</option>
+                <option value="quality">Quality</option>
+                <option value="last_fired_at">Last Fired</option>
+                <option value="created_at">Created</option>
+              </select>
+              <button
+                onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                className="px-2 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+                title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                {sortDir === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -298,10 +358,10 @@ export default function Detections() {
             <div className="flex items-center justify-center h-32 text-slate-500">Loading...</div>
           ) : (
             <div className="space-y-2">
-              {displayed.map(d => (
+              {sorted.map(d => (
                 <div
                   key={d.id}
-                  onClick={() => setSelectedDetection(prev => prev?.id === d.id ? null : d)}
+                  onClick={() => { setSelectedDetection(prev => prev?.id === d.id ? null : d); setLogFireOpen(false); setLogFireOutcome(''); }}
                   className={`bg-slate-900 border rounded-xl p-4 cursor-pointer transition-all hover:border-slate-600 ${
                     selectedDetection?.id === d.id
                       ? 'border-blue-500/50 bg-blue-500/5'
@@ -343,6 +403,28 @@ export default function Detections() {
                             </span>
                           );
                         })()}
+                        {!d.last_fired_at && d.status === 'active' && (
+                          <span className="px-1.5 py-0.5 text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded" title="No fires recorded — effectiveness unvalidated">
+                            unvalidated
+                          </span>
+                        )}
+                        {(() => {
+                          const totalFires = d.true_positive_count + d.false_positive_count;
+                          if (totalFires >= 5 && d.false_positive_count / totalFires > 0.3) {
+                            return (
+                              <span className="px-1.5 py-0.5 text-xs bg-red-500/20 text-red-400 border border-red-500/30 rounded"
+                                title={`High false positive rate: ${d.false_positive_count}/${totalFires} fires`}>
+                                high FP
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                        {(d.true_positive_count > 0 || d.false_positive_count > 0) && (
+                          <span className="text-xs text-slate-500" title="True positive / False positive fires">
+                            TP:{d.true_positive_count} FP:{d.false_positive_count}
+                          </span>
+                        )}
                         {d.rule_id && <span className="font-mono text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{d.rule_id}</span>}
                         {d.source && <span className="text-xs text-slate-500">{d.source}</span>}
                         <span className="text-xs text-slate-600">{d.confidence} confidence</span>
@@ -358,7 +440,7 @@ export default function Detections() {
                   </div>
                 </div>
               ))}
-              {displayed.length === 0 && (
+              {sorted.length === 0 && (
                 <div className="text-center py-16 text-slate-500">No detections found.</div>
               )}
             </div>
@@ -416,6 +498,66 @@ export default function Detections() {
                 </div>
               );
             })()}
+            <div className="p-3 bg-slate-800/60 border border-slate-700 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-slate-300">Effectiveness</span>
+                {selectedDetection.last_reviewed_at && (
+                  <span className="text-xs text-slate-500">reviewed {new Date(selectedDetection.last_reviewed_at).toLocaleDateString()}</span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                {[['TP', selectedDetection.true_positive_count, 'text-emerald-400'],
+                  ['FP', selectedDetection.false_positive_count, 'text-red-400'],
+                  ['Sup', selectedDetection.suppressed_count, 'text-slate-400'],
+                ].map(([label, count, color]) => (
+                  <div key={label as string} className="bg-slate-900 rounded p-1.5">
+                    <div className={`text-sm font-bold ${color}`}>{count as number}</div>
+                    <div className="text-xs text-slate-500">{label}</div>
+                  </div>
+                ))}
+              </div>
+              {selectedDetection.last_fired_at ? (
+                <div className="text-xs text-slate-500 mb-2">Last fired: {new Date(selectedDetection.last_fired_at).toLocaleDateString()}</div>
+              ) : (
+                <div className="text-xs text-yellow-500/80 mb-2">No fires recorded</div>
+              )}
+              {canWrite && !logFireOpen && (
+                <div className="flex gap-1.5">
+                  <button onClick={() => setLogFireOpen(true)}
+                    className="flex-1 px-2 py-1 text-xs bg-slate-700 text-slate-300 border border-slate-600 rounded hover:bg-slate-600 transition-colors">
+                    Log Fire Event
+                  </button>
+                  <button onClick={() => markReviewed(selectedDetection.id)}
+                    className="px-2 py-1 text-xs bg-slate-700 text-slate-300 border border-slate-600 rounded hover:bg-slate-600 transition-colors">
+                    Mark Reviewed
+                  </button>
+                </div>
+              )}
+              {canWrite && logFireOpen && (
+                <div className="space-y-2">
+                  <div className="flex gap-1.5 flex-wrap">
+                    {(['true_positive', 'false_positive', 'suppressed'] as const).map(o => (
+                      <label key={o} className="flex items-center gap-1 cursor-pointer">
+                        <input type="radio" name="fire_outcome" value={o}
+                          checked={logFireOutcome === o}
+                          onChange={() => setLogFireOutcome(o)}
+                          className="accent-blue-500" />
+                        <span className="text-xs text-slate-300">{o.replace('_', ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => logFire(selectedDetection.id)} disabled={!logFireOutcome || loggingFire}
+                      className="flex-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 disabled:opacity-50 transition-colors">
+                      {loggingFire ? 'Saving...' : 'Save'}
+                    </button>
+                    <button onClick={() => { setLogFireOpen(false); setLogFireOutcome(''); }}
+                      className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200">Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3 text-xs">
               {selectedDetection.source && (
                 <div>

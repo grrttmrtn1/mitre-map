@@ -37,10 +37,15 @@ export default function Settings() {
   const [deprecated, setDeprecated] = useState<any[]>([]);
   const [migrationScan, setMigrationScan] = useState<any | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
+  const [migrateLoading, setMigrateLoading] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<any | null>(null);
   const [updateCheck, setUpdateCheck] = useState<any | null>(null);
   const [checkLoading, setCheckLoading] = useState(false);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyResult, setApplyResult] = useState<any | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [updateDiff, setUpdateDiff] = useState<any | null>(null);
+  const [diffExpanded, setDiffExpanded] = useState<Record<string, boolean>>({});
 
   // OIDC providers state
   const [oidcProviders, setOidcProviders] = useState<any[]>([]);
@@ -1063,6 +1068,8 @@ export default function Settings() {
                 {attackVersion.notes && <div className="text-slate-500 text-xs mt-1">{attackVersion.notes}</div>}
               </div>
             )}
+
+            {/* Check for Updates */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-medium text-slate-300">Check for Updates</h2>
@@ -1070,6 +1077,7 @@ export default function Settings() {
                   onClick={async () => {
                     setCheckLoading(true);
                     setUpdateCheck(null);
+                    setUpdateDiff(null);
                     setApplyResult(null);
                     try { setUpdateCheck(await api.checkAttackUpdates()); }
                     catch { setUpdateCheck({ error: 'Failed to reach GitHub API' }); }
@@ -1081,9 +1089,7 @@ export default function Settings() {
                 </button>
               </div>
               <p className="text-slate-500 text-xs mb-3">Queries GitHub for the latest MITRE ATT&CK STIX release and compares it to the active version.</p>
-              {updateCheck?.error && (
-                <p className="text-red-400 text-sm">{updateCheck.error}</p>
-              )}
+              {updateCheck?.error && <p className="text-red-400 text-sm">{updateCheck.error}</p>}
               {updateCheck && !updateCheck.error && (
                 <div className="space-y-3">
                   <div className="flex gap-6 text-sm">
@@ -1096,63 +1102,205 @@ export default function Settings() {
                   {updateCheck.up_to_date ? (
                     <p className="text-green-400 text-sm">You are on the latest ATT&CK version.</p>
                   ) : (
-                    <div className="flex items-center gap-3">
-                      <p className="text-yellow-400 text-sm">v{updateCheck.latest_version} is available.</p>
-                      <button
-                        onClick={async () => {
-                          setApplyLoading(true);
-                          setApplyResult(null);
-                          try {
-                            const result = await api.applyAttackUpdate(updateCheck.latest_version);
-                            setApplyResult(result);
-                            loadAttackVersion();
-                          } catch (e: any) {
-                            setApplyResult({ error: e?.message ?? 'Update failed' });
-                          } finally { setApplyLoading(false); }
-                        }}
-                        disabled={applyLoading}
-                        className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-500 disabled:opacity-50">
-                        {applyLoading ? 'Applying…' : `Apply v${updateCheck.latest_version}`}
-                      </button>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <p className="text-yellow-400 text-sm">v{updateCheck.latest_version} is available.</p>
+                        <button
+                          onClick={async () => {
+                            setDiffLoading(true);
+                            setUpdateDiff(null);
+                            setDiffExpanded({});
+                            try { setUpdateDiff(await api.previewAttackUpdate(updateCheck.latest_version)); }
+                            catch { setUpdateDiff({ error: 'Failed to load diff' }); }
+                            finally { setDiffLoading(false); }
+                          }}
+                          disabled={diffLoading || applyLoading}
+                          className="px-3 py-1.5 text-sm bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 disabled:opacity-50">
+                          {diffLoading ? 'Loading diff…' : 'Preview Changes'}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setApplyLoading(true);
+                            setApplyResult(null);
+                            setMigrationScan(null);
+                            setMigrateResult(null);
+                            try {
+                              const result = await api.applyAttackUpdate(updateCheck.latest_version);
+                              setApplyResult(result);
+                              loadAttackVersion();
+                              const scan = await api.getMigrationScan();
+                              setMigrationScan(scan);
+                            } catch (e: any) {
+                              setApplyResult({ error: e?.message ?? 'Update failed' });
+                            } finally { setApplyLoading(false); }
+                          }}
+                          disabled={applyLoading}
+                          className="px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-500 disabled:opacity-50">
+                          {applyLoading ? 'Applying…' : `Apply v${updateCheck.latest_version}`}
+                        </button>
+                      </div>
+
+                      {/* Diff Preview */}
+                      {updateDiff?.error && <p className="text-red-400 text-sm">{updateDiff.error}</p>}
+                      {updateDiff && !updateDiff.error && (
+                        <div className="bg-slate-800 rounded-lg p-3 space-y-2 text-xs">
+                          <p className="text-slate-300 font-medium">Changes in ATT&CK v{updateDiff.version}:</p>
+                          <div className="flex gap-4 text-xs">
+                            <span className="text-green-400">+{updateDiff.summary.added} added</span>
+                            <span className="text-red-400">-{updateDiff.summary.removed} removed</span>
+                            <span className="text-yellow-400">~{updateDiff.summary.renamed} renamed</span>
+                            {updateDiff.summary.detections_affected > 0 && (
+                              <span className="text-orange-400">{updateDiff.summary.detections_affected} detection(s) affected</span>
+                            )}
+                          </div>
+                          {updateDiff.added.length > 0 && (
+                            <div>
+                              <button onClick={() => setDiffExpanded(e => ({ ...e, added: !e.added }))} className="text-green-400 hover:text-green-300 font-medium mb-1">
+                                {diffExpanded.added ? '▾' : '▸'} New Techniques ({updateDiff.added.length})
+                              </button>
+                              {diffExpanded.added && (
+                                <div className="ml-3 space-y-0.5 max-h-40 overflow-y-auto">
+                                  {updateDiff.added.map((t: any) => (
+                                    <div key={t.id} className="flex gap-2"><span className="font-mono text-green-400">{t.id}</span><span className="text-slate-400">{t.name}</span></div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {updateDiff.removed.length > 0 && (
+                            <div>
+                              <button onClick={() => setDiffExpanded(e => ({ ...e, removed: !e.removed }))} className="text-red-400 hover:text-red-300 font-medium mb-1">
+                                {diffExpanded.removed ? '▾' : '▸'} Removed Techniques ({updateDiff.removed.length})
+                              </button>
+                              {diffExpanded.removed && (
+                                <div className="ml-3 space-y-0.5 max-h-40 overflow-y-auto">
+                                  {updateDiff.removed.map((t: any) => (
+                                    <div key={t.id} className="flex gap-2"><span className="font-mono text-red-400">{t.id}</span><span className="text-slate-400">{t.name}</span></div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {updateDiff.renamed.length > 0 && (
+                            <div>
+                              <button onClick={() => setDiffExpanded(e => ({ ...e, renamed: !e.renamed }))} className="text-yellow-400 hover:text-yellow-300 font-medium mb-1">
+                                {diffExpanded.renamed ? '▾' : '▸'} Renamed Techniques ({updateDiff.renamed.length})
+                              </button>
+                              {diffExpanded.renamed && (
+                                <div className="ml-3 space-y-0.5 max-h-40 overflow-y-auto">
+                                  {updateDiff.renamed.map((t: any) => (
+                                    <div key={t.id} className="flex gap-2">
+                                      <span className="font-mono text-yellow-400">{t.id}</span>
+                                      <span className="text-slate-500 line-through">{t.old_name}</span>
+                                      <span className="text-slate-300">→ {t.new_name}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {updateDiff.detections_affected.length > 0 && (
+                            <div>
+                              <button onClick={() => setDiffExpanded(e => ({ ...e, det: !e.det }))} className="text-orange-400 hover:text-orange-300 font-medium mb-1">
+                                {diffExpanded.det ? '▾' : '▸'} Affected Detections ({updateDiff.detections_affected.length})
+                              </button>
+                              {diffExpanded.det && (
+                                <div className="ml-3 space-y-1 max-h-40 overflow-y-auto">
+                                  {updateDiff.detections_affected.map((d: any) => (
+                                    <div key={d.detection_id} className="flex gap-2">
+                                      <span className="text-slate-300">{d.detection_name}</span>
+                                      <span className="text-red-400">{d.deprecated_ids.join(', ')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                   {applyResult?.error && <p className="text-red-400 text-sm">{applyResult.error}</p>}
                   {applyResult && !applyResult.error && (
                     <div className="bg-slate-800 rounded-lg px-3 py-2 text-xs space-y-1">
                       <p className="text-green-400 font-medium">Update applied — ATT&CK v{applyResult.version}</p>
-                      <p className="text-slate-400">{applyResult.techniques_new} new techniques · {applyResult.techniques_updated} updated · {applyResult.deprecated_added} newly deprecated · {applyResult.mitigations} mitigations</p>
+                      <p className="text-slate-400">{applyResult.techniques_new} new · {applyResult.techniques_updated} updated · {applyResult.deprecated_added} newly deprecated · {applyResult.mitigations} mitigations</p>
                     </div>
                   )}
                 </div>
               )}
             </div>
+
+            {/* Migration Scan */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-medium text-slate-300">Migration Scan</h2>
                 <button
-                  onClick={async () => { setScanLoading(true); try { setMigrationScan(await api.getMigrationScan()); } finally { setScanLoading(false); } }}
-                  disabled={scanLoading}
+                  onClick={async () => {
+                    setScanLoading(true);
+                    setMigrateResult(null);
+                    try { setMigrationScan(await api.getMigrationScan()); }
+                    finally { setScanLoading(false); }
+                  }}
+                  disabled={scanLoading || migrateLoading}
                   className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50">
                   {scanLoading ? 'Scanning…' : 'Run Scan'}
                 </button>
               </div>
-              <p className="text-slate-500 text-xs mb-3">Scans all detections for deprecated technique IDs from the current ATT&CK version.</p>
+              <p className="text-slate-500 text-xs mb-3">Scans all detections for deprecated technique IDs and shows available replacements.</p>
               {migrationScan && (
-                migrationScan.needs_update?.length === 0
+                migrationScan.detections_affected?.length === 0
                   ? <p className="text-green-400 text-sm">All detections use current technique IDs.</p>
-                  : (
-                    <div className="space-y-2">
-                      <p className="text-yellow-400 text-sm">{migrationScan.needs_update?.length ?? 0} detection(s) reference deprecated techniques:</p>
-                      {(migrationScan.needs_update ?? []).map((d: any) => (
-                        <div key={d.detection_id} className="bg-slate-800 rounded-lg px-3 py-2 text-xs">
-                          <span className="text-slate-300 font-medium">{d.detection_name}</span>
-                          <span className="text-red-400 ml-2">{d.deprecated_ids?.join(', ')}</span>
-                        </div>
-                      ))}
+                  : migrationScan.detections_affected?.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-yellow-400 text-sm">{migrationScan.total} detection(s) reference deprecated techniques.</p>
+                        {migrationScan.detections_affected.some((d: any) => d.can_auto_migrate) && (
+                          <button
+                            onClick={async () => {
+                              setMigrateLoading(true);
+                              setMigrateResult(null);
+                              try {
+                                const result = await api.migrateDetections();
+                                setMigrateResult(result);
+                                setMigrationScan(await api.getMigrationScan());
+                              } catch (e: any) {
+                                setMigrateResult({ error: e?.message ?? 'Migration failed' });
+                              } finally { setMigrateLoading(false); }
+                            }}
+                            disabled={migrateLoading}
+                            className="px-3 py-1.5 text-sm bg-emerald-700 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50">
+                            {migrateLoading ? 'Migrating…' : 'Auto-migrate'}
+                          </button>
+                        )}
+                      </div>
+                      {migrateResult?.error && <p className="text-red-400 text-sm">{migrateResult.error}</p>}
+                      {migrateResult && !migrateResult.error && (
+                        <p className="text-green-400 text-sm">Migrated {migrateResult.migrated} detection(s).</p>
+                      )}
+                      <div className="space-y-1.5">
+                        {migrationScan.detections_affected.map((d: any) => (
+                          <div key={d.detection_id} className="bg-slate-800 rounded-lg px-3 py-2 text-xs space-y-1">
+                            <span className="text-slate-300 font-medium">{d.detection_name}</span>
+                            <div className="space-y-0.5 mt-1">
+                              {d.deprecated_ids.map((id: string) => (
+                                <div key={id} className="flex items-center gap-2">
+                                  <span className="font-mono text-red-400">{id}</span>
+                                  {d.replacements[id]
+                                    ? <><span className="text-slate-500">→</span><span className="font-mono text-indigo-400">{d.replacements[id]}</span></>
+                                    : <span className="text-slate-500 italic">no replacement</span>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )
               )}
             </div>
+
+            {/* Deprecated Techniques reference list */}
             {deprecated.length > 0 && (
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                 <h2 className="text-sm font-medium text-slate-300 mb-3">Deprecated Techniques ({deprecated.length})</h2>

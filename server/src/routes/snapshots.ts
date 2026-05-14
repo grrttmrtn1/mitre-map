@@ -3,15 +3,8 @@ import { getKnex, rawAll, rawGet, rawRun, rawInsert, buildTechniqueGraph, resolv
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
+export async function takeSnapshot(notes?: string | null, actor?: string, sourceIp?: string): Promise<any> {
   const db = getKnex();
-  res.json(await rawAll(db, 'SELECT * FROM coverage_snapshots ORDER BY taken_at ASC'));
-});
-
-router.post('/', async (req, res) => {
-  const db = getKnex();
-  const { notes } = req.body;
-
   const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
   const total = parentTechIds.size;
   const active = await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'");
@@ -20,7 +13,6 @@ router.post('/', async (req, res) => {
     const p = resolveToParent(id, parentTechIds, subtechToParent);
     if (p) covered.add(p);
   }
-
   const { c: mitigated } = await rawGet<{ c: number }>(db, `
     SELECT COUNT(DISTINCT tm.technique_id) as c FROM technique_mitigations tm
     JOIN tool_mitigations tlm ON tm.mitigation_id = tlm.mitigation_id
@@ -28,7 +20,6 @@ router.post('/', async (req, res) => {
   `) as any;
   const { c: activeDetCount } = await rawGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM detections WHERE status='active'") as any;
   const { c: toolCount } = await rawGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM tools WHERE status='active'") as any;
-
   const coveredCount = covered.size;
   const id = await rawInsert(db, `
     INSERT INTO coverage_snapshots (total_techniques, covered_techniques, detected_techniques,
@@ -37,11 +28,21 @@ router.post('/', async (req, res) => {
   `, [total, coveredCount, coveredCount, mitigated,
     total - coveredCount, Math.round((coveredCount / total) * 100),
     activeDetCount, toolCount, notes ?? null]);
-
   const snapshot = await rawGet<any>(db, 'SELECT * FROM coverage_snapshots WHERE id = ?', [id]);
-  await logAudit(db, 'snapshot', String(id), 'created', (req as any).actor ?? 'user',
+  await logAudit(db, 'snapshot', String(id), 'created', actor ?? 'system',
     { coverage_pct: snapshot.coverage_pct, covered_techniques: snapshot.covered_techniques, total_techniques: snapshot.total_techniques },
-    (req as any).sourceIp);
+    sourceIp);
+  return snapshot;
+}
+
+router.get('/', async (_req, res) => {
+  const db = getKnex();
+  res.json(await rawAll(db, 'SELECT * FROM coverage_snapshots ORDER BY taken_at ASC'));
+});
+
+router.post('/', async (req, res) => {
+  const { notes } = req.body;
+  const snapshot = await takeSnapshot(notes, (req as any).actor ?? 'user', (req as any).sourceIp);
   res.status(201).json(snapshot);
 });
 

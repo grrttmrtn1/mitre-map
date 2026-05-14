@@ -227,16 +227,103 @@ router.get('/migration-scan', async (_req, res) => {
     const ids: string[] = JSON.parse(det.technique_ids);
     const hits = ids.filter(id => deprecatedIds.has(id));
     if (hits.length === 0) return [];
-    return hits.map(id => ({
+    const replacements: Record<string, string | null> = {};
+    let canAutoMigrate = true;
+    for (const id of hits) {
+      const sup = deprecatedMap[id]?.superseded_by ?? null;
+      replacements[id] = sup;
+      if (!sup) canAutoMigrate = false;
+    }
+    return [{
       detection_id: det.id,
       detection_name: det.name,
-      deprecated_technique_id: id,
-      superseded_by: deprecatedMap[id]?.superseded_by ?? null,
-      reason: deprecatedMap[id]?.reason ?? null,
-    }));
+      deprecated_ids: hits,
+      replacements,
+      can_auto_migrate: canAutoMigrate,
+    }];
   });
 
   res.json({ detections_affected: affected, total: affected.length });
+});
+
+router.get('/preview-update', async (req, res) => {
+  try {
+    const targetVersion = req.query.version as string | undefined;
+    const stix = await fetchAndParseStix(targetVersion);
+    if (!stix) return res.status(502).json({ error: targetVersion ? `Failed to fetch STIX bundle for v${targetVersion}` : 'Failed to reach GitHub API' });
+
+    const { version, techniques } = stix;
+    const db = getKnex();
+
+    const currentTechniques = await rawAll<{ id: string; name: string }>(db, 'SELECT id, name FROM attack_techniques');
+    const currentTechMap = new Map(currentTechniques.map(t => [t.id, t.name]));
+    const newTechIds = new Set(techniques.map(t => t.id));
+
+    const added = techniques.filter(t => !currentTechMap.has(t.id)).map(t => ({ id: t.id, name: t.name }));
+    const removed = currentTechniques.filter(t => !newTechIds.has(t.id));
+    const renamed = techniques
+      .filter(t => currentTechMap.has(t.id) && currentTechMap.get(t.id) !== t.name)
+      .map(t => ({ id: t.id, old_name: currentTechMap.get(t.id)!, new_name: t.name }));
+
+    const removedIds = new Set(removed.map(t => t.id));
+    const deprecated = await rawAll<{ technique_id: string; superseded_by: string | null }>(db, 'SELECT technique_id, superseded_by FROM deprecated_techniques');
+    const deprecatedMap = Object.fromEntries(deprecated.map(d => [d.technique_id, d.superseded_by]));
+
+    const allDetections = await rawAll<{ id: number; name: string; technique_ids: string }>(db, 'SELECT id, name, technique_ids FROM detections');
+    const detections_affected = allDetections.flatMap(det => {
+      const ids: string[] = JSON.parse(det.technique_ids);
+      const hits = ids.filter(id => removedIds.has(id));
+      if (hits.length === 0) return [];
+      return [{ detection_id: det.id, detection_name: det.name, deprecated_ids: hits, replacements: Object.fromEntries(hits.map(id => [id, deprecatedMap[id] ?? null])) }];
+    });
+
+    res.json({
+      version,
+      added,
+      removed: removed.map(t => ({ id: t.id, name: t.name })),
+      renamed,
+      detections_affected,
+      summary: { added: added.length, removed: removed.length, renamed: renamed.length, detections_affected: detections_affected.length },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? 'Preview failed' });
+  }
+});
+
+router.post('/migrate-detections', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const db = getKnex();
+
+  const deprecated = await rawAll<{ technique_id: string; superseded_by: string }>(
+    db, 'SELECT technique_id, superseded_by FROM deprecated_techniques WHERE superseded_by IS NOT NULL'
+  );
+  if (deprecated.length === 0) return res.json({ migrated: 0, detections_updated: [] });
+
+  const replacementMap = Object.fromEntries(deprecated.map(d => [d.technique_id, d.superseded_by]));
+  const deprecatedIds = new Set(Object.keys(replacementMap));
+
+  const allDetections = await rawAll<{ id: number; name: string; technique_ids: string }>(
+    db, 'SELECT id, name, technique_ids FROM detections'
+  );
+
+  const updates: Array<{ id: number; name: string; old_ids: string[]; new_ids: string[] }> = [];
+
+  await db.transaction(async trx => {
+    for (const det of allDetections) {
+      const ids: string[] = JSON.parse(det.technique_ids);
+      const oldDeprecated = ids.filter(id => deprecatedIds.has(id));
+      if (oldDeprecated.length === 0) continue;
+      const newIds = [...new Set(ids.map(id => replacementMap[id] ?? id))];
+      await trx.raw('UPDATE detections SET technique_ids = ? WHERE id = ?', [JSON.stringify(newIds), det.id]);
+      updates.push({ id: det.id, name: det.name, old_ids: oldDeprecated, new_ids: newIds.filter(id => !ids.includes(id)) });
+    }
+    if (updates.length > 0) {
+      await logAudit(trx, 'detection', 'bulk', 'bulk_migrated', (req as any).actor ?? 'user',
+        { migrated: updates.length, replacements: replacementMap }, (req as any).sourceIp);
+    }
+  });
+
+  res.json({ migrated: updates.length, detections_updated: updates });
 });
 
 export default router;

@@ -134,6 +134,9 @@ export const api = {
   importDetections: (detections: Partial<Detection>[]) => post<{ imported: number }>('/detections/import', { detections }),
   bulkUpdateDetections: (ids: number[], status: string) => patch<{ updated: number }>('/detections/bulk', { ids, status }),
   bulkDeleteDetections: (ids: number[]) => del('/detections/bulk', { ids }),
+  logDetectionFire: (id: number, outcome: 'true_positive' | 'false_positive' | 'suppressed') =>
+    patch<Detection>(`/detections/${id}/fire`, { outcome }),
+  reviewDetection: (id: number) => patch<Detection>(`/detections/${id}/review`, {}),
 
   // Tools
   getTools: () => get<Tool[]>('/tools'),
@@ -258,6 +261,8 @@ export const api = {
   getAttackVersion: () => get<AttackVersion>('/attack/version'),
   getDeprecatedTechniques: () => get<any[]>('/attack/deprecated'),
   getMigrationScan: () => get<any>('/attack/migration-scan'),
+  previewAttackUpdate: (version?: string) => get<any>(`/attack/preview-update${version ? `?version=${encodeURIComponent(version)}` : ''}`),
+  migrateDetections: () => post<any>('/attack/migrate-detections', {}),
   checkAttackUpdates: () => get<any>('/attack/check-updates'),
   applyAttackUpdate: (version?: string) => post<any>('/attack/apply-update', version ? { version } : {}),
 

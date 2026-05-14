@@ -87,6 +87,11 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.string('confidence').notNullable().defaultTo('medium');
       t.string('false_positive_rate');
       t.text('notes');
+      t.timestamp('last_fired_at').nullable();
+      t.integer('true_positive_count').notNullable().defaultTo(0);
+      t.integer('false_positive_count').notNullable().defaultTo(0);
+      t.integer('suppressed_count').notNullable().defaultTo(0);
+      t.timestamp('last_reviewed_at').nullable();
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })

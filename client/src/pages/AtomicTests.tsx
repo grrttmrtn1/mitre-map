@@ -8,6 +8,12 @@ const PLATFORM_COLORS: Record<string, string> = {
   macos: 'bg-purple-500/20 text-purple-300',
 };
 
+const PLATFORM_ACTIVE_COLORS: Record<string, string> = {
+  windows: 'bg-blue-500/20 text-blue-300 border-blue-500/50',
+  linux: 'bg-orange-500/20 text-orange-300 border-orange-500/50',
+  macos: 'bg-purple-500/20 text-purple-300 border-purple-500/50',
+};
+
 const PLATFORMS = ['windows', 'linux', 'macos', 'iaas:aws', 'iaas:gcp', 'iaas:azure', 'containers', 'network', 'office-365', 'saas'];
 const EXECUTOR_TYPES = ['powershell', 'bash', 'sh', 'command_prompt', 'python', 'ruby', 'manual'];
 
@@ -29,6 +35,43 @@ const emptyForm = (): CustomTestForm => ({
   command: '',
 });
 
+function PlatformFilterBar({ selected, onChange }: { selected: string[]; onChange: (p: string[]) => void }) {
+  function toggle(p: string) {
+    onChange(selected.includes(p) ? selected.filter(x => x !== p) : [...selected, p]);
+  }
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="text-xs text-slate-500 flex-shrink-0 mr-0.5">Platform:</span>
+      {PLATFORMS.map(p => {
+        const active = selected.includes(p);
+        return (
+          <button
+            key={p}
+            type="button"
+            onClick={() => toggle(p)}
+            className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+              active
+                ? (PLATFORM_ACTIVE_COLORS[p] ?? 'bg-blue-600/30 border-blue-500 text-blue-300')
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'
+            }`}
+          >
+            {p}
+          </button>
+        );
+      })}
+      {selected.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          className="text-xs text-slate-500 hover:text-slate-300 transition-colors ml-1"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PlatformBadges({ platform }: { platform: string }) {
   const parts = platform.split(',').map(p => p.trim()).filter(Boolean);
   if (!parts.length) return null;
@@ -43,6 +86,7 @@ function PlatformBadges({ platform }: { platform: string }) {
 
 function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
   const [search, setSearch] = useState('');
+  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [yamlInput, setYamlInput] = useState('');
@@ -68,7 +112,14 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
     }
   }
 
-  const grouped = allTests.reduce<Record<string, ArtTest[]>>((acc, t) => {
+  const platformFiltered = platformFilter.length === 0
+    ? allTests
+    : allTests.filter(t => {
+        const testPlatforms = t.platform.split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+        return platformFilter.some(p => testPlatforms.includes(p));
+      });
+
+  const grouped = platformFiltered.reduce<Record<string, ArtTest[]>>((acc, t) => {
     const base = t.technique_id.split('.')[0];
     if (!acc[base]) acc[base] = [];
     acc[base].push(t);
@@ -164,13 +215,16 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="mb-4">
+        <div className="mb-3">
           <input
             className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
             placeholder="Search by technique ID or test name…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+        </div>
+        <div className="mb-4">
+          <PlatformFilterBar selected={platformFilter} onChange={setPlatformFilter} />
         </div>
 
         {loading ? (
@@ -356,13 +410,21 @@ function CustomTestModal({
 
 function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: boolean; onRefresh: () => void }) {
   const [search, setSearch] = useState('');
+  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState<ArtTest | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const filtered = tests.filter(t =>
+  const platformFiltered = platformFilter.length === 0
+    ? tests
+    : tests.filter(t => {
+        const testPlatforms = (t.platform ?? '').split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+        return platformFilter.some(p => testPlatforms.includes(p));
+      });
+
+  const filtered = platformFiltered.filter(t =>
     !search ||
     t.technique_id.toLowerCase().includes(search.toLowerCase()) ||
     t.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -454,13 +516,16 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="mb-4">
+        <div className="mb-3">
           <input
             className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
             placeholder="Search by technique ID or test name…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+        </div>
+        <div className="mb-4">
+          <PlatformFilterBar selected={platformFilter} onChange={setPlatformFilter} />
         </div>
 
         {loading ? (

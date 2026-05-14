@@ -42,6 +42,11 @@ export interface Detection {
   confidence: 'high' | 'medium' | 'low';
   false_positive_rate: string | null;
   notes: string | null;
+  last_fired_at: string | null;
+  true_positive_count: number;
+  false_positive_count: number;
+  suppressed_count: number;
+  last_reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 }
