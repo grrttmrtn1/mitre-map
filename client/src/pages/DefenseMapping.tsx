@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { Tactic, Technique, D3FendTechnique, Mitigation, Detection } from '../types';
+import StatusBadge from '../components/StatusBadge';
+import { D3FEND_CATEGORY_COLORS } from '../lib/constants';
 
 interface TechDetail {
   technique: Technique;
@@ -8,14 +10,6 @@ interface TechDetail {
   d3fend: D3FendTechnique[];
   mitigations: Mitigation[];
 }
-
-const D3FEND_CATEGORY_COLORS: Record<string, string> = {
-  Harden: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  Detect: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  Isolate: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-  Deceive: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-  Evict:   'bg-orange-500/15 text-orange-400 border-orange-500/30',
-};
 
 export default function DefenseMapping() {
   const [tactics, setTactics] = useState<Tactic[]>([]);
@@ -50,7 +44,12 @@ export default function DefenseMapping() {
   });
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+        <h1 className="text-xl font-semibold text-slate-100">Defense Mapping</h1>
+        <p className="text-sm text-slate-400 mt-0.5">D3FEND countermeasures and ATT&CK mitigations by technique</p>
+      </div>
+      <div className="flex flex-1 overflow-hidden">
       <div className="w-72 flex-shrink-0 border-r border-slate-800 flex flex-col bg-slate-900/30">
         <div className="px-4 py-4 border-b border-slate-800">
           <h2 className="text-sm font-semibold text-slate-200">ATT&CK Techniques</h2>
@@ -150,12 +149,8 @@ export default function DefenseMapping() {
                             {d.source && <div className="text-xs text-slate-500">{d.source}</div>}
                           </div>
                           <div className="flex flex-col gap-1 items-end">
-                            <span className={`px-1.5 py-0.5 rounded text-xs ${d.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : d.status === 'tuning' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-slate-700 text-slate-400'}`}>
-                              {d.status}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-xs ${d.severity === 'critical' ? 'bg-red-500/20 text-red-400' : d.severity === 'high' ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-700 text-slate-400'}`}>
-                              {d.severity}
-                            </span>
+                            <StatusBadge value={d.status} variant="detection_status" />
+                            <StatusBadge value={d.severity} variant="severity" />
                           </div>
                         </div>
                       </div>
@@ -219,6 +214,7 @@ export default function DefenseMapping() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

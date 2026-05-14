@@ -2,23 +2,41 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import type { LucideIcon } from 'lucide-react';
+import {
+  LayoutDashboard,
+  LayoutGrid,
+  ShieldAlert,
+  Wrench,
+  Shield,
+  AlertTriangle,
+  Users,
+  Database,
+  FlaskConical,
+  Target,
+  FileCode2,
+  ArrowLeftRight,
+  BarChart3,
+  Settings,
+  Zap,
+} from 'lucide-react';
 
-const NAV: { to: string; label: string; icon: string; beta?: boolean }[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: '⬡' },
-  { to: '/matrix', label: 'ATT&CK Matrix', icon: '⊞' },
-  { to: '/detections', label: 'Detections', icon: '◉' },
-  { to: '/tools', label: 'Tools & Capabilities', icon: '⚙' },
-  { to: '/defense', label: 'Defense Mapping', icon: '⛨' },
-  { to: '/gaps', label: 'Gap Analysis', icon: '△' },
-  { to: '/threats', label: 'Threat Groups', icon: '◈' },
-  { to: '/data-sources', label: 'Data Sources', icon: '◫' },
-  { to: '/atomic', label: 'Atomic Tests', icon: '⚗' },
-  { to: '/exercises', label: 'Exercises', icon: '⚔' },
-  { to: '/sigma', label: 'SIGMA Library', icon: 'σ' },
-  { to: '/taxii', label: 'TAXII Ingest', icon: '⇌', beta: true },
-  { to: '/reports', label: 'Reports & Exports', icon: '▦' },
-  { to: '/settings', label: 'Settings', icon: '⚛' },
-  { to: '/api', label: 'API Playground', icon: '⚡' },
+const NAV: { to: string; label: string; icon: LucideIcon; beta?: boolean }[] = [
+  { to: '/dashboard',    label: 'Dashboard',         icon: LayoutDashboard },
+  { to: '/matrix',       label: 'ATT&CK Matrix',     icon: LayoutGrid },
+  { to: '/detections',   label: 'Detections',        icon: ShieldAlert },
+  { to: '/tools',        label: 'Tools & Capabilities', icon: Wrench },
+  { to: '/defense',      label: 'Defense Mapping',   icon: Shield },
+  { to: '/gaps',         label: 'Gap Analysis',      icon: AlertTriangle },
+  { to: '/threats',      label: 'Threat Groups',     icon: Users },
+  { to: '/data-sources', label: 'Data Sources',      icon: Database },
+  { to: '/atomic',       label: 'Atomic Tests',      icon: FlaskConical },
+  { to: '/exercises',    label: 'Exercises',         icon: Target },
+  { to: '/sigma',        label: 'SIGMA Library',     icon: FileCode2 },
+  { to: '/taxii',        label: 'TAXII Ingest',      icon: ArrowLeftRight, beta: true },
+  { to: '/reports',      label: 'Reports & Exports', icon: BarChart3 },
+  { to: '/settings',     label: 'Settings',          icon: Settings },
+  { to: '/api',          label: 'API Playground',    icon: Zap },
 ];
 
 export default function Sidebar() {
@@ -48,7 +66,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ to, label, icon, beta }) => (
+        {NAV.map(({ to, label, icon: Icon, beta }) => (
           <NavLink
             key={to}
             to={to}
@@ -60,7 +78,7 @@ export default function Sidebar() {
               }`
             }
           >
-            <span className="text-base w-4 text-center leading-none">{icon}</span>
+            <Icon size={15} className="flex-shrink-0" />
             <span className="flex-1">{label}</span>
             {beta && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 leading-none">

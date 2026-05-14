@@ -3,6 +3,7 @@ const DETECTION_STATUS: Record<string, string> = {
   tuning:   'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30',
   disabled: 'bg-slate-500/15 text-slate-400 border border-slate-500/30',
   planned:  'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+  archived: 'bg-slate-700/40 text-slate-500 border border-slate-600/30',
 };
 
 const SEVERITY: Record<string, string> = {

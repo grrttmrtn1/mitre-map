@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { Country, Motivation, Procedure, ProcedureType, ThreatGroup, Technique } from '../types';
+import ConfirmModal from '../components/ConfirmModal';
 
 const BLANK_FORM = {
   id: '', name: '', country: '', motivation: '', description: '', url: '', aliases: '', targeted_sectors: [] as string[],
@@ -317,24 +318,16 @@ export default function ThreatGroups() {
         />
       )}
 
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
-            <h2 className="text-base font-semibold text-slate-100 mb-2">Delete Threat Group</h2>
-            <p className="text-sm text-slate-400 mb-4">
-              Delete <span className="font-medium text-slate-200">{deleteConfirm.name}</span>? This will remove all technique associations.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setDeleteConfirm(null)}
-                className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
-              <button onClick={confirmDelete} disabled={deleting}
-                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50">
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={confirmDelete}
+        title="Delete Threat Group"
+        message={`Delete "${deleteConfirm?.name}"? This will remove all technique associations.`}
+        confirmLabel="Delete"
+        destructive
+        confirming={deleting}
+      />
     </div>
   );
 }
@@ -383,7 +376,7 @@ function GroupModal({
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
           <h2 className="text-base font-semibold text-slate-100">{isEdit ? 'Edit Threat Group' : 'Add Threat Group'}</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none">×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -776,7 +769,7 @@ function GroupDetailPane({ group, detail, onClose, onEdit }: {
         <div className="flex items-center gap-2">
           <button onClick={onEdit}
             className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-500/10">Edit</button>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-lg">×</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-xl leading-none">×</button>
         </div>
       </div>
 

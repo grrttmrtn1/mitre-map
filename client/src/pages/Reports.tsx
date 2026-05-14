@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api';
 import type { ExecutiveReport, CoverageSnapshot } from '../types';
+import ConfirmModal from '../components/ConfirmModal';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import CoverageBar from '../components/CoverageBar';
 import ReportBuilder from '../components/ReportBuilder';
@@ -26,6 +27,8 @@ export default function Reports() {
   const [loadingGaps, setLoadingGaps] = useState(false);
   const [snapping, setSnapping] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('executive');
+  const [deleteSnapshotId, setDeleteSnapshotId] = useState<number | null>(null);
+  const [deletingSnapshot, setDeletingSnapshot] = useState(false);
   const [fetchedTabs, setFetchedTabs] = useState<Set<TabId>>(new Set(['executive']));
 
   // Load executive on mount
@@ -67,10 +70,16 @@ export default function Reports() {
     } finally { setSnapping(false); }
   };
 
-  const deleteSnapshot = async (id: number) => {
-    if (!confirm('Delete this snapshot?')) return;
-    await api.deleteSnapshot(id);
-    setSnapshots(prev => prev.filter(s => s.id !== id));
+  const deleteSnapshot = (id: number) => { setDeleteSnapshotId(id); };
+
+  const confirmDeleteSnapshot = async () => {
+    if (deleteSnapshotId === null) return;
+    setDeletingSnapshot(true);
+    try {
+      await api.deleteSnapshot(deleteSnapshotId);
+      setSnapshots(prev => prev.filter(s => s.id !== deleteSnapshotId));
+      setDeleteSnapshotId(null);
+    } finally { setDeletingSnapshot(false); }
   };
 
   const tabBar = (
@@ -159,12 +168,12 @@ export default function Reports() {
             <div className="space-y-6">
               <div className="grid grid-cols-4 gap-4">
                 {[
-                  { label: 'Coverage', value: `${report.summary.coverage_pct}%`, sub: `${report.summary.covered_techniques}/${report.summary.total_techniques} techniques`, color: 'text-blue-400' },
-                  { label: 'Active Detections', value: report.summary.active_detections, sub: `of ${report.summary.total_detections} total`, color: 'text-emerald-400' },
-                  { label: 'Coverage Gaps', value: report.summary.gap_count, sub: 'undetected techniques', color: 'text-red-400' },
-                  { label: 'Active Tools', value: report.summary.active_tools, sub: 'in security stack', color: 'text-purple-400' },
+                  { label: 'Coverage', value: `${report.summary.coverage_pct}%`, sub: `${report.summary.covered_techniques}/${report.summary.total_techniques} techniques`, color: 'text-blue-400', bg: 'border-blue-500/20 bg-blue-500/5' },
+                  { label: 'Active Detections', value: report.summary.active_detections, sub: `of ${report.summary.total_detections} total`, color: 'text-emerald-400', bg: 'border-emerald-500/20 bg-emerald-500/5' },
+                  { label: 'Coverage Gaps', value: report.summary.gap_count, sub: 'undetected techniques', color: 'text-red-400', bg: 'border-red-500/20 bg-red-500/5' },
+                  { label: 'Active Tools', value: report.summary.active_tools, sub: 'in security stack', color: 'text-purple-400', bg: 'border-purple-500/20 bg-purple-500/5' },
                 ].map(kpi => (
-                  <div key={kpi.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <div key={kpi.label} className={`rounded-xl border p-4 ${kpi.bg}`}>
                     <div className="text-xs text-slate-400">{kpi.label}</div>
                     <div className={`text-3xl font-bold mt-1 ${kpi.color}`}>{kpi.value}</div>
                     <div className="text-xs text-slate-500 mt-1">{kpi.sub}</div>
@@ -386,6 +395,16 @@ export default function Reports() {
           ) : null
         )}
       </div>
+      <ConfirmModal
+        open={deleteSnapshotId !== null}
+        onClose={() => setDeleteSnapshotId(null)}
+        onConfirm={confirmDeleteSnapshot}
+        title="Delete Snapshot"
+        message="Delete this coverage snapshot? This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        confirming={deletingSnapshot}
+      />
     </div>
   );
 }

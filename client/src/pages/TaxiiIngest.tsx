@@ -3,6 +3,8 @@ import { api } from '../api';
 import type {
   TaxiiServer, TaxiiJob, TaxiiBatch, TaxiiPendingItem, TaxiiCollection,
 } from '../types';
+import ConfirmModal from '../components/ConfirmModal';
+import { useToast } from '../context/ToastContext';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -309,6 +311,8 @@ function BatchDetail({ batch, onDone }: { batch: TaxiiBatch; onDone: () => void 
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [rejectAllConfirm, setRejectAllConfirm] = useState(false);
+  const { toast } = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -321,15 +325,15 @@ function BatchDetail({ batch, onDone }: { batch: TaxiiBatch; onDone: () => void 
   async function approveAll() {
     setWorking(true);
     try { await api.approveTaxiiBatch(batch.batch_id); await load(); onDone(); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { toast.error(err.message); }
     finally { setWorking(false); }
   }
 
   async function rejectAll() {
-    if (!confirm('Reject all pending items in this batch?')) return;
+    setRejectAllConfirm(false);
     setWorking(true);
     try { await api.rejectTaxiiBatch(batch.batch_id); await load(); onDone(); }
-    catch (err: any) { alert(err.message); }
+    catch (err: any) { toast.error(err.message); }
     finally { setWorking(false); }
   }
 
@@ -339,7 +343,7 @@ function BatchDetail({ batch, onDone }: { batch: TaxiiBatch; onDone: () => void 
       if (approve) await api.approveTaxiiItem(item.id);
       else await api.rejectTaxiiItem(item.id);
       await load(); onDone();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: any) { toast.error(err.message); }
     finally { setWorking(false); }
   }
 
@@ -372,7 +376,7 @@ function BatchDetail({ batch, onDone }: { batch: TaxiiBatch; onDone: () => void 
             className="flex-1 py-1.5 text-xs font-medium bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded transition-colors disabled:opacity-50">
             Approve All ({pending.length})
           </button>
-          <button onClick={rejectAll} disabled={working}
+          <button onClick={() => setRejectAllConfirm(true)} disabled={working}
             className="flex-1 py-1.5 text-xs font-medium bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded transition-colors disabled:opacity-50">
             Reject All
           </button>
@@ -429,6 +433,16 @@ function BatchDetail({ batch, onDone }: { batch: TaxiiBatch; onDone: () => void 
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={rejectAllConfirm}
+        onClose={() => setRejectAllConfirm(false)}
+        onConfirm={rejectAll}
+        title="Reject All Items"
+        message="Reject all pending items in this batch?"
+        confirmLabel="Reject All"
+        destructive
+      />
     </div>
   );
 }
@@ -493,6 +507,8 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
   const [fetching, setFetching] = useState<number | null>(null);
   const [testing, setTesting] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<{ id: number; collections?: TaxiiCollection[]; error?: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<TaxiiServer | null>(null);
+  const { toast } = useToast();
 
   // Poll while any server is in 'running' state
   useEffect(() => {
@@ -509,8 +525,13 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
   }
 
   async function handleDelete(server: TaxiiServer) {
-    if (!confirm(`Delete server "${server.name}"? All its batches will also be removed.`)) return;
-    await api.deleteTaxiiServer(server.id);
+    setDeleteConfirm(server);
+  }
+
+  async function confirmDelete() {
+    if (!deleteConfirm) return;
+    await api.deleteTaxiiServer(deleteConfirm.id);
+    setDeleteConfirm(null);
     onRefresh();
   }
 
@@ -529,7 +550,7 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
     try {
       await api.fetchTaxiiServer(server.id);
       onFetchStarted();
-    } catch (err: any) { alert(`Fetch failed: ${err.message}`); }
+    } catch (err: any) { toast.error(`Fetch failed: ${err.message}`); }
     finally { setFetching(null); }
   }
 
@@ -626,6 +647,16 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
           onClose={() => setModal(null)}
         />
       )}
+
+      <ConfirmModal
+        open={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={confirmDelete}
+        title="Delete Server"
+        message={`Delete server "${deleteConfirm?.name}"? All its batches will also be removed.`}
+        confirmLabel="Delete"
+        destructive
+      />
     </div>
   );
 }
@@ -774,6 +805,8 @@ function ScheduleTab({ servers }: { servers: TaxiiServer[] }) {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<'add' | TaxiiJob | null>(null);
   const [running, setRunning] = useState<number | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<TaxiiJob | null>(null);
+  const { toast } = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -790,8 +823,13 @@ function ScheduleTab({ servers }: { servers: TaxiiServer[] }) {
   }
 
   async function handleDelete(job: TaxiiJob) {
-    if (!confirm(`Delete scheduled job "${job.name}"?`)) return;
-    await api.deleteTaxiiJob(job.id);
+    setDeleteConfirm(job);
+  }
+
+  async function confirmDelete() {
+    if (!deleteConfirm) return;
+    await api.deleteTaxiiJob(deleteConfirm.id);
+    setDeleteConfirm(null);
     await load();
   }
 
@@ -805,7 +843,7 @@ function ScheduleTab({ servers }: { servers: TaxiiServer[] }) {
     try {
       await api.runTaxiiJob(job.id);
       await load();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: any) { toast.error(err.message); }
     finally { setRunning(null); }
   }
 
@@ -902,6 +940,16 @@ function ScheduleTab({ servers }: { servers: TaxiiServer[] }) {
           onClose={() => setModal(null)}
         />
       )}
+
+      <ConfirmModal
+        open={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={confirmDelete}
+        title="Delete Job"
+        message={`Delete scheduled job "${deleteConfirm?.name}"?`}
+        confirmLabel="Delete"
+        destructive
+      />
     </div>
   );
 }

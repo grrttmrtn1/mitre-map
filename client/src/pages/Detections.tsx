@@ -3,7 +3,9 @@ import { api } from '../api';
 import type { Detection, DetectionHistory, DetectionQualityScore, Technique } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
+import ConfirmModal from '../components/ConfirmModal';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const GRADE_COLORS: Record<string, string> = {
   A: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -27,6 +29,7 @@ const EMPTY_FORM = {
 
 export default function Detections() {
   const { canWrite } = useAuth();
+  const { toast } = useToast();
   const [detections, setDetections] = useState<Detection[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +61,9 @@ export default function Detections() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyData, setHistoryData] = useState<DetectionHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = () => api.getDetections({ status: filterStatus || undefined, severity: filterSeverity || undefined, source: filterSource || undefined })
@@ -97,12 +103,20 @@ export default function Detections() {
     } finally { setSaving(false); }
   };
 
-  const del = async (id: number, e?: React.MouseEvent) => {
+  const del = (id: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!confirm('Delete this detection?')) return;
-    await api.deleteDetection(id);
-    if (selectedDetection?.id === id) setSelectedDetection(null);
-    load();
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirmId === null) return;
+    setDeleting(true);
+    try {
+      await api.deleteDetection(deleteConfirmId);
+      if (selectedDetection?.id === deleteConfirmId) setSelectedDetection(null);
+      setDeleteConfirmId(null);
+      load();
+    } finally { setDeleting(false); }
   };
 
   const handleImport = async () => {
@@ -128,9 +142,9 @@ export default function Detections() {
           };
         }).filter(r => r.name);
       }
-      if (rows.length === 0) { alert('No valid rows found.'); return; }
+      if (rows.length === 0) { toast.error('No valid rows found.'); return; }
       const { imported } = await api.importDetections(rows);
-      alert(`Imported ${imported} detections.`);
+      toast.success(`Imported ${imported} detection${imported !== 1 ? 's' : ''}.`);
       setImportModalOpen(false);
       setCsvText('');
       load();
@@ -156,7 +170,7 @@ export default function Detections() {
     setImporting(true);
     try {
       const { imported } = await api.importSigmaRules([sigmaText]);
-      alert(`Imported ${imported} detection(s) from SIGMA rule.`);
+      toast.success(`Imported ${imported} detection${imported !== 1 ? 's' : ''} from SIGMA rule.`);
       setImportModalOpen(false);
       setSigmaText('');
       setSigmaPreview(null);
@@ -185,12 +199,17 @@ export default function Detections() {
     load();
   };
 
-  const bulkDelete = async () => {
-    if (!confirm(`Delete ${selectedIds.size} detection(s)?`)) return;
-    await api.bulkDeleteDetections([...selectedIds]);
-    setSelectedIds(new Set());
-    if (selectedDetection && selectedIds.has(selectedDetection.id)) setSelectedDetection(null);
-    load();
+  const bulkDelete = () => { setBulkDeleteConfirm(true); };
+
+  const confirmBulkDelete = async () => {
+    setDeleting(true);
+    try {
+      await api.bulkDeleteDetections([...selectedIds]);
+      setSelectedIds(new Set());
+      if (selectedDetection && selectedIds.has(selectedDetection.id)) setSelectedDetection(null);
+      setBulkDeleteConfirm(false);
+      load();
+    } finally { setDeleting(false); }
   };
 
   const logFire = async (detectionId: number) => {
@@ -808,6 +827,27 @@ export default function Detections() {
           </>
         )}
       </Modal>
+
+      <ConfirmModal
+        open={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={confirmDelete}
+        title="Delete Detection"
+        message="Delete this detection? This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        confirming={deleting}
+      />
+      <ConfirmModal
+        open={bulkDeleteConfirm}
+        onClose={() => setBulkDeleteConfirm(false)}
+        onConfirm={confirmBulkDelete}
+        title="Delete Detections"
+        message={`Delete ${selectedIds.size} detection${selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.`}
+        confirmLabel="Delete All"
+        destructive
+        confirming={deleting}
+      />
 
       <Modal open={historyOpen} onClose={() => { setHistoryOpen(false); setHistoryData(null); }} title="Detection Change History" width="max-w-2xl">
         {historyLoading && (

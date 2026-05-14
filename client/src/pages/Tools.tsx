@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { Tool, ToolDetail, D3FendTechnique, Mitigation } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
+import ConfirmModal from '../components/ConfirmModal';
 
 const CATEGORIES = ['EDR', 'SIEM', 'NDR', 'IAM', 'PAM', 'Email Security', 'NGFW', 'Vulnerability Management', 'DLP', 'SOAR', 'Other'];
 const STATUSES = ['active', 'planned', 'deprecated'];
@@ -68,11 +69,20 @@ export default function Tools() {
     } finally { setSaving(false); }
   };
 
-  const del = async (id: number) => {
-    if (!confirm('Delete this tool?')) return;
-    await api.deleteTool(id);
-    if (selectedTool?.id === id) setSelectedTool(null);
-    load();
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const del = (id: number) => { setDeleteConfirmId(id); };
+
+  const confirmDelete = async () => {
+    if (deleteConfirmId === null) return;
+    setDeleting(true);
+    try {
+      await api.deleteTool(deleteConfirmId);
+      if (selectedTool?.id === deleteConfirmId) setSelectedTool(null);
+      setDeleteConfirmId(null);
+      load();
+    } finally { setDeleting(false); }
   };
 
   const toggleD3 = (id: string) => setForm(f => ({ ...f, d3fend_ids: f.d3fend_ids.includes(id) ? f.d3fend_ids.filter(x => x !== id) : [...f.d3fend_ids, id] }));
@@ -298,6 +308,16 @@ export default function Tools() {
           </button>
         </div>
       </Modal>
+      <ConfirmModal
+        open={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={confirmDelete}
+        title="Delete Tool"
+        message="Delete this tool? Its mitigation and D3FEND mappings will also be removed."
+        confirmLabel="Delete"
+        destructive
+        confirming={deleting}
+      />
     </div>
   );
 }

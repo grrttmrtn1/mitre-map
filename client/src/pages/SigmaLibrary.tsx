@@ -540,15 +540,15 @@ export default function SigmaLibrary() {
             Browse community rules from SigmaHQ and generate per-technique detection templates. Nothing is imported until you click "Import".
           </p>
         </div>
-        <div className="flex gap-1 mt-3 p-1 bg-slate-800 rounded-lg w-fit">
+        <div className="flex gap-1 mt-3">
           <button
             onClick={() => setTab('library')}
-            className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${tab === 'library' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-300'}`}>
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${tab === 'library' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
             Community Rules (SigmaHQ)
           </button>
           <button
             onClick={() => setTab('templates')}
-            className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${tab === 'templates' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-300'}`}>
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${tab === 'templates' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
             Detection Templates
           </button>
         </div>

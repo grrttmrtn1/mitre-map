@@ -2,6 +2,8 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { onAuthError } from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import ToastContainer from './components/ToastContainer';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import AttackMatrix from './pages/AttackMatrix';
@@ -96,7 +98,10 @@ function AppShell() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <ToastProvider>
+        <AppShell />
+        <ToastContainer />
+      </ToastProvider>
     </AuthProvider>
   );
 }

@@ -61,22 +61,25 @@ export default function Dashboard() {
     }));
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-100">Coverage Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-0.5">MITRE ATT&CK Enterprise detection and defense coverage</p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/gaps" className="px-3 py-1.5 text-sm bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-colors">
-            View Gaps →
-          </Link>
-          <Link to="/matrix" className="px-3 py-1.5 text-sm bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600/30 transition-colors">
-            ATT&CK Matrix →
-          </Link>
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-100">Coverage Dashboard</h1>
+            <p className="text-sm text-slate-400 mt-0.5">MITRE ATT&CK Enterprise detection and defense coverage</p>
+          </div>
+          <div className="flex gap-2">
+            <Link to="/gaps" className="px-3 py-1.5 text-sm bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-colors">
+              View Gaps →
+            </Link>
+            <Link to="/matrix" className="px-3 py-1.5 text-sm bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600/30 transition-colors">
+              ATT&CK Matrix →
+            </Link>
+          </div>
         </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <div className="grid grid-cols-4 gap-4">
         {kpis.map(kpi => (
           <div key={kpi.label} className={`rounded-xl border p-4 ${kpi.bg}`}>
@@ -171,6 +174,7 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );

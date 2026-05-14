@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, getStoredApiKey, setStoredApiKey, clearStoredApiKey } from '../api';
 import type { Country, Motivation, Tag, AuditLogEntry, ApiKey, User, AttackVersion, WebhookConfig, AlertRule, AlertRuleType } from '../types';
 import { useAuth } from '../context/AuthContext';
+import ConfirmModal from '../components/ConfirmModal';
+import { useToast } from '../context/ToastContext';
 
 const ROLE_INFO: Record<string, { label: string; description: string; color: string }> = {
   readonly:  { label: 'Read Only',  description: 'View all data — cannot create, edit, or delete anything.', color: 'text-slate-400 bg-slate-800 border-slate-700' },
@@ -21,6 +23,7 @@ const BLANK_KEY_FORM = { name: '', scopes: ['read'] as string[], expires_at: '',
 
 export default function Settings() {
   const { user: currentUser, canWrite, canAdmin } = useAuth();
+  const { toast } = useToast();
   // Show admin tabs if logged in as admin OR using API key mode (no user — server enforces auth)
   const isAdmin = canAdmin;
 
@@ -31,6 +34,14 @@ export default function Settings() {
   const [savingUser, setSavingUser] = useState(false);
   const [savingRoleId, setSavingRoleId] = useState<number | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [deleteTagConfirm, setDeleteTagConfirm] = useState<number | null>(null);
+  const [deleteMotConfirm, setDeleteMotConfirm] = useState<number | null>(null);
+  const [deleteCountryConfirm, setDeleteCountryConfirm] = useState<number | null>(null);
+  const [deleteUserConfirm, setDeleteUserConfirm] = useState<User | null>(null);
+  const [deleteOidcConfirm, setDeleteOidcConfirm] = useState<any | null>(null);
+  const [resetPwUser, setResetPwUser] = useState<User | null>(null);
+  const [resetPwInput, setResetPwInput] = useState('');
+  const [resetPwWorking, setResetPwWorking] = useState(false);
 
   // ATT&CK Version state
   const [attackVersion, setAttackVersion] = useState<AttackVersion | null>(null);
@@ -166,8 +177,8 @@ export default function Settings() {
   };
 
   const deleteTag = async (id: number) => {
-    if (!confirm('Delete this tag? It will be removed from all entities.')) return;
     await api.deleteTag(id);
+    setDeleteTagConfirm(null);
     loadTags();
   };
 
@@ -193,8 +204,8 @@ export default function Settings() {
   };
 
   const deleteMot = async (id: number) => {
-    if (!confirm('Delete this motivation? Existing threat groups will keep their current value.')) return;
     await api.deleteMotivation(id);
+    setDeleteMotConfirm(null);
     loadMotivations();
   };
 
@@ -221,8 +232,8 @@ export default function Settings() {
   };
 
   const deleteCountry = async (id: number) => {
-    if (!confirm('Delete this country? Existing threat groups will keep their current value.')) return;
     await api.deleteCountry(id);
+    setDeleteCountryConfirm(null);
     loadCountries();
   };
 
@@ -393,7 +404,7 @@ export default function Settings() {
                   {tag.description && <span className="text-xs text-slate-500 flex-1 truncate">{tag.description}</span>}
                   <span className="font-mono text-xs" style={{ color: tag.color }}>{tag.color}</span>
                   {canWrite && <button onClick={() => startEditTag(tag)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>}
-                  {canWrite && <button onClick={() => deleteTag(tag.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
+                  {canWrite && <button onClick={() => setDeleteTagConfirm(tag.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
                 </div>
               ))}
               {tags.length === 0 && <div className="text-sm text-slate-500 text-center py-8">No tags yet.{canWrite ? ' Create one above.' : ''}</div>}
@@ -456,7 +467,7 @@ export default function Settings() {
                   <span className="font-mono text-xs" style={{ color: m.color }}>{m.color}</span>
                   {m.description && <span className="text-xs text-slate-500 flex-1 truncate">{m.description}</span>}
                   {canWrite && <button onClick={() => startEditMot(m)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 ml-auto">Edit</button>}
-                  {canWrite && <button onClick={() => deleteMot(m.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
+                  {canWrite && <button onClick={() => setDeleteMotConfirm(m.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
                 </div>
               ))}
               {motivations.length === 0 && (
@@ -518,7 +529,7 @@ export default function Settings() {
                   <span className="text-sm font-medium text-slate-200 flex-1">{c.name}</span>
                   <span className="font-mono text-xs" style={{ color: c.color }}>{c.color}</span>
                   {canWrite && <button onClick={() => startEditCountry(c)} className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>}
-                  {canWrite && <button onClick={() => deleteCountry(c.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
+                  {canWrite && <button onClick={() => setDeleteCountryConfirm(c.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>}
                 </div>
               ))}
               {countries.length === 0 && (
@@ -947,22 +958,12 @@ export default function Settings() {
                         {u.is_active ? 'Deactivate' : 'Activate'}
                       </button>
                       <button
-                        onClick={async () => {
-                          const pw = prompt('New password (min 8 chars):');
-                          if (!pw || pw.length < 8) return;
-                          await api.resetUserPassword(u.id, pw);
-                          alert('Password reset. All sessions invalidated.');
-                        }}
+                        onClick={() => { setResetPwUser(u); setResetPwInput(''); }}
                         className="text-xs px-2.5 py-1 border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors">
                         Reset PW
                       </button>
                       <button
-                        onClick={async () => {
-                          if (!confirm(`Delete ${u.name ?? u.email}? This cannot be undone.`)) return;
-                          setDeletingUserId(u.id);
-                          try { await api.deleteUser(u.id); loadUsers(); }
-                          finally { setDeletingUserId(null); }
-                        }}
+                        onClick={() => setDeleteUserConfirm(u)}
                         disabled={deletingUserId === u.id || u.id === currentUser?.id}
                         title={u.id === currentUser?.id ? 'You cannot delete yourself' : 'Delete user'}
                         className="text-xs px-2.5 py-1 border border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/60 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
@@ -1075,11 +1076,7 @@ export default function Settings() {
                     onClick={() => { setEditOidcId(p.id); setOidcForm({ name: p.name, slug: p.slug, issuer_url: p.issuer_url, client_id: p.client_id, client_secret: '', enabled: !!p.enabled }); setOidcError(''); }}
                     className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1">Edit</button>
                   <button
-                    onClick={async () => {
-                      if (!confirm(`Delete "${p.name}"?`)) return;
-                      await api.deleteOidcProvider(p.id);
-                      loadOidcProviders();
-                    }}
+                    onClick={() => setDeleteOidcConfirm(p)}
                     className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Delete</button>
                 </div>
               ))}
@@ -1710,6 +1707,103 @@ export default function Settings() {
               <button onClick={doPurgeAll} disabled={purging}
                 className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50">
                 {purging ? 'Purging...' : 'Purge Everything'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={deleteTagConfirm !== null}
+        onClose={() => setDeleteTagConfirm(null)}
+        onConfirm={() => deleteTag(deleteTagConfirm!)}
+        title="Delete Tag"
+        message="Delete this tag? It will be removed from all entities."
+        confirmLabel="Delete"
+        destructive
+      />
+
+      <ConfirmModal
+        open={deleteMotConfirm !== null}
+        onClose={() => setDeleteMotConfirm(null)}
+        onConfirm={() => deleteMot(deleteMotConfirm!)}
+        title="Delete Motivation"
+        message="Delete this motivation? Existing threat groups will keep their current value."
+        confirmLabel="Delete"
+        destructive
+      />
+
+      <ConfirmModal
+        open={deleteCountryConfirm !== null}
+        onClose={() => setDeleteCountryConfirm(null)}
+        onConfirm={() => deleteCountry(deleteCountryConfirm!)}
+        title="Delete Country"
+        message="Delete this country? Existing threat groups will keep their current value."
+        confirmLabel="Delete"
+        destructive
+      />
+
+      <ConfirmModal
+        open={deleteUserConfirm !== null}
+        onClose={() => setDeleteUserConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteUserConfirm) return;
+          setDeletingUserId(deleteUserConfirm.id);
+          setDeleteUserConfirm(null);
+          try { await api.deleteUser(deleteUserConfirm.id); loadUsers(); }
+          finally { setDeletingUserId(null); }
+        }}
+        title="Delete User"
+        message={`Delete ${deleteUserConfirm?.name ?? deleteUserConfirm?.email}? This cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+      />
+
+      <ConfirmModal
+        open={deleteOidcConfirm !== null}
+        onClose={() => setDeleteOidcConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteOidcConfirm) return;
+          await api.deleteOidcProvider(deleteOidcConfirm.id);
+          setDeleteOidcConfirm(null);
+          loadOidcProviders();
+        }}
+        title="Delete OIDC Provider"
+        message={`Delete "${deleteOidcConfirm?.name}"?`}
+        confirmLabel="Delete"
+        destructive
+      />
+
+      {resetPwUser !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="text-base font-semibold text-slate-100 mb-1">Reset Password</h2>
+            <p className="text-sm text-slate-400 mb-4">Set a new password for <span className="text-slate-200">{resetPwUser.name ?? resetPwUser.email}</span>.</p>
+            <input
+              type="password"
+              value={resetPwInput}
+              onChange={e => setResetPwInput(e.target.value)}
+              placeholder="New password (min 8 chars)"
+              autoFocus
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500 mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setResetPwUser(null)} className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+              <button
+                onClick={async () => {
+                  if (resetPwInput.length < 8) return;
+                  setResetPwWorking(true);
+                  try {
+                    await api.resetUserPassword(resetPwUser.id, resetPwInput);
+                    toast.success('Password reset. All sessions invalidated.');
+                    setResetPwUser(null);
+                  } catch (e: any) {
+                    toast.error(e.message ?? 'Password reset failed');
+                  } finally { setResetPwWorking(false); }
+                }}
+                disabled={resetPwInput.length < 8 || resetPwWorking}
+                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50">
+                {resetPwWorking ? 'Saving...' : 'Reset Password'}
               </button>
             </div>
           </div>

@@ -1,27 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { CoveredTechnique, GapTechnique } from '../types';
+import StatusBadge from '../components/StatusBadge';
+import { D3FEND_CATEGORY_COLORS } from '../lib/constants';
 
 const SECTORS = [
   'Financial', 'Healthcare', 'Energy', 'Government', 'Defense', 'Technology',
   'Retail', 'Manufacturing', 'Education', 'Transportation', 'Telecommunications', 'Media',
 ];
-
-const D3FEND_COLORS: Record<string, string> = {
-  Harden: 'bg-blue-500/15 text-blue-400',
-  Detect: 'bg-emerald-500/15 text-emerald-400',
-  Isolate: 'bg-purple-500/15 text-purple-400',
-  Deceive: 'bg-yellow-500/15 text-yellow-400',
-  Evict:   'bg-orange-500/15 text-orange-400',
-};
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  high: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  medium: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-  low: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  informational: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
-};
 
 const STATUS_BADGE: Record<string, string> = {
   full: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
@@ -159,16 +145,16 @@ export default function GapAnalysis() {
           </button>
         </div>
 
-        <div className="flex gap-1 mt-3 p-1 bg-slate-800 rounded-lg w-fit">
+        <div className="flex gap-1 mt-3">
           <button
             onClick={() => handleViewChange('gaps')}
-            className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${view === 'gaps' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-300'}`}>
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${view === 'gaps' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
             Gaps
             <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${view === 'gaps' ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-500'}`}>{gaps.length}</span>
           </button>
           <button
             onClick={() => handleViewChange('covered')}
-            className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${view === 'covered' ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-300'}`}>
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${view === 'covered' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
             Covered
             <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${view === 'covered' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-500'}`}>{covered.length}</span>
           </button>
@@ -274,7 +260,7 @@ export default function GapAnalysis() {
                         <div className="space-y-1.5">
                           {g.recommended_d3fend.map(d => (
                             <div key={d.id} className="flex items-center gap-2">
-                              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${D3FEND_COLORS[d.category] ?? 'bg-slate-700 text-slate-400'}`}>
+                              <span className={`px-1.5 py-0.5 rounded border text-xs font-medium ${D3FEND_CATEGORY_COLORS[d.category] ?? 'bg-slate-700 text-slate-400 border-slate-600'}`}>
                                 {d.category}
                               </span>
                               <span className="font-mono text-xs text-slate-500">{d.id}</span>
@@ -389,9 +375,7 @@ export default function GapAnalysis() {
                         <div className="space-y-1.5">
                           {c.detections.map(d => (
                             <div key={d.id} className="flex items-center gap-2">
-                              <span className={`px-1.5 py-0.5 rounded border text-xs font-medium ${SEVERITY_COLORS[d.severity] ?? 'bg-slate-700 text-slate-400 border-slate-600'}`}>
-                                {d.severity}
-                              </span>
+                              <StatusBadge value={d.severity} variant="severity" />
                               <span className="text-xs text-slate-300 truncate">{d.name}</span>
                             </div>
                           ))}
