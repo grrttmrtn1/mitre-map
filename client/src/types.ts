@@ -129,6 +129,13 @@ export interface GapTechnique extends Technique {
   recommended_mitigations: Array<{ id: string; name: string }>;
 }
 
+export interface CoveredTechnique extends Technique {
+  tactic_names: string[];
+  status: 'full' | 'detected' | 'mitigated';
+  detections: Array<{ id: number; name: string; severity: string }>;
+  tools: Array<{ id: number; name: string; category: string }>;
+}
+
 export interface Tag {
   id: number;
   name: string;

@@ -1,6 +1,6 @@
 import type {
   ApiKey, ArtResult, ArtTest, Assignment, AttackVersion, AuditLogEntry, Comment, ComplianceFramework,
-  CoverageSnapshot, CoverageStats, Country, DataSource, Detection, DetectionQualityScore, D3FendTechnique,
+  CoverageSnapshot, CoverageStats, Country, CoveredTechnique, DataSource, Detection, DetectionQualityScore, D3FendTechnique,
   Exercise, ExerciseDetail, ExerciseFinding, ExerciseReport, ExerciseTestRun,
   ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
   RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
@@ -149,6 +149,7 @@ export const api = {
   getCoverageStats: () => get<CoverageStats>('/coverage/stats'),
   getCoverageMatrix: () => get<MatrixColumn[]>('/coverage/matrix'),
   getCoverageGaps: () => get<GapTechnique[]>('/coverage/gaps'),
+  getCoveredTechniques: () => get<CoveredTechnique[]>('/coverage/covered'),
 
   // Tags
   getTags: () => get<Tag[]>('/tags'),

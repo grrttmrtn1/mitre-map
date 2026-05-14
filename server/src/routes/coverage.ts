@@ -156,6 +156,70 @@ router.get('/matrix', async (_req, res) => {
   res.json(columns);
 });
 
+router.get('/covered', async (_req, res) => {
+  const db = getKnex();
+  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
+
+  const techDetections = new Map<string, Set<number>>();
+  const techTools = new Map<string, Set<number>>();
+
+  const activeDetections = await rawAll<{ id: number; name: string; severity: string; status: string; technique_ids: string }>(
+    db, "SELECT id, name, severity, status, technique_ids FROM detections WHERE status='active'"
+  );
+  for (const d of activeDetections) {
+    for (const id of JSON.parse(d.technique_ids)) {
+      const p = resolveToParent(id, parentTechIds, subtechToParent);
+      if (p) {
+        if (!techDetections.has(p)) techDetections.set(p, new Set());
+        techDetections.get(p)!.add(d.id);
+      }
+    }
+  }
+
+  const toolMitigationRows = await rawAll<{ technique_id: string; tool_id: number }>(db, `
+    SELECT tm.technique_id, tom.tool_id FROM technique_mitigations tm
+    JOIN tool_mitigations tom ON tm.mitigation_id = tom.mitigation_id
+    JOIN tools t ON tom.tool_id = t.id WHERE t.status='active'
+  `);
+  for (const r of toolMitigationRows) {
+    const p = resolveToParent(r.technique_id, parentTechIds, subtechToParent);
+    if (p) {
+      if (!techTools.has(p)) techTools.set(p, new Set());
+      techTools.get(p)!.add(r.tool_id);
+    }
+  }
+
+  const coveredIds = new Set([...techDetections.keys(), ...techTools.keys()]);
+  const detectionMap = new Map(activeDetections.map(d => [d.id, d]));
+  const toolRows = await rawAll<{ id: number; name: string; category: string }>(db, "SELECT id, name, category FROM tools WHERE status='active'");
+  const toolMap = new Map(toolRows.map(t => [t.id, t]));
+  const allTactics = await rawAll<{ id: string; name: string }>(db, 'SELECT id, name FROM attack_tactics');
+  const tacticNameMap = new Map(allTactics.map((t: any) => [t.id, t.name]));
+
+  const allTechniques = await rawAll<any>(db, 'SELECT * FROM attack_techniques WHERE is_subtechnique=0');
+  const covered = allTechniques
+    .filter(t => coveredIds.has(t.id))
+    .map(t => {
+      const tacticIds: string[] = JSON.parse(t.tactic_ids);
+      const detectionIds = techDetections.get(t.id) ?? new Set<number>();
+      const toolIds = techTools.get(t.id) ?? new Set<number>();
+      const isDetected = detectionIds.size > 0;
+      const isMitigated = toolIds.size > 0;
+      return {
+        ...t, tactic_ids: tacticIds,
+        tactic_names: tacticIds.map(id => tacticNameMap.get(id)).filter(Boolean),
+        status: isDetected && isMitigated ? 'full' : isDetected ? 'detected' : 'mitigated',
+        detections: [...detectionIds].map(id => {
+          const d = detectionMap.get(id)!;
+          return { id: d.id, name: d.name, severity: d.severity };
+        }),
+        tools: [...toolIds].map(id => toolMap.get(id)).filter(Boolean).map((t: any) => ({ id: t.id, name: t.name, category: t.category })),
+      };
+    });
+
+  res.json(covered);
+});
+
 router.get('/gaps', async (_req, res) => {
   const db = getKnex();
   const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
