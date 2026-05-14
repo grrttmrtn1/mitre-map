@@ -300,6 +300,41 @@ export interface DetectionQualityScore {
   };
 }
 
+export interface SigmaLibraryItem {
+  name: string;
+  path: string;
+  category: string;
+  raw_url: string;
+  html_url: string;
+}
+
+export interface SigmaLibrarySearch {
+  total_count: number;
+  rate_limit_remaining: number | null;
+  items: SigmaLibraryItem[];
+}
+
+export interface SigmaRuleDetail {
+  raw: string;
+  parsed: {
+    title?: string; id?: string; status?: string; level?: string;
+    author?: string; date?: string; description?: string;
+    tags?: string[]; references?: string[]; falsepositives?: string[];
+    logsource?: Record<string, string>; detection_raw?: string;
+    technique_ids: string[];
+  };
+}
+
+export interface SigmaTemplate {
+  technique_id: string;
+  technique_name: string;
+  tactic_names: string[];
+  logsource: { category: string; product?: string };
+  level: string;
+  data_sources: string[];
+  yaml: string;
+}
+
 export interface SigmaParseResult {
   title: string | undefined;
   rule_id: string | undefined;

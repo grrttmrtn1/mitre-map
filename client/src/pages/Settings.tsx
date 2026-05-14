@@ -9,7 +9,7 @@ const ROLE_INFO: Record<string, { label: string; description: string; color: str
   admin:     { label: 'Admin',      description: 'Full access — includes user management, API key management, data purge, and all write operations.', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
 };
 
-type TabId = 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data' | 'users' | 'attack_version' | 'sso' | 'webhooks';
+type TabId = 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data' | 'users' | 'attack_version' | 'sso' | 'webhooks' | 'integrations';
 
 const SCOPES = ['read', 'write', 'admin'];
 const SCOPE_DESC: Record<string, string> = {
@@ -108,6 +108,12 @@ export default function Settings() {
   const [purging, setPurging] = useState(false);
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
 
+  // Integrations state
+  const [ghTokenInput, setGhTokenInput] = useState('');
+  const [ghTokenConfigured, setGhTokenConfigured] = useState(false);
+  const [savingGhToken, setSavingGhToken] = useState(false);
+  const [ghTokenMsg, setGhTokenMsg] = useState<string | null>(null);
+
   // Webhook state
   const BLANK_WEBHOOK = { name: '', url: '', secret: '', custom_headers: '' };
   const BLANK_RULE = { name: '', type: 'coverage_threshold' as AlertRuleType, threshold: '80', webhook_config_id: '' };
@@ -137,8 +143,12 @@ export default function Settings() {
   const loadApiKeys = () => api.getApiKeys().then(setApiKeys);
   const loadDatasets = () => api.getPurgeableDatasets().then(r => setDatasets(r.datasets));
 
+  const loadIntegrations = () => {
+    api.getSettingStatus('github_token').then(r => setGhTokenConfigured(r.configured)).catch(() => {});
+  };
+
   useEffect(() => {
-    loadTags(); loadMotivations(); loadCountries(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets(); loadWebhooks();
+    loadTags(); loadMotivations(); loadCountries(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets(); loadWebhooks(); loadIntegrations();
     if (isAdmin) { loadUsers(); loadAttackVersion(); loadOidcProviders(); }
   }, [isAdmin]);
 
@@ -303,6 +313,7 @@ export default function Settings() {
     { id: 'sso', label: 'SSO / OIDC', adminOnly: true, disabled: true },
     { id: 'attack_version', label: 'ATT&CK Version', adminOnly: true },
     { id: 'webhooks', label: 'Webhooks' },
+    { id: 'integrations', label: 'Integrations' },
   ];
   const TABS = ALL_TABS.filter(t => !t.adminOnly || isAdmin);
 
@@ -1590,6 +1601,70 @@ export default function Settings() {
     "technique_name": "PowerShell"
   }
 }`}</pre>
+            </div>
+          </div>
+        )}
+
+        {/* ── Integrations ── */}
+        {activeTab === 'integrations' && (
+          <div className="max-w-xl space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+              <div>
+                <h2 className="text-sm font-medium text-slate-300">GitHub Personal Access Token</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Required for the SIGMA Rule Library to search SigmaHQ community rules via the GitHub API.
+                  The token only needs the <code className="bg-slate-800 px-1 rounded">public_repo</code> scope (read-only) to search public repositories.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className={`px-2 py-0.5 rounded-full font-medium ${ghTokenConfigured ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700 text-slate-400'}`}>
+                  {ghTokenConfigured ? '● Token configured' : '○ Not configured'}
+                </span>
+                <span className="text-slate-600">also readable from GITHUB_TOKEN env var on the server</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={ghTokenInput}
+                  onChange={e => setGhTokenInput(e.target.value)}
+                  placeholder={ghTokenConfigured ? 'Enter new token to replace…' : 'ghp_xxxxxxxxxxxx'}
+                  className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 font-mono"
+                />
+                <button
+                  disabled={!ghTokenInput.trim() || savingGhToken}
+                  onClick={async () => {
+                    setSavingGhToken(true); setGhTokenMsg(null);
+                    try {
+                      await api.setSetting('github_token', ghTokenInput.trim());
+                      setGhTokenConfigured(true);
+                      setGhTokenInput('');
+                      setGhTokenMsg('Token saved.');
+                    } catch { setGhTokenMsg('Failed to save token.'); }
+                    finally { setSavingGhToken(false); }
+                  }}
+                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                >
+                  {savingGhToken ? 'Saving…' : 'Save'}
+                </button>
+                {ghTokenConfigured && (
+                  <button
+                    onClick={async () => {
+                      await api.clearSetting('github_token');
+                      setGhTokenConfigured(false);
+                      setGhTokenMsg('Token removed.');
+                    }}
+                    className="px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {ghTokenMsg && (
+                <p className={`text-xs ${ghTokenMsg.includes('Failed') ? 'text-red-400' : 'text-emerald-400'}`}>{ghTokenMsg}</p>
+              )}
+              <p className="text-xs text-slate-600">
+                Create a token at github.com → Settings → Developer settings → Personal access tokens → Tokens (classic). Select the <code className="bg-slate-800 px-1 rounded">public_repo</code> scope under "repo".
+              </p>
             </div>
           </div>
         )}

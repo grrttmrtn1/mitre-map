@@ -14,6 +14,7 @@ const NAV: { to: string; label: string; icon: string; beta?: boolean }[] = [
   { to: '/data-sources', label: 'Data Sources', icon: '◫' },
   { to: '/atomic', label: 'Atomic Tests', icon: '⚗' },
   { to: '/exercises', label: 'Exercises', icon: '⚔' },
+  { to: '/sigma', label: 'SIGMA Library', icon: 'σ' },
   { to: '/taxii', label: 'TAXII Ingest', icon: '⇌', beta: true },
   { to: '/reports', label: 'Reports & Exports', icon: '▦' },
   { to: '/settings', label: 'Settings', icon: '⚛' },

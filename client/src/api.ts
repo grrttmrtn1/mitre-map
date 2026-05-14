@@ -3,7 +3,8 @@ import type {
   CoverageSnapshot, CoverageStats, Country, CoveredTechnique, DataSource, Detection, DetectionQualityScore, D3FendTechnique,
   Exercise, ExerciseDetail, ExerciseFinding, ExerciseReport, ExerciseTestRun,
   ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
-  RiskByTactic, RiskScore, SigmaParseResult, Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
+  RiskByTactic, RiskScore, SigmaLibrarySearch, SigmaParseResult, SigmaRuleDetail, SigmaTemplate,
+  Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
   TaxiiBatch, TaxiiJob, TaxiiPendingItem, TaxiiServer, TaxiiCollection,
   Tool, ToolDetail, User, WebhookConfig, AlertRule,
 } from './types';
@@ -226,7 +227,11 @@ export const api = {
 
   // SIGMA
   parseSigmaRule: (rule_text: string) => post<SigmaParseResult>('/sigma/parse', { rule_text }),
-  importSigmaRules: (rules: string[]) => post<{ imported: number; skipped: number; detection_ids: number[] }>('/sigma/import', { rules }),
+  importSigmaRules: (rules: string[], source?: string, default_status?: string) =>
+    post<{ imported: number; skipped: number; detection_ids: number[] }>('/sigma/import', { rules, source, default_status }),
+  searchSigmaLibrary: (technique: string) => get<SigmaLibrarySearch>(`/sigma/library?technique=${encodeURIComponent(technique)}`),
+  getSigmaRule: (raw_url: string) => get<SigmaRuleDetail>(`/sigma/library/rule?raw_url=${encodeURIComponent(raw_url)}`),
+  getSigmaTemplate: (technique: string) => get<SigmaTemplate>(`/sigma/templates?technique=${encodeURIComponent(technique)}`),
 
   // Auth
   login: (email: string, password: string) => post<{ token: string; user: User }>('/auth/login', { email, password }),
@@ -350,6 +355,11 @@ export const api = {
   deleteExerciseFinding: (id: number, finding_id: number) =>
     del(`/exercises/${id}/findings/${finding_id}`),
   getExerciseReport: (id: number) => get<ExerciseReport>(`/exercises/${id}/report`),
+
+  // Settings
+  getSettingStatus: (key: string) => get<{ key: string; configured: boolean; value?: string | null }>(`/settings/${key}`),
+  setSetting: (key: string, value: string) => put<{ key: string; configured: boolean }>(`/settings/${key}`, { value }),
+  clearSetting: (key: string) => del(`/settings/${key}`),
 
   // Admin / Purge
   getPurgeableDatasets: () => get<{ datasets: Array<{ key: string; label: string; count: number }> }>('/admin/purgeable'),

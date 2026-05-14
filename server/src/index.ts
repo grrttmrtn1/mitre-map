@@ -39,6 +39,7 @@ import atomicRouter from './routes/atomic';
 import exercisesRouter from './routes/exercises';
 import taxiiRouter from './routes/taxii';
 import webhooksRouter from './routes/webhooks';
+import settingsRouter from './routes/settings';
 import { initScheduler } from './taxii/scheduler';
 import { requireApiKey } from './middleware/auth';
 
@@ -103,6 +104,7 @@ app.use('/api/atomic', atomicRouter);
 app.use('/api/exercises', exercisesRouter);
 app.use('/api/taxii', taxiiRouter);
 app.use('/api/webhooks', webhooksRouter);
+app.use('/api/settings', settingsRouter);
 
 // OpenAPI spec — machine-readable, no auth required
 app.get('/api/openapi.json', (_req, res) => {
