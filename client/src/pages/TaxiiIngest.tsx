@@ -62,13 +62,13 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 interface ServerFormData {
   name: string; url: string; api_root: string; collection_id: string;
   auth_type: string; username: string; password: string; token: string;
-  ssl_verify: number; notes: string;
+  ssl_verify: number; auto_merge: number; notes: string;
 }
 
 const emptyServer = (): ServerFormData => ({
   name: '', url: '', api_root: '', collection_id: '',
   auth_type: 'none', username: '', password: '', token: '',
-  ssl_verify: 1, notes: '',
+  ssl_verify: 1, auto_merge: 0, notes: '',
 });
 
 function ServerModal({
@@ -83,7 +83,7 @@ function ServerModal({
       name: server.name, url: server.url,
       api_root: server.api_root ?? '', collection_id: server.collection_id ?? '',
       auth_type: server.auth_type, username: '', password: '', token: '',
-      ssl_verify: server.ssl_verify, notes: server.notes ?? '',
+      ssl_verify: server.ssl_verify, auto_merge: server.auto_merge, notes: server.notes ?? '',
     } : emptyServer(),
   );
   const [saving, setSaving] = useState(false);
@@ -175,6 +175,18 @@ function ServerModal({
               onChange={e => set('ssl_verify', e.target.checked ? 1 : 0)}
               className="rounded border-slate-600 bg-slate-800" />
             <label htmlFor="ssl_verify" className="text-xs text-slate-400">Verify SSL certificate</label>
+          </div>
+
+          <div className="flex items-start gap-2 bg-blue-500/5 border border-blue-500/20 rounded px-3 py-2">
+            <input type="checkbox" id="auto_merge" checked={form.auto_merge === 1}
+              onChange={e => set('auto_merge', e.target.checked ? 1 : 0)}
+              className="rounded border-slate-600 bg-slate-800 mt-0.5" />
+            <div>
+              <label htmlFor="auto_merge" className="text-xs text-slate-300 font-medium cursor-pointer">Auto-merge fetched items</label>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Ingested items are applied directly without manual review. Only enable for trusted sources (e.g. MITRE official feed).
+              </p>
+            </div>
           </div>
 
           <div>
@@ -463,12 +475,13 @@ function FetchStatusBadge({ server }: { server: TaxiiServer }) {
     );
   }
   if (server.last_fetch_status === 'success') {
-    const staged = server.last_fetch_items ?? 0;
+    const count = server.last_fetch_items ?? 0;
     const skipped = server.last_fetch_skipped;
     const skippedLabel = skipped != null && skipped > 0 ? `, ${skipped.toLocaleString()} skipped` : '';
+    const itemLabel = server.auto_merge === 1 ? 'auto-merged' : 'staged';
     return (
       <span className="text-xs text-emerald-400">
-        {staged === 0 ? `Up to date${skippedLabel}` : `${staged} staged${skippedLabel}`}
+        {count === 0 ? `Up to date${skippedLabel}` : `${count} ${itemLabel}${skippedLabel}`}
       </span>
     );
   }
@@ -546,6 +559,9 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-sm font-medium text-slate-200">{server.name}</span>
                     <span className="text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{server.auth_type}</span>
+                    {server.auto_merge === 1 && (
+                      <span className="text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">Auto-merge</span>
+                    )}
                     {server.ssl_verify === 0 && (
                       <span className="text-xs text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">SSL verify off</span>
                     )}

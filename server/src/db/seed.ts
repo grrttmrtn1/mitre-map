@@ -233,6 +233,43 @@ async function seedNewTables(db: Knex, isFirstRun: boolean): Promise<void> {
     });
   }
 
+  // MITRE ATT&CK Live CTI feed — pre-configured TAXII server with auto-merge enabled.
+  // Seeded disabled (job enabled=0) so the user opts in by enabling the scheduled job.
+  const MITRE_COLLECTION_ID = '95ecc380-afe9-11e4-9b6c-751b66dd541e';
+  const MITRE_NOTES = 'Official MITRE ATT&CK Enterprise TAXII 2.1 feed. Enable the scheduled job below to automatically sync new threat groups and technique mappings as MITRE publishes them.';
+  let mitreServer = await db('taxii_servers').where('name', 'MITRE ATT&CK Enterprise (Official)').first();
+  if (!mitreServer) {
+    const [mitreServerId] = await db('taxii_servers').insert({
+      name: 'MITRE ATT&CK Enterprise (Official)',
+      url: 'https://attack-taxii.mitre.org',
+      api_root: '/api/v21/',
+      collection_id: MITRE_COLLECTION_ID,
+      auth_type: 'none',
+      ssl_verify: 1,
+      auto_merge: 1,
+      notes: MITRE_NOTES,
+    });
+    mitreServer = { id: mitreServerId };
+  } else {
+    // Patch any fields that may have been seeded without their final values
+    await db('taxii_servers').where('id', mitreServer.id).update({
+      collection_id: MITRE_COLLECTION_ID,
+      auto_merge: 1,
+      notes: MITRE_NOTES,
+    });
+  }
+  // Ensure the scheduled job exists regardless of when the server was first seeded
+  const mitreJobExists = await db('taxii_ingest_jobs').where('server_id', mitreServer.id).first();
+  if (!mitreJobExists) {
+    await db('taxii_ingest_jobs').insert({
+      server_id: mitreServer.id,
+      name: 'MITRE ATT&CK Live Sync',
+      schedule: '0 3 * * *',
+      enabled: 0,
+      last_status: 'pending',
+    });
+  }
+
   // Motivations + countries (idempotent)
   await db.transaction(async trx => {
     for (const m of SEED_MOTIVATIONS) {

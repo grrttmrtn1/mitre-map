@@ -33,6 +33,7 @@ export async function runFetch(serverId: number, jobId: number | null = null): P
   const db = getKnex();
   const server = await rawGet<any>(db, 'SELECT * FROM taxii_servers WHERE id=?', [serverId]);
   if (!server) throw new Error(`TAXII server ${serverId} not found`);
+  const autoMerge = server.auto_merge === 1;
 
   const client = new TaxiiClient({
     url: server.url,
@@ -59,6 +60,10 @@ export async function runFetch(serverId: number, jobId: number | null = null): P
   const stixToTechAttackId = new Map<string, string | null>();
   for (const g of groups) stixToGroupAttackId.set(g.stix_id, g.attack_id);
   for (const t of techniques) stixToTechAttackId.set(t.stix_id, t.attack_id);
+
+  // Include groups being staged in this batch so their links aren't dropped
+  const batchGroupAttackIds = new Set(groups.map(g => g.attack_id).filter(Boolean) as string[]);
+  const knownGroupIds = new Set([...existingGroupIds, ...batchGroupAttackIds]);
 
   // Pre-load existing group→technique links to avoid N+1 queries inside the transaction
   const existingLinks = await rawAll<{ group_id: string; technique_id: string }>(
@@ -109,13 +114,25 @@ export async function runFetch(serverId: number, jobId: number | null = null): P
       const groupAttackId = stixToGroupAttackId.get(rel.source_ref);
       const techAttackId = stixToTechAttackId.get(rel.target_ref);
       if (!groupAttackId || !techAttackId) continue;
-      if (!existingGroupIds.has(groupAttackId) || !existingTechIds.has(techAttackId)) continue;
+      if (!knownGroupIds.has(groupAttackId) || !existingTechIds.has(techAttackId)) continue;
       if (existingLinkSet.has(`${groupAttackId}::${techAttackId}`)) continue;
 
       const data = { group_id: groupAttackId, technique_id: techAttackId };
       const label = `${groupAttackId} → ${techAttackId}`;
       await insertPending(trx, serverId, jobId, batch_id, rel.stix_id, 'relationship', label, 'link_technique', data);
       items_created++;
+    }
+
+    // Auto-merge: immediately apply all staged items within the same transaction
+    // so they land as approved without requiring manual review.
+    if (autoMerge && items_created > 0) {
+      const staged = await rawAll<any>(trx,
+        `SELECT * FROM taxii_pending_ingests WHERE batch_id=? AND status='pending'`,
+        [batch_id],
+      );
+      for (const item of staged) {
+        await applyItemInTrx(trx, item);
+      }
     }
   });
 
@@ -127,6 +144,43 @@ export async function runFetch(serverId: number, jobId: number | null = null): P
     relationships_found: relationships.length,
     skipped,
   };
+}
+
+async function applyItemInTrx(trx: DB, item: any): Promise<void> {
+  const data = JSON.parse(item.proposed_data);
+  switch (item.proposed_action as string) {
+    case 'create_group':
+      await rawRun(trx,
+        `INSERT INTO threat_groups (id, name, aliases, description, url)
+         VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`,
+        [data.id, data.name, JSON.stringify(data.aliases ?? []), data.description ?? null, data.url ?? null],
+      );
+      break;
+    case 'update_group':
+      await rawRun(trx,
+        `UPDATE threat_groups SET name=COALESCE(?,name), aliases=COALESCE(?,aliases), description=COALESCE(?,description), url=COALESCE(?,url)
+         WHERE id=?`,
+        [data.name ?? null, data.aliases ? JSON.stringify(data.aliases) : null, data.description ?? null, data.url ?? null, data.id],
+      );
+      break;
+    case 'create_technique':
+      await rawRun(trx,
+        `INSERT INTO attack_techniques (id, name, description, tactic_ids, is_subtechnique, url)
+         VALUES (?, ?, ?, ?, 0, ?) ON CONFLICT DO NOTHING`,
+        [data.id, data.name, data.description ?? null, JSON.stringify([]), data.url ?? null],
+      );
+      break;
+    case 'link_technique':
+      await rawRun(trx,
+        'INSERT INTO group_techniques (group_id, technique_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+        [data.group_id, data.technique_id],
+      );
+      break;
+  }
+  await rawRun(trx,
+    `UPDATE taxii_pending_ingests SET status='approved', reviewed_at=CURRENT_TIMESTAMP WHERE id=?`,
+    [item.id],
+  );
 }
 
 async function insertPending(
@@ -167,14 +221,13 @@ export async function applyPendingItem(itemId: number, reviewerId: number | null
 
       case 'update_group':
         await rawRun(trx,
-          `UPDATE threat_groups SET name=COALESCE(?,name), description=COALESCE(?,description), url=COALESCE(?,url)
+          `UPDATE threat_groups SET name=COALESCE(?,name), aliases=COALESCE(?,aliases), description=COALESCE(?,description), url=COALESCE(?,url)
            WHERE id=?`,
-          [data.name ?? null, data.description ?? null, data.url ?? null, data.id],
+          [data.name ?? null, data.aliases ? JSON.stringify(data.aliases) : null, data.description ?? null, data.url ?? null, data.id],
         );
         break;
 
       case 'create_technique': {
-        const existingTactic = await rawGet<any>(db, 'SELECT id FROM attack_tactics WHERE shortname=?', ['unknown']);
         await rawRun(trx,
           `INSERT INTO attack_techniques (id, name, description, tactic_ids, is_subtechnique, url)
            VALUES (?, ?, ?, ?, 0, ?) ON CONFLICT DO NOTHING`,

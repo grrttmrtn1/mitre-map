@@ -371,12 +371,12 @@ export const api = {
   createTaxiiServer: (data: {
     name: string; url: string; api_root?: string; collection_id?: string;
     auth_type?: string; username?: string; password?: string; token?: string;
-    ssl_verify?: number; notes?: string;
+    ssl_verify?: number; auto_merge?: number; notes?: string;
   }) => post<TaxiiServer>('/taxii/servers', data),
   updateTaxiiServer: (id: number, data: Partial<{
     name: string; url: string; api_root: string; collection_id: string;
     auth_type: string; username: string; password: string; token: string;
-    ssl_verify: number; notes: string;
+    ssl_verify: number; auto_merge: number; notes: string;
   }>) => put<TaxiiServer>(`/taxii/servers/${id}`, data),
   deleteTaxiiServer: (id: number) => del(`/taxii/servers/${id}`),
   testTaxiiServer: (id: number) => post<{ ok: boolean; collections?: TaxiiCollection[]; error?: string }>(`/taxii/servers/${id}/test`, {}),

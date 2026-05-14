@@ -558,6 +558,7 @@ export interface TaxiiServer {
   collection_id: string | null;
   auth_type: TaxiiAuthType;
   ssl_verify: number;
+  auto_merge: number;
   notes: string | null;
   last_fetch_status: 'running' | 'success' | 'error' | null;
   last_fetch_error: string | null;

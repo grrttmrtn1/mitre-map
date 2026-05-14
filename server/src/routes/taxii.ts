@@ -11,22 +11,22 @@ const router = Router();
 
 router.get('/servers', async (_req, res) => {
   const db = getKnex();
-  const servers = await rawAll(db, 'SELECT id, name, url, api_root, collection_id, auth_type, ssl_verify, notes, last_fetch_status, last_fetch_error, last_fetch_items, last_fetch_skipped, last_fetch_at, created_at, updated_at FROM taxii_servers ORDER BY name', []);
+  const servers = await rawAll(db, 'SELECT id, name, url, api_root, collection_id, auth_type, ssl_verify, auto_merge, notes, last_fetch_status, last_fetch_error, last_fetch_items, last_fetch_skipped, last_fetch_at, created_at, updated_at FROM taxii_servers ORDER BY name', []);
   res.json(servers);
 });
 
 router.post('/servers', async (req, res) => {
   const db = getKnex();
-  const { name, url, api_root, collection_id, auth_type = 'none', username, password, token, ssl_verify = 1, notes } = req.body;
+  const { name, url, api_root, collection_id, auth_type = 'none', username, password, token, ssl_verify = 1, auto_merge = 0, notes } = req.body;
   if (!name || !url) return res.status(400).json({ error: 'name and url are required' });
 
   const id = await rawInsert(db,
-    `INSERT INTO taxii_servers (name, url, api_root, collection_id, auth_type, username, password, token, ssl_verify, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-    [name, url, api_root ?? null, collection_id ?? null, auth_type, username ?? null, password ?? null, token ?? null, ssl_verify ? 1 : 0, notes ?? null],
+    `INSERT INTO taxii_servers (name, url, api_root, collection_id, auth_type, username, password, token, ssl_verify, auto_merge, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+    [name, url, api_root ?? null, collection_id ?? null, auth_type, username ?? null, password ?? null, token ?? null, ssl_verify ? 1 : 0, auto_merge ? 1 : 0, notes ?? null],
   );
   await logAudit(db, 'taxii_server', String(id), 'create', (req as any).actor ?? 'user', { name, url }, (req as any).sourceIp);
-  const server = await rawGet(db, 'SELECT id, name, url, api_root, collection_id, auth_type, ssl_verify, notes, created_at FROM taxii_servers WHERE id=?', [id]);
+  const server = await rawGet(db, 'SELECT id, name, url, api_root, collection_id, auth_type, ssl_verify, auto_merge, notes, created_at FROM taxii_servers WHERE id=?', [id]);
   res.status(201).json(server);
 });
 
@@ -35,19 +35,21 @@ router.put('/servers/:id', async (req, res) => {
   const server = await rawGet(db, 'SELECT id FROM taxii_servers WHERE id=?', [req.params.id]);
   if (!server) return res.status(404).json({ error: 'Not found' });
 
-  const { name, url, api_root, collection_id, auth_type, username, password, token, ssl_verify, notes } = req.body;
+  const { name, url, api_root, collection_id, auth_type, username, password, token, ssl_verify, auto_merge, notes } = req.body;
   await rawRun(db,
     `UPDATE taxii_servers SET
       name=COALESCE(?,name), url=COALESCE(?,url), api_root=?, collection_id=?,
       auth_type=COALESCE(?,auth_type), username=?, password=?, token=?,
-      ssl_verify=COALESCE(?,ssl_verify), notes=?, updated_at=CURRENT_TIMESTAMP
+      ssl_verify=COALESCE(?,ssl_verify), auto_merge=COALESCE(?,auto_merge), notes=?, updated_at=CURRENT_TIMESTAMP
      WHERE id=?`,
     [name ?? null, url ?? null, api_root ?? null, collection_id ?? null,
      auth_type ?? null, username ?? null, password ?? null, token ?? null,
-     ssl_verify !== undefined ? (ssl_verify ? 1 : 0) : null, notes ?? null, req.params.id],
+     ssl_verify !== undefined ? (ssl_verify ? 1 : 0) : null,
+     auto_merge !== undefined ? (auto_merge ? 1 : 0) : null,
+     notes ?? null, req.params.id],
   );
   await logAudit(db, 'taxii_server', req.params.id, 'update', (req as any).actor ?? 'user', req.body, (req as any).sourceIp);
-  const updated = await rawGet(db, 'SELECT id, name, url, api_root, collection_id, auth_type, ssl_verify, notes, updated_at FROM taxii_servers WHERE id=?', [req.params.id]);
+  const updated = await rawGet(db, 'SELECT id, name, url, api_root, collection_id, auth_type, ssl_verify, auto_merge, notes, updated_at FROM taxii_servers WHERE id=?', [req.params.id]);
   res.json(updated);
 });
 
