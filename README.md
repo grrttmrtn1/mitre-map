@@ -49,6 +49,9 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **CSV import** — paste or upload a CSV of detections with semicolon-separated technique IDs
 - **SIGMA rule import** — paste YAML, preview extracted ATT&CK technique IDs, import as detection
 - Filters by status, severity, and source platform
+- **Effectiveness tracking** — log alert fires as `true_positive`, `false_positive`, or `suppressed`; counters feed the quality-score algorithm
+- **Quality scores** — per-detection score (0–100, letter grade A–F) computed from severity, confidence, empirical FP rate, test results, and technique uniqueness; available as a bulk endpoint
+- **Version history** — every create/update snapshots the detection; the history endpoint returns version-by-version diffs of changed fields
 
 ### Security Stack Management
 - Tool inventory with vendor, category, and status tracking
@@ -59,6 +62,7 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **18 tracked threat groups** — APT29, APT28, Lazarus, APT41, FIN7, Sandworm, Turla, Scattered Spider, Wizard Spider, and more
 - **Full CRUD** — create, edit, and delete threat groups; assign any subset of ATT&CK techniques with an inline searchable picker
 - **Procedures per TTP** — record specific observed behaviors for each technique a group uses: command lines, scripts, artifact paths, prose descriptions, or reference links. Each procedure is typed, color-coded, and editable inline within the detail pane.
+- **Industry sector targeting** — tag each threat group with the industry sectors it targets (stored as a JSON array)
 - Per-group detection coverage with technique-level status (detected / exposed)
 - Exposure percentage and risk level per group
 - Split-panel detail view with full technique and procedure breakdown
@@ -128,6 +132,15 @@ Ingest external threat intelligence from any TAXII 2.1 server directly into Mitr
 - **Proposed actions** — each pending item is pre-classified: `create_group`, `update_group`, `create_technique`, or `link_technique`; approved items are applied atomically to the threat-group and technique tables
 - **Batch history** — browse all past ingest batches grouped by server with pending/approved/rejected counts and timestamps
 - **Fetch status** — each server shows last fetch status (`running` / `success` / `error`), item count, skipped-duplicate count, and error message on failure
+
+### Webhook Alert Integration
+- **Webhook configs** — register outbound HTTP endpoints with an optional HMAC secret for payload signing and arbitrary custom headers; test connectivity with a single click
+- **Alert rules** — attach rules to webhook configs with three trigger types: `coverage_threshold` (fires when overall coverage drops below a set percentage), `detection_validation_failed`, and `new_uncovered_group_technique`
+- Alerts fire automatically after detection changes, coverage recalculations, and exercise test runs
+
+### Application Settings
+- Key-value settings store accessible via API (`GET/PUT/DELETE /api/settings/:key`)
+- Sensitive keys (e.g. `github_token`) are masked in GET responses — only a `configured: true/false` flag is returned
 
 ### API Playground
 - Interactive in-app API explorer — browse every endpoint grouped by resource, fill path/query/body params, and fire live requests authenticated with your stored API key. Responses are syntax-highlighted inline.
@@ -203,6 +216,10 @@ Ingest external threat intelligence from any TAXII 2.1 server directly into Mitr
 │  │   ├── /jobs           Scheduled ingest jobs      │
 │  │   ├── /batches        Ingest batch review        │
 │  │   └── /pending        Per-item approve/reject    │
+│  ├── /api/webhooks       Webhook configs + rules    │
+│  │   ├── /configs        Endpoint CRUD + test       │
+│  │   └── /rules          Alert rule CRUD            │
+│  ├── /api/settings       Key-value app settings     │
 │  ├── /api/openapi.json   OpenAPI 3.0 spec           │
 │  └── /api/docs           Swagger UI                 │
 │                                                     │
@@ -233,6 +250,8 @@ Ingest external threat intelligence from any TAXII 2.1 server directly into Mitr
 │  exercise_test_runs · exercise_findings             │
 │  taxii_servers · taxii_ingest_jobs                  │
 │  taxii_pending_ingests                              │
+│  webhook_configs · alert_rules                      │
+│  settings · detection_versions                      │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -464,11 +483,18 @@ Authorization: Bearer <raw-key>
 |---|---|---|
 | `GET` | `/api/detections` | List (filter: `status`, `severity`, `source`, `technique`) |
 | `POST` | `/api/detections` | Create detection |
+| `GET` | `/api/detections/:id` | Get detection |
 | `PUT` | `/api/detections/:id` | Update detection |
 | `DELETE` | `/api/detections/:id` | Delete detection |
 | `PATCH` | `/api/detections/bulk` | Bulk status update `{ ids, status }` |
 | `DELETE` | `/api/detections/bulk` | Bulk delete `{ ids }` |
 | `POST` | `/api/detections/import` | Import array of detections |
+| `GET` | `/api/detections/quality-scores` | Quality score (0–100, grade A–F) for all detections |
+| `GET` | `/api/detections/:id/history` | Version history with per-version field diffs |
+| `PATCH` | `/api/detections/:id/fire` | Log a fire event `{ outcome }` — increments TP/FP/suppressed counter |
+| `PATCH` | `/api/detections/:id/review` | Stamp `last_reviewed_at` timestamp |
+
+**Fire outcomes:** `true_positive` · `false_positive` · `suppressed`
 
 ### SIGMA Import
 
@@ -493,7 +519,7 @@ Authorization: Bearer <raw-key>
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/threat-groups` | List all groups |
-| `POST` | `/api/threat-groups` | Create group `{ id, name, aliases, country, motivation, url, description, technique_ids }` |
+| `POST` | `/api/threat-groups` | Create group `{ id, name, aliases, country, motivation, url, description, technique_ids, targeted_sectors? }` |
 | `GET` | `/api/threat-groups/:id` | Detail with techniques and detection coverage |
 | `PUT` | `/api/threat-groups/:id` | Update group fields and technique assignments |
 | `DELETE` | `/api/threat-groups/:id` | Delete group and cascade associations |
@@ -656,6 +682,38 @@ Authorization: Bearer <raw-key>
 
 **Pending item statuses:** `pending` · `approved` · `rejected`
 
+### Webhooks & Alert Rules
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/webhooks/configs` | List webhook endpoint configurations |
+| `POST` | `/api/webhooks/configs` | Create webhook config `{ name, url, secret?, custom_headers?, enabled? }` |
+| `PUT` | `/api/webhooks/configs/:id` | Update webhook config fields |
+| `DELETE` | `/api/webhooks/configs/:id` | Delete webhook config (cascades alert rules) |
+| `POST` | `/api/webhooks/configs/:id/test` | Send a test payload to the webhook endpoint |
+| `GET` | `/api/webhooks/rules` | List alert rules (joined with webhook config name/URL) |
+| `POST` | `/api/webhooks/rules` | Create alert rule `{ name, type, webhook_config_id, threshold?, enabled? }` |
+| `PUT` | `/api/webhooks/rules/:id` | Update alert rule fields |
+| `DELETE` | `/api/webhooks/rules/:id` | Delete alert rule |
+
+**Alert rule types:** `coverage_threshold` · `detection_validation_failed` · `new_uncovered_group_technique`
+
+`threshold` (float, 0–100) is required when `type` is `coverage_threshold` and specifies the minimum coverage percentage below which the webhook fires.
+
+### Settings
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/settings/:key` | Get a setting value (sensitive keys return `{ configured: bool }` only) |
+| `PUT` | `/api/settings/:key` | Upsert a setting `{ value }` |
+| `DELETE` | `/api/settings/:key` | Clear a setting |
+
+Known setting keys:
+
+| Key | Sensitive | Purpose |
+|---|---|---|
+| `github_token` | yes | GitHub PAT used by ATT&CK update check to avoid rate limits |
+
 ### Exports
 
 | Method | Path | Description |
@@ -707,14 +765,19 @@ mitremap/
 │       │   ├── knex.ts         # Knex connection + migration runner
 │       │   ├── seed.ts         # Idempotent seeding
 │       │   └── migrations/
-│       │       ├── 001_core_schema.ts       # Base schema
-│       │       ├── 002_new_features.ts      # Auth, ART, data sources, ATT&CK versioning
-│       │       ├── 003_custom_tests.ts      # source column on art_tests
-│       │       ├── 004_exercises.ts         # Exercises, test runs, findings
-│       │       ├── 005_exercises_blocked.ts # blocked column on exercise_test_runs
-│       │       ├── 006_taxii.ts             # TAXII servers, jobs, pending ingests
-│       │       ├── 007_taxii_fetch_status.ts# last_fetch_* columns on taxii_servers
-│       │       └── 008_taxii_skipped.ts     # last_fetch_skipped column
+│       │       ├── 001_core_schema.ts               # Base schema
+│       │       ├── 002_new_features.ts              # Auth, ART, data sources, ATT&CK versioning
+│       │       ├── 003_custom_tests.ts              # source column on art_tests
+│       │       ├── 004_exercises.ts                 # Exercises, test runs, findings
+│       │       ├── 005_exercises_blocked.ts         # blocked column on exercise_test_runs
+│       │       ├── 006_taxii.ts                     # TAXII servers, jobs, pending ingests
+│       │       ├── 007_taxii_fetch_status.ts        # last_fetch_* columns on taxii_servers
+│       │       ├── 008_taxii_skipped.ts             # last_fetch_skipped column
+│       │       ├── 009_detection_effectiveness.ts   # TP/FP/suppressed counters + review timestamp
+│       │       ├── 010_webhooks.ts                  # webhook_configs + alert_rules tables
+│       │       ├── 011_settings.ts                  # key-value app settings table
+│       │       ├── 012_taxii_auto_merge.ts          # auto_merge flag on taxii_servers
+│       │       └── 013_prioritization_and_versions.ts # detection_versions + targeted_sectors
 │       ├── data/
 │       │   ├── attack.ts           # ATT&CK tactics, techniques, mitigations
 │       │   ├── d3fend.ts           # D3FEND techniques + ATT&CK mappings
@@ -749,6 +812,8 @@ mitremap/
 │           ├── taxii.ts              # TAXII servers, jobs, pending-item review
 │           ├── threat-groups.ts      # CRUD + technique assignment + procedures
 │           ├── api-keys.ts           # API key lifecycle (hash, mask, revoke)
+│           ├── webhooks.ts           # Webhook config + alert rule CRUD
+│           ├── settings.ts           # Key-value settings store
 │           └── admin.ts              # Data purge endpoints
 ├── client/
 │   └── src/
