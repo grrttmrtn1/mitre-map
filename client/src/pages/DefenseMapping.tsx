@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { Tactic, Technique, D3FendTechnique, Mitigation, Detection } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import { D3FEND_CATEGORY_COLORS } from '../lib/constants';
+import { SkeletonDetailPanel } from '../components/Skeleton';
 
 interface TechDetail {
   technique: Technique;
@@ -84,7 +85,7 @@ export default function DefenseMapping() {
 
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center h-full text-slate-500">Loading...</div>
+          <SkeletonDetailPanel />
         ) : !selected ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-500">
             <div className="text-4xl mb-3">⛨</div>

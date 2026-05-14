@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { CoveredTechnique, GapTechnique } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import { D3FEND_CATEGORY_COLORS } from '../lib/constants';
+import { SkeletonRow } from '../components/Skeleton';
 
 const SECTORS = [
   'Financial', 'Healthcare', 'Energy', 'Government', 'Defense', 'Technology',
@@ -125,7 +126,19 @@ export default function GapAnalysis() {
     setSortBy(v === 'gaps' ? 'priority' : 'tactic');
   };
 
-  if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Loading gap analysis...</div>;
+  if (loading) return (
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+        <div className="h-6 w-36 bg-slate-800 rounded animate-pulse" />
+        <div className="h-3.5 w-64 bg-slate-800/60 rounded animate-pulse mt-2" />
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
+        {Array.from({ length: 18 }).map((_, i) => (
+          <SkeletonRow key={i} className="bg-slate-900 border border-slate-800 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -205,9 +218,12 @@ export default function GapAnalysis() {
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {view === 'gaps' ? (
           filteredGaps.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-slate-500">
-              <div className="text-4xl mb-3">✓</div>
-              <div className="text-sm">No gaps found with current filters</div>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <svg className="w-14 h-14 text-emerald-700/60 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              <p className="text-sm font-medium text-emerald-400">No gaps with current filters</p>
+              <p className="text-xs text-slate-500 mt-1">All techniques are covered — or try adjusting your filters.</p>
             </div>
           ) : (
             filteredGaps.map(g => (
@@ -329,8 +345,12 @@ export default function GapAnalysis() {
           )
         ) : (
           filteredCovered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-slate-500">
-              <div className="text-sm">No covered techniques found with current filters</div>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <svg className="w-14 h-14 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+              <p className="text-sm font-medium text-slate-400">No covered techniques match filters</p>
+              <p className="text-xs text-slate-500 mt-1">Try clearing filters or add detections and tools to build coverage.</p>
             </div>
           ) : (
             filteredCovered.map(c => (

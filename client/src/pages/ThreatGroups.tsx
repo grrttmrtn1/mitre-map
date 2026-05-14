@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { Country, Motivation, Procedure, ProcedureType, ThreatGroup, Technique } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
+import { SkeletonRow } from '../components/Skeleton';
 
 const BLANK_FORM = {
   id: '', name: '', country: '', motivation: '', description: '', url: '', aliases: '', targeted_sectors: [] as string[],
@@ -175,7 +176,21 @@ export default function ThreatGroups() {
     !techSearch || t.id.toLowerCase().includes(techSearch.toLowerCase()) || t.name.toLowerCase().includes(techSearch.toLowerCase())
   );
 
-  if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Loading threat groups...</div>;
+  if (loading) return (
+    <div className="flex h-full">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+          <div className="h-6 w-40 bg-slate-800 rounded animate-pulse" />
+          <div className="h-3.5 w-56 bg-slate-800/60 rounded animate-pulse mt-2" />
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <SkeletonRow key={i} className="bg-slate-900 border border-slate-800 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex h-full">
@@ -269,7 +284,16 @@ export default function ThreatGroups() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">No groups match filters.</td></tr>
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <svg className="w-10 h-10 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                        </svg>
+                        <p className="text-sm text-slate-500">No groups match filters.</p>
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { onAuthError } from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -40,6 +40,32 @@ function AuthBanner({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+function AnimatedRoutes() {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="h-full animate-fadein">
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/matrix" element={<AttackMatrix />} />
+        <Route path="/detections" element={<Detections />} />
+        <Route path="/tools" element={<Tools />} />
+        <Route path="/defense" element={<DefenseMapping />} />
+        <Route path="/gaps" element={<GapAnalysis />} />
+        <Route path="/threats" element={<ThreatGroups />} />
+        <Route path="/data-sources" element={<DataSources />} />
+        <Route path="/atomic" element={<AtomicTests />} />
+        <Route path="/exercises" element={<Exercises />} />
+        <Route path="/taxii" element={<TaxiiIngest />} />
+        <Route path="/sigma" element={<SigmaLibrary />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/api" element={<ApiPlayground />} />
+      </Routes>
+    </div>
+  );
+}
+
 function AppShell() {
   const [authError, setAuthError] = useState(false);
   const { loading, user, isBootstrapMode } = useAuth();
@@ -67,25 +93,8 @@ function AppShell() {
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
               {authError && <AuthBanner onDismiss={() => setAuthError(false)} />}
-              <main className="flex-1 overflow-y-auto">
-                <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/matrix" element={<AttackMatrix />} />
-                  <Route path="/detections" element={<Detections />} />
-                  <Route path="/tools" element={<Tools />} />
-                  <Route path="/defense" element={<DefenseMapping />} />
-                  <Route path="/gaps" element={<GapAnalysis />} />
-                  <Route path="/threats" element={<ThreatGroups />} />
-                  <Route path="/data-sources" element={<DataSources />} />
-                  <Route path="/atomic" element={<AtomicTests />} />
-                  <Route path="/exercises" element={<Exercises />} />
-                  <Route path="/taxii" element={<TaxiiIngest />} />
-                  <Route path="/sigma" element={<SigmaLibrary />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/api" element={<ApiPlayground />} />
-                </Routes>
+              <main className="flex-1 overflow-hidden">
+                <AnimatedRoutes />
               </main>
             </div>
           </div>

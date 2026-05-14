@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import ConfirmModal from '../components/ConfirmModal';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { SkeletonRow } from '../components/Skeleton';
 
 const GRADE_COLORS: Record<string, string> = {
   A: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -394,7 +395,11 @@ export default function Detections() {
 
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div className="flex items-center justify-center h-32 text-slate-500">Loading...</div>
+            <div className="space-y-2 p-0.5">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <SkeletonRow key={i} className="bg-slate-900 border border-slate-800 rounded-xl" />
+              ))}
+            </div>
           ) : (
             <div className="space-y-2">
               {sorted.map(d => (
@@ -480,7 +485,13 @@ export default function Detections() {
                 </div>
               ))}
               {sorted.length === 0 && (
-                <div className="text-center py-16 text-slate-500">No detections found.</div>
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <svg className="w-14 h-14 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                  </svg>
+                  <p className="text-sm font-medium text-slate-400">No detections found</p>
+                  <p className="text-xs text-slate-600 mt-1 max-w-xs">Try adjusting your filters, or add detections via CSV import or the SIGMA browser.</p>
+                </div>
               )}
             </div>
           )}

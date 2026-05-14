@@ -4,6 +4,7 @@ import type { Tool, ToolDetail, D3FendTechnique, Mitigation } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import ConfirmModal from '../components/ConfirmModal';
+import { SkeletonRow } from '../components/Skeleton';
 
 const CATEGORIES = ['EDR', 'SIEM', 'NDR', 'IAM', 'PAM', 'Email Security', 'NGFW', 'Vulnerability Management', 'DLP', 'SOAR', 'Other'];
 const STATUSES = ['active', 'planned', 'deprecated'];
@@ -126,7 +127,11 @@ export default function Tools() {
 
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div className="flex items-center justify-center h-32 text-slate-500">Loading...</div>
+            <div className="space-y-3 p-0.5">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <SkeletonRow key={i} className="bg-slate-900 border border-slate-800 rounded-xl" />
+              ))}
+            </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
               {tools.map(tool => (
@@ -167,7 +172,13 @@ export default function Tools() {
                 </div>
               ))}
               {tools.length === 0 && (
-                <div className="text-center py-16 text-slate-500">No tools configured. Add your security tools to start tracking coverage.</div>
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <svg className="w-14 h-14 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.654-4.654m5.896-2.678a7.5 7.5 0 0 0-10.607 0" />
+                  </svg>
+                  <p className="text-sm font-medium text-slate-400">No tools configured</p>
+                  <p className="text-xs text-slate-600 mt-1 max-w-xs">Add your security tools — EDR, SIEM, NDR and more — to track which ATT&amp;CK techniques they cover.</p>
+                </div>
               )}
             </div>
           )}

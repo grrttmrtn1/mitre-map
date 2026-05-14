@@ -71,9 +71,9 @@ export default function Sidebar() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+              `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors relative ${
                 isActive
-                  ? 'bg-blue-600/20 text-blue-400 font-medium'
+                  ? 'bg-blue-600/20 text-blue-400 font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-blue-500 before:rounded-r'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
               }`
             }
