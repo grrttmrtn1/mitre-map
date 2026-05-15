@@ -58,6 +58,16 @@ export default function Settings() {
   const [updateDiff, setUpdateDiff] = useState<any | null>(null);
   const [diffExpanded, setDiffExpanded] = useState<Record<string, boolean>>({});
 
+  // ATT&CK Auto-Update Queue state
+  const [autoUpdateSettings, setAutoUpdateSettings] = useState<any | null>(null);
+  const [autoUpdateScheduleInput, setAutoUpdateScheduleInput] = useState('0 3 * * *');
+  const [savingAutoUpdate, setSavingAutoUpdate] = useState(false);
+  const [checkNowLoading, setCheckNowLoading] = useState(false);
+  const [updateBatches, setUpdateBatches] = useState<any[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<any | null>(null);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchActionLoading, setBatchActionLoading] = useState(false);
+
   // OIDC providers state
   const [oidcProviders, setOidcProviders] = useState<any[]>([]);
   const [oidcForm, setOidcForm] = useState({ name: '', slug: '', issuer_url: '', client_id: '', client_secret: '', enabled: true });
@@ -72,6 +82,14 @@ export default function Settings() {
   const loadAttackVersion = () => {
     api.getAttackVersion().then(setAttackVersion).catch(() => {});
     api.getDeprecatedTechniques().then(setDeprecated).catch(() => {});
+  };
+
+  const loadAutoUpdateData = () => {
+    api.getAttackUpdateSettings().then(s => {
+      setAutoUpdateSettings(s);
+      setAutoUpdateScheduleInput(s.schedule ?? '0 3 * * *');
+    }).catch(() => {});
+    api.getAttackUpdateBatches().then(setUpdateBatches).catch(() => {});
   };
 
   const [tags, setTags] = useState<Tag[]>([]);
@@ -160,7 +178,7 @@ export default function Settings() {
 
   useEffect(() => {
     loadTags(); loadMotivations(); loadCountries(); loadAudit(); loadRisk(); loadApiKeys(); loadDatasets(); loadWebhooks(); loadIntegrations();
-    if (isAdmin) { loadUsers(); loadAttackVersion(); loadOidcProviders(); }
+    if (isAdmin) { loadUsers(); loadAttackVersion(); loadOidcProviders(); loadAutoUpdateData(); }
   }, [isAdmin]);
 
   // ── Tag actions ─────────────────────────────────────────────────────────────
@@ -1259,6 +1277,216 @@ export default function Settings() {
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+
+            {/* ATT&CK Auto-Update Queue */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium text-slate-300">Auto-Update Queue</h2>
+                <button
+                  onClick={async () => {
+                    setCheckNowLoading(true);
+                    try {
+                      await api.triggerAttackCheckNow();
+                      toast.info('Update check started — results will appear in the queue below');
+                      setTimeout(() => loadAutoUpdateData(), 3000);
+                    } catch (e: any) {
+                      toast.error(e?.message ?? 'Check failed');
+                    } finally { setCheckNowLoading(false); }
+                  }}
+                  disabled={checkNowLoading || !isAdmin}
+                  className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50">
+                  {checkNowLoading ? 'Checking…' : 'Check Now'}
+                </button>
+              </div>
+              <p className="text-slate-500 text-xs">Automatically fetches ATT&CK releases on a schedule and stages changes for review — same model as the TAXII ingest queue.</p>
+
+              {/* Schedule config */}
+              {autoUpdateSettings && (
+                <div className="bg-slate-800 rounded-lg p-3 space-y-3">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
+                      <input type="checkbox" checked={autoUpdateSettings.enabled === 1}
+                        onChange={async e => {
+                          const enabled = e.target.checked;
+                          setSavingAutoUpdate(true);
+                          try {
+                            const updated = await api.saveAttackUpdateSettings({ enabled });
+                            setAutoUpdateSettings(updated);
+                          } finally { setSavingAutoUpdate(false); }
+                        }}
+                        className="accent-indigo-500" />
+                      Enabled
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
+                      <input type="checkbox" checked={autoUpdateSettings.auto_apply === 1}
+                        onChange={async e => {
+                          const auto_apply = e.target.checked;
+                          setSavingAutoUpdate(true);
+                          try {
+                            const updated = await api.saveAttackUpdateSettings({ auto_apply });
+                            setAutoUpdateSettings(updated);
+                          } finally { setSavingAutoUpdate(false); }
+                        }}
+                        className="accent-amber-500" />
+                      <span>Auto-apply <span className="text-slate-500">(skip review queue)</span></span>
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-slate-400 shrink-0">Schedule (cron):</label>
+                    <input
+                      value={autoUpdateScheduleInput}
+                      onChange={e => setAutoUpdateScheduleInput(e.target.value)}
+                      className="flex-1 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500"
+                      placeholder="0 3 * * *"
+                    />
+                    <button
+                      onClick={async () => {
+                        setSavingAutoUpdate(true);
+                        try {
+                          const updated = await api.saveAttackUpdateSettings({ schedule: autoUpdateScheduleInput });
+                          setAutoUpdateSettings(updated);
+                          toast.success('Schedule saved');
+                        } catch (e: any) {
+                          toast.error(e?.message ?? 'Save failed');
+                        } finally { setSavingAutoUpdate(false); }
+                      }}
+                      disabled={savingAutoUpdate}
+                      className="px-2 py-1 text-xs bg-slate-600 text-slate-200 rounded hover:bg-slate-500 disabled:opacity-50">
+                      {savingAutoUpdate ? '…' : 'Save'}
+                    </button>
+                  </div>
+                  {autoUpdateSettings.last_checked_at && (
+                    <div className="text-xs text-slate-500">
+                      Last checked: {new Date(autoUpdateSettings.last_checked_at).toLocaleString()}
+                      {autoUpdateSettings.last_check_status === 'error' && (
+                        <span className="ml-2 text-red-400">{autoUpdateSettings.last_check_error}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Pending update batches */}
+              {updateBatches.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Update Queue</h3>
+                  {updateBatches.map((batch: any) => (
+                    <div key={batch.batch_id} className="bg-slate-800 rounded-lg p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 text-sm min-w-0">
+                          <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${
+                            batch.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                            batch.status === 'approved' || batch.status === 'auto_applied' ? 'bg-green-500/20 text-green-400' :
+                            'bg-slate-700 text-slate-400'
+                          }`}>{batch.status === 'auto_applied' ? 'applied' : batch.status}</span>
+                          <span className="text-slate-300 font-mono">v{batch.from_version} → v{batch.to_version}</span>
+                          <span className="text-slate-500 text-xs truncate">
+                            {[
+                              batch.added_count > 0 && `+${batch.added_count} added`,
+                              batch.removed_count > 0 && `−${batch.removed_count} removed`,
+                              batch.renamed_count > 0 && `~${batch.renamed_count} renamed`,
+                              batch.mitigation_count > 0 && `${batch.mitigation_count} mit. changes`,
+                            ].filter(Boolean).join(' · ')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={async () => {
+                              if (selectedBatch?.batch_id === batch.batch_id) { setSelectedBatch(null); return; }
+                              setBatchLoading(true);
+                              try {
+                                setSelectedBatch(await api.getAttackUpdateBatch(batch.batch_id));
+                              } finally { setBatchLoading(false); }
+                            }}
+                            className="text-xs text-indigo-400 hover:text-indigo-300">
+                            {selectedBatch?.batch_id === batch.batch_id ? 'Hide' : 'Review'}
+                          </button>
+                          {batch.status === 'pending' && isAdmin && (
+                            <>
+                              <button
+                                onClick={async () => {
+                                  setBatchActionLoading(true);
+                                  try {
+                                    await api.approveAttackBatch(batch.batch_id);
+                                    toast.success(`ATT&CK v${batch.to_version} applied`);
+                                    loadAutoUpdateData();
+                                    loadAttackVersion();
+                                    setSelectedBatch(null);
+                                  } catch (e: any) {
+                                    toast.error(e?.message ?? 'Approve failed');
+                                  } finally { setBatchActionLoading(false); }
+                                }}
+                                disabled={batchActionLoading}
+                                className="text-xs px-2 py-1 bg-emerald-700 text-white rounded hover:bg-emerald-600 disabled:opacity-50">
+                                Approve All
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setBatchActionLoading(true);
+                                  try {
+                                    await api.rejectAttackBatch(batch.batch_id);
+                                    toast.info('Batch rejected');
+                                    loadAutoUpdateData();
+                                    setSelectedBatch(null);
+                                  } catch (e: any) {
+                                    toast.error(e?.message ?? 'Reject failed');
+                                  } finally { setBatchActionLoading(false); }
+                                }}
+                                disabled={batchActionLoading}
+                                className="text-xs px-2 py-1 bg-slate-700 text-slate-300 rounded hover:bg-slate-600 disabled:opacity-50">
+                                Reject
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Expanded batch diff */}
+                      {selectedBatch?.batch_id === batch.batch_id && (
+                        <div className="mt-3 space-y-2 text-xs border-t border-slate-700 pt-3">
+                          {batchLoading && <p className="text-slate-500">Loading…</p>}
+                          {!batchLoading && selectedBatch.items && (() => {
+                            const grouped: Record<string, any[]> = {};
+                            for (const item of selectedBatch.items) {
+                              (grouped[item.change_type] ??= []).push(item);
+                            }
+                            const labels: Record<string, { label: string; color: string }> = {
+                              add_technique:    { label: 'New Techniques',          color: 'text-green-400' },
+                              remove_technique: { label: 'Deprecated Techniques',   color: 'text-red-400' },
+                              rename_technique: { label: 'Renamed Techniques',      color: 'text-yellow-400' },
+                              add_mitigation:   { label: 'New Mitigations',         color: 'text-blue-400' },
+                              add_mit_rel:      { label: 'New Mitigation Links',    color: 'text-indigo-400' },
+                            };
+                            return Object.entries(grouped).map(([type, items]) => (
+                              <div key={type}>
+                                <p className={`font-medium mb-1 ${labels[type]?.color ?? 'text-slate-300'}`}>
+                                  {labels[type]?.label ?? type} ({items.length})
+                                </p>
+                                <div className="ml-2 space-y-0.5 max-h-32 overflow-y-auto">
+                                  {items.map((item: any) => (
+                                    <div key={item.id} className="flex items-center gap-2">
+                                      <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${item.status === 'pending' ? 'bg-yellow-400' : item.status === 'approved' ? 'bg-green-400' : 'bg-slate-500'}`} />
+                                      <span className="font-mono text-slate-400">{item.item_id}</span>
+                                      {type === 'rename_technique' && item.old_data && item.new_data && (
+                                        <span className="text-slate-500">{item.old_data.name} → <span className="text-slate-300">{item.new_data.name}</span></span>
+                                      )}
+                                      {type !== 'rename_technique' && <span className="text-slate-500 truncate">{item.item_name}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {updateBatches.length === 0 && autoUpdateSettings && (
+                <p className="text-slate-500 text-xs text-center py-2">No update batches yet — click Check Now or enable the schedule to get started.</p>
               )}
             </div>
 

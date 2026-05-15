@@ -42,6 +42,7 @@ import webhooksRouter from './routes/webhooks';
 import settingsRouter from './routes/settings';
 import prioritizationRouter from './routes/prioritization';
 import { initScheduler } from './taxii/scheduler';
+import { initAttackScheduler } from './attack/scheduler';
 import { requireApiKey } from './middleware/auth';
 
 const app = express();
@@ -176,6 +177,7 @@ async function start() {
   const db = getKnex();
   await seedDatabase(db);
   await initScheduler();
+  await initAttackScheduler();
 
   if (process.env.NODE_ENV === 'production') {
     const tlsOptions = await loadTlsOptions();

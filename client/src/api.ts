@@ -284,6 +284,17 @@ export const api = {
   checkAttackUpdates: () => get<any>('/attack/check-updates'),
   applyAttackUpdate: (version?: string) => post<any>('/attack/apply-update', version ? { version } : {}),
 
+  // ATT&CK Auto-Update Queue
+  getAttackUpdateSettings: () => get<any>('/attack/update-settings'),
+  saveAttackUpdateSettings: (data: { enabled?: boolean; schedule?: string; auto_apply?: boolean }) => put<any>('/attack/update-settings', data),
+  triggerAttackCheckNow: () => post<any>('/attack/check-now', {}),
+  getAttackUpdateBatches: () => get<any[]>('/attack/update-batches'),
+  getAttackUpdateBatch: (batchId: string) => get<any>(`/attack/update-batches/${batchId}`),
+  approveAttackBatch: (batchId: string) => post<any>(`/attack/update-batches/${batchId}/approve`, {}),
+  rejectAttackBatch: (batchId: string) => post<any>(`/attack/update-batches/${batchId}/reject`, {}),
+  approveAttackItem: (batchId: string, itemId: number) => post<any>(`/attack/update-batches/${batchId}/items/${itemId}/approve`, {}),
+  rejectAttackItem: (batchId: string, itemId: number) => post<any>(`/attack/update-batches/${batchId}/items/${itemId}/reject`, {}),
+
   // Atomic Red Team
   getArtTests: () => get<ArtTest[]>('/atomic/tests'),
   getArtTestsForTechnique: (technique_id: string) => get<ArtTest[]>(`/atomic/tests/${technique_id}`),

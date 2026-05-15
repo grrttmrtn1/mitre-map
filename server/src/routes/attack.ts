@@ -1,6 +1,11 @@
 import { Router } from 'express';
+import cron from 'node-cron';
 import { getKnex, rawAll, rawGet, logAudit } from '../db/database';
 import { fetchAndParseStix, GITHUB_RELEASES_API, GH_HEADERS } from '../data/stix-fetch';
+import {
+  getSettings, updateSettings, stageUpdate, approveBatch, rejectBatch, approveItem, rejectItem,
+} from '../attack/updater';
+import { scheduleCheck, stopCheck, runCheck } from '../attack/scheduler';
 
 const router = Router();
 
@@ -324,6 +329,121 @@ router.post('/migrate-detections', async (req, res) => {
   });
 
   res.json({ migrated: updates.length, detections_updated: updates });
+});
+
+// ── ATT&CK Auto-Update Queue ──────────────────────────────────────────────────
+
+router.get('/update-settings', async (_req, res) => {
+  try {
+    res.json(await getSettings());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/update-settings', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const { enabled, schedule, auto_apply } = req.body;
+
+  if (schedule !== undefined && !cron.validate(schedule)) {
+    return res.status(400).json({ error: 'Invalid cron expression' });
+  }
+
+  const settings = await updateSettings({ enabled, schedule, auto_apply });
+
+  // Reconfigure the live scheduler
+  if (settings.enabled) {
+    scheduleCheck(settings.schedule, settings.auto_apply === 1);
+  } else {
+    stopCheck();
+  }
+
+  res.json(settings);
+});
+
+router.post('/check-now', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const settings = await getSettings();
+
+  res.json({ ok: true, message: 'Update check started — any new version will appear in the update queue shortly' });
+
+  runCheck(settings.auto_apply === 1).catch(console.error);
+});
+
+router.get('/update-batches', async (_req, res) => {
+  const db = getKnex();
+  const batches = await rawAll(db, `
+    SELECT b.*,
+      SUM(CASE WHEN i.status='pending' THEN 1 ELSE 0 END) as pending_count
+    FROM attack_update_batches b
+    LEFT JOIN attack_update_items i ON i.batch_id = b.batch_id
+    GROUP BY b.id
+    ORDER BY b.created_at DESC
+  `);
+  res.json(batches);
+});
+
+router.get('/update-batches/:batch_id', async (req, res) => {
+  const db = getKnex();
+  const batch = await rawGet(db, 'SELECT * FROM attack_update_batches WHERE batch_id=?', [req.params.batch_id]);
+  if (!batch) return res.status(404).json({ error: 'Not found' });
+
+  const items = await rawAll(db,
+    'SELECT * FROM attack_update_items WHERE batch_id=? ORDER BY change_type, item_id',
+    [req.params.batch_id],
+  );
+  res.json({
+    ...batch,
+    items: items.map((i: any) => ({
+      ...i,
+      old_data: i.old_data ? JSON.parse(i.old_data) : null,
+      new_data: i.new_data ? JSON.parse(i.new_data) : null,
+    })),
+  });
+});
+
+router.post('/update-batches/:batch_id/approve', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const reviewer = (req as any).actor ?? 'user';
+    await approveBatch(req.params.batch_id, reviewer);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/update-batches/:batch_id/reject', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const reviewer = (req as any).actor ?? 'user';
+    await rejectBatch(req.params.batch_id, reviewer);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/update-batches/:batch_id/items/:id/approve', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const reviewer = (req as any).actor ?? null;
+    await approveItem(Number(req.params.id), reviewer);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/update-batches/:batch_id/items/:id/reject', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const reviewer = (req as any).actor ?? null;
+    await rejectItem(Number(req.params.id), reviewer);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 export default router;
