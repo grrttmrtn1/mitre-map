@@ -21,7 +21,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-const NAV: { to: string; label: string; icon: LucideIcon; beta?: boolean }[] = [
+const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/dashboard',    label: 'Dashboard',         icon: LayoutDashboard },
   { to: '/matrix',       label: 'ATT&CK Matrix',     icon: LayoutGrid },
   { to: '/detections',   label: 'Detections',        icon: ShieldAlert },
@@ -33,7 +33,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; beta?: boolean }[] = [
   { to: '/atomic',       label: 'Atomic Tests',      icon: FlaskConical },
   { to: '/exercises',    label: 'Exercises',         icon: Target },
   { to: '/sigma',        label: 'SIGMA Library',     icon: FileCode2 },
-  { to: '/taxii',        label: 'TAXII Ingest',      icon: ArrowLeftRight, beta: true },
+  { to: '/taxii',        label: 'TAXII Ingest',      icon: ArrowLeftRight },
   { to: '/reports',      label: 'Reports & Exports', icon: BarChart3 },
   { to: '/settings',     label: 'Settings',          icon: Settings },
   { to: '/api',          label: 'API Playground',    icon: Zap },
@@ -106,7 +106,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ to, label, icon: Icon, beta }) => (
+        {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -120,11 +120,6 @@ export default function Sidebar() {
           >
             <Icon size={15} className={`flex-shrink-0 transition-all duration-150`} />
             <span className="flex-1">{label}</span>
-            {beta && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 leading-none">
-                beta
-              </span>
-            )}
           </NavLink>
         ))}
       </nav>
