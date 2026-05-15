@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, computeCoverageSummary } from '../db/database';
+import { recordCoverageChangeDirect } from '../coverage/attribution';
 
 const router = Router();
 
@@ -31,6 +32,8 @@ router.post('/', async (req, res) => {
   const db = getKnex();
   const { name, vendor, description, category, status, notes, d3fend_ids, mitigation_ids } = req.body;
   if (!name || !category) return res.status(400).json({ error: 'name and category are required' });
+  const actor = (req as any).actor ?? 'user';
+  const coverageBefore = await computeCoverageSummary(db);
   const toolId = await rawInsert(db, `
     INSERT INTO tools (name, vendor, description, category, status, notes) VALUES (?, ?, ?, ?, ?, ?) RETURNING id
   `, [name, vendor ?? null, description ?? null, category, status ?? 'active', notes ?? null]);
@@ -41,7 +44,10 @@ router.post('/', async (req, res) => {
     for (const id of mitigation_ids) await rawRun(db, 'INSERT INTO tool_mitigations (tool_id, mitigation_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [toolId, id]);
   }
   const created = await rawGet(db, 'SELECT * FROM tools WHERE id = ?', [toolId]);
-  await logAudit(db, 'tool', String(toolId), 'created', (req as any).actor ?? 'user', { name }, (req as any).sourceIp);
+  await logAudit(db, 'tool', String(toolId), 'created', actor, { name }, (req as any).sourceIp);
+  computeCoverageSummary(db).then(after =>
+    recordCoverageChangeDirect(db, 'tool', String(toolId), name, 'created', actor, coverageBefore, after)
+  ).catch(() => {});
   res.status(201).json(created);
 });
 
@@ -50,6 +56,8 @@ router.put('/:id', async (req, res) => {
   const existing = await rawGet(db, 'SELECT * FROM tools WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const { name, vendor, description, category, status, notes, d3fend_ids, mitigation_ids } = req.body;
+  const actor = (req as any).actor ?? 'user';
+  const coverageBefore = await computeCoverageSummary(db);
   await rawRun(db, `
     UPDATE tools SET name=?, vendor=?, description=?, category=?, status=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?
   `, [name, vendor ?? null, description ?? null, category, status ?? 'active', notes ?? null, req.params.id]);
@@ -62,7 +70,10 @@ router.put('/:id', async (req, res) => {
     for (const id of mitigation_ids) await rawRun(db, 'INSERT INTO tool_mitigations (tool_id, mitigation_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [req.params.id, id]);
   }
   const updated = await rawGet(db, 'SELECT * FROM tools WHERE id = ?', [req.params.id]);
-  await logAudit(db, 'tool', req.params.id, 'updated', (req as any).actor ?? 'user', { name, status }, (req as any).sourceIp);
+  await logAudit(db, 'tool', req.params.id, 'updated', actor, { name, status }, (req as any).sourceIp);
+  computeCoverageSummary(db).then(after =>
+    recordCoverageChangeDirect(db, 'tool', req.params.id, name, 'updated', actor, coverageBefore, after)
+  ).catch(() => {});
   res.json(updated);
 });
 
@@ -70,8 +81,13 @@ router.delete('/:id', async (req, res) => {
   const db = getKnex();
   const existing = await rawGet<any>(db, 'SELECT * FROM tools WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Not found' });
-  await logAudit(db, 'tool', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: existing.name }, (req as any).sourceIp);
+  const actor = (req as any).actor ?? 'user';
+  const coverageBefore = await computeCoverageSummary(db);
+  await logAudit(db, 'tool', req.params.id, 'deleted', actor, { name: existing.name }, (req as any).sourceIp);
   await rawRun(db, 'DELETE FROM tools WHERE id = ?', [req.params.id]);
+  computeCoverageSummary(db).then(after =>
+    recordCoverageChangeDirect(db, 'tool', req.params.id, existing.name, 'deleted', actor, coverageBefore, after)
+  ).catch(() => {});
   res.status(204).send();
 });
 

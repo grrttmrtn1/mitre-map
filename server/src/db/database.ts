@@ -77,6 +77,40 @@ export async function buildTechniqueGraph(db: DB): Promise<{
   return { parentTechIds: new Set(parents.map(r => r.id)), subtechToParent, parentToSubtechs };
 }
 
+export interface CoverageSummary {
+  pct: number;
+  covered: number;
+  total: number;
+}
+
+export async function computeCoverageSummary(db: DB): Promise<CoverageSummary> {
+  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
+  const total = parentTechIds.size;
+
+  const detectedIds = new Set<string>();
+  const activeDetections = await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'");
+  for (const d of activeDetections) {
+    for (const id of JSON.parse(d.technique_ids)) {
+      const p = resolveToParent(id, parentTechIds, subtechToParent);
+      if (p) detectedIds.add(p);
+    }
+  }
+
+  const mitigatedRows = await rawAll<{ technique_id: string }>(db, `
+    SELECT DISTINCT tm.technique_id FROM technique_mitigations tm
+    JOIN tool_mitigations tom ON tm.mitigation_id = tom.mitigation_id
+    JOIN tools t ON tom.tool_id = t.id WHERE t.status='active'
+  `);
+  const mitigatedIds = new Set<string>();
+  for (const r of mitigatedRows) {
+    const p = resolveToParent(r.technique_id, parentTechIds, subtechToParent);
+    if (p) mitigatedIds.add(p);
+  }
+
+  const covered = new Set([...detectedIds, ...mitigatedIds]).size;
+  return { pct: total > 0 ? Math.round((covered / total) * 100) : 0, covered, total };
+}
+
 // Map a technique ID (parent or subtechnique) to its parent technique ID.
 // Returns null if the ID is unknown (not a parent, not a known subtechnique).
 export function resolveToParent(

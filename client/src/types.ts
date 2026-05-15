@@ -663,6 +663,75 @@ export interface WebhookConfig {
 
 export type AlertRuleType = 'coverage_threshold' | 'detection_validation_failed' | 'new_uncovered_group_technique';
 
+export interface PrioritizationGroup {
+  id: string;
+  name: string;
+  country: string | null;
+  motivation: string | null;
+  in_sector: boolean;
+}
+
+export type DataReadinessStatus = 'ready' | 'partial' | 'blind' | 'unknown';
+export type CoverageStatus = 'gap' | 'mitigated_only';
+export type PrioritizationAction = 'build_detection' | 'add_detection';
+
+export interface PrioritizationItem {
+  rank: number;
+  technique_id: string;
+  technique_name: string;
+  tactic_ids: string[];
+  tactic_names: string[];
+  priority_score: number;
+  priority_components: {
+    industry: number;
+    group: number;
+    data_sources: number;
+    gap_severity: number;
+    compliance: number;
+  };
+  coverage_status: CoverageStatus;
+  action: PrioritizationAction;
+  groups: PrioritizationGroup[];
+  industry_group_count: number;
+  group_count: number;
+  data_readiness: {
+    available: number;
+    required: number;
+    ratio: number;
+    status: DataReadinessStatus;
+  };
+  available_sources: string[];
+  missing_sources: string[];
+  has_mitigation_guidance: boolean;
+  compliance_count: number;
+}
+
+export interface PrioritizationQueue {
+  summary: {
+    total_items: number;
+    gaps: number;
+    mitigated_only: number;
+    data_ready: number;
+    org_sector: string | null;
+  };
+  queue: PrioritizationItem[];
+}
+
+export interface CoverageAttributionEntry {
+  id: number;
+  triggered_by_entity_type: 'detection' | 'tool';
+  triggered_by_entity_id: string;
+  triggered_by_entity_name: string | null;
+  action: string;
+  actor: string;
+  coverage_pct_before: number;
+  coverage_pct_after: number;
+  covered_techniques_before: number;
+  covered_techniques_after: number;
+  total_techniques: number;
+  created_at: string;
+}
+
 export interface AlertRule {
   id: number;
   name: string;

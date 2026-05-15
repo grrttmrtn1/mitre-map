@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, type DB } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, computeCoverageSummary, type DB } from '../db/database';
 import { checkCoverageAlerts } from '../webhooks/service';
+import { recordCoverageChangeDirect } from '../coverage/attribution';
 
 const router = Router();
 
@@ -128,6 +129,7 @@ router.post('/', async (req, res) => {
   const db = getKnex();
   const { name, description, rule_id, source, technique_ids, status, severity, confidence, false_positive_rate, notes } = req.body;
   if (!name || !technique_ids) return res.status(400).json({ error: 'name and technique_ids are required' });
+  const coverageBefore = await computeCoverageSummary(db);
   const id = await rawInsert(db, `
     INSERT INTO detections (name, description, rule_id, source, technique_ids, status, severity, confidence, false_positive_rate, notes)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
@@ -138,6 +140,9 @@ router.post('/', async (req, res) => {
   await saveVersion(db, id, { ...created, technique_ids: JSON.parse(created.technique_ids) }, actor, 'created');
   await logAudit(db, 'detection', String(id), 'created', actor, { name }, (req as any).sourceIp);
   checkCoverageAlerts(db).catch(() => {});
+  computeCoverageSummary(db).then(after =>
+    recordCoverageChangeDirect(db, 'detection', String(id), name, 'created', actor, coverageBefore, after)
+  ).catch(() => {});
   res.status(201).json({ ...created, technique_ids: JSON.parse(created.technique_ids) });
 });
 
@@ -146,6 +151,7 @@ router.put('/:id', async (req, res) => {
   const existing = await rawGet(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const { name, description, rule_id, source, technique_ids, status, severity, confidence, false_positive_rate, notes } = req.body;
+  const coverageBefore = await computeCoverageSummary(db);
   await rawRun(db, `
     UPDATE detections SET name=?, description=?, rule_id=?, source=?, technique_ids=?,
       status=?, severity=?, confidence=?, false_positive_rate=?, notes=?, updated_at=CURRENT_TIMESTAMP
@@ -163,6 +169,9 @@ router.put('/:id', async (req, res) => {
   }
   await logAudit(db, 'detection', req.params.id, 'updated', actor, { status, severity }, (req as any).sourceIp);
   checkCoverageAlerts(db).catch(() => {});
+  computeCoverageSummary(db).then(after =>
+    recordCoverageChangeDirect(db, 'detection', req.params.id, (updated as any).name ?? name, 'updated', actor, coverageBefore, after)
+  ).catch(() => {});
   res.json({ ...updated, technique_ids: JSON.parse(updated.technique_ids) });
 });
 
@@ -170,9 +179,14 @@ router.delete('/:id', async (req, res) => {
   const db = getKnex();
   const existing = await rawGet<any>(db, 'SELECT * FROM detections WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Not found' });
-  await logAudit(db, 'detection', req.params.id, 'deleted', (req as any).actor ?? 'user', { name: existing.name }, (req as any).sourceIp);
+  const actor = (req as any).actor ?? 'user';
+  const coverageBefore = await computeCoverageSummary(db);
+  await logAudit(db, 'detection', req.params.id, 'deleted', actor, { name: existing.name }, (req as any).sourceIp);
   await rawRun(db, 'DELETE FROM detections WHERE id = ?', [req.params.id]);
   checkCoverageAlerts(db).catch(() => {});
+  computeCoverageSummary(db).then(after =>
+    recordCoverageChangeDirect(db, 'detection', req.params.id, existing.name, 'deleted', actor, coverageBefore, after)
+  ).catch(() => {});
   res.status(204).send();
 });
 
@@ -215,11 +229,16 @@ router.patch('/bulk', async (req, res) => {
   }
   const validStatuses = ['active', 'tuning', 'planned', 'disabled', 'archived'];
   if (!validStatuses.includes(status)) return res.status(400).json({ error: 'invalid status' });
+  const actor = (req as any).actor ?? 'user';
+  const coverageBefore = await computeCoverageSummary(db);
   const placeholders = ids.map(() => '?').join(',');
   await db.transaction(async trx => {
     await trx.raw(`UPDATE detections SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id IN (${placeholders})`, [status, ...ids]);
-    for (const id of ids) await logAudit(trx, 'detection', String(id), 'bulk_status_update', (req as any).actor ?? 'user', { status }, (req as any).sourceIp);
+    for (const id of ids) await logAudit(trx, 'detection', String(id), 'bulk_status_update', actor, { status }, (req as any).sourceIp);
   });
+  computeCoverageSummary(db).then(after =>
+    recordCoverageChangeDirect(db, 'detection', 'bulk', `${ids.length} detections`, 'bulk_updated', actor, coverageBefore, after)
+  ).catch(() => {});
   res.json({ updated: ids.length });
 });
 
@@ -227,11 +246,16 @@ router.delete('/bulk', async (req, res) => {
   const db = getKnex();
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids array is required' });
+  const actor = (req as any).actor ?? 'user';
+  const coverageBefore = await computeCoverageSummary(db);
   const placeholders = ids.map(() => '?').join(',');
   await db.transaction(async trx => {
-    for (const id of ids) await logAudit(trx, 'detection', String(id), 'deleted', (req as any).actor ?? 'user', undefined, (req as any).sourceIp);
+    for (const id of ids) await logAudit(trx, 'detection', String(id), 'deleted', actor, undefined, (req as any).sourceIp);
     await trx.raw(`DELETE FROM detections WHERE id IN (${placeholders})`, ids);
   });
+  computeCoverageSummary(db).then(after =>
+    recordCoverageChangeDirect(db, 'detection', 'bulk', `${ids.length} detections`, 'bulk_deleted', actor, coverageBefore, after)
+  ).catch(() => {});
   res.json({ deleted: ids.length });
 });
 
@@ -239,6 +263,8 @@ router.post('/import', async (req, res) => {
   const db = getKnex();
   const { detections } = req.body;
   if (!Array.isArray(detections)) return res.status(400).json({ error: 'detections array required' });
+  const actor = (req as any).actor ?? 'user';
+  const coverageBefore = await computeCoverageSummary(db);
   let imported = 0;
   await db.transaction(async trx => {
     for (const d of detections) {
@@ -252,10 +278,14 @@ router.post('/import', async (req, res) => {
       imported++;
     }
     if (imported > 0) {
-      await logAudit(trx, 'detection', 'bulk', 'imported', (req as any).actor ?? 'user',
-        { count: imported }, (req as any).sourceIp);
+      await logAudit(trx, 'detection', 'bulk', 'imported', actor, { count: imported }, (req as any).sourceIp);
     }
   });
+  if (imported > 0) {
+    computeCoverageSummary(db).then(after =>
+      recordCoverageChangeDirect(db, 'detection', 'bulk', `${imported} detections`, 'imported', actor, coverageBefore, after)
+    ).catch(() => {});
+  }
   res.json({ imported });
 });
 

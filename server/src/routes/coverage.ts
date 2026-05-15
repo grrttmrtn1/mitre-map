@@ -320,4 +320,18 @@ router.get('/gaps', async (_req, res) => {
   res.json(gaps);
 });
 
+router.get('/attribution', async (req, res) => {
+  const db = getKnex();
+  const { entity_type, actor, limit = '100', offset = '0' } = req.query;
+  let sql = 'SELECT * FROM coverage_attribution_log WHERE 1=1';
+  const params: any[] = [];
+  if (entity_type) { sql += ' AND triggered_by_entity_type=?'; params.push(entity_type); }
+  if (actor) { sql += ' AND actor=?'; params.push(actor); }
+  const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as c');
+  const countRow = await rawGet<{ c: number }>(db, countSql, params);
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  const rows = await rawAll(db, sql, [...params, Number(limit), Number(offset)]);
+  res.json({ rows, total: countRow?.c ?? 0 });
+});
+
 export default router;

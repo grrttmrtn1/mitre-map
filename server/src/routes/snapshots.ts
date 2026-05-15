@@ -46,6 +46,18 @@ router.post('/', async (req, res) => {
   res.status(201).json(snapshot);
 });
 
+router.patch('/:id', async (req, res) => {
+  const db = getKnex();
+  if (!await rawGet(db, 'SELECT id FROM coverage_snapshots WHERE id = ?', [req.params.id])) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  const { notes } = req.body;
+  await rawRun(db, 'UPDATE coverage_snapshots SET notes = ? WHERE id = ?', [notes ?? null, req.params.id]);
+  await logAudit(db, 'snapshot', req.params.id, 'annotated', (req as any).actor ?? 'user',
+    { notes }, (req as any).sourceIp);
+  res.json(await rawGet(db, 'SELECT * FROM coverage_snapshots WHERE id = ?', [req.params.id]));
+});
+
 router.delete('/:id', async (req, res) => {
   const db = getKnex();
   if (!await rawGet(db, 'SELECT id FROM coverage_snapshots WHERE id = ?', [req.params.id])) {

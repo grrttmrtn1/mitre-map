@@ -21,6 +21,7 @@ import AtomicTests from './pages/AtomicTests';
 import Exercises from './pages/Exercises';
 import TaxiiIngest from './pages/TaxiiIngest';
 import SigmaLibrary from './pages/SigmaLibrary';
+import Prioritization from './pages/Prioritization';
 
 function AuthBanner({ onDismiss }: { onDismiss: () => void }) {
   const navigate = useNavigate();
@@ -52,6 +53,7 @@ function AnimatedRoutes() {
         <Route path="/tools" element={<Tools />} />
         <Route path="/defense" element={<DefenseMapping />} />
         <Route path="/gaps" element={<GapAnalysis />} />
+        <Route path="/prioritization" element={<Prioritization />} />
         <Route path="/threats" element={<ThreatGroups />} />
         <Route path="/data-sources" element={<DataSources />} />
         <Route path="/atomic" element={<AtomicTests />} />

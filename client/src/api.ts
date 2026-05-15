@@ -1,8 +1,9 @@
 import type {
   ApiKey, ArtResult, ArtTest, Assignment, AttackVersion, AuditLogEntry, Comment, ComplianceFramework,
-  CoverageSnapshot, CoverageStats, Country, CoveredTechnique, DataSource, Detection, DetectionHistory, DetectionQualityScore, D3FendTechnique,
+  CoverageAttributionEntry, CoverageSnapshot, CoverageStats, Country, CoveredTechnique, DataSource, Detection, DetectionHistory, DetectionQualityScore, D3FendTechnique,
   Exercise, ExerciseDetail, ExerciseFinding, ExerciseReport, ExerciseTestRun,
   ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
+  PrioritizationQueue,
   RiskByTactic, RiskScore, SigmaLibrarySearch, SigmaParseResult, SigmaRuleDetail, SigmaTemplate,
   Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
   TaxiiBatch, TaxiiJob, TaxiiPendingItem, TaxiiServer, TaxiiCollection,
@@ -152,6 +153,15 @@ export const api = {
   getCoverageMatrix: () => get<MatrixColumn[]>('/coverage/matrix'),
   getCoverageGaps: () => get<GapTechnique[]>('/coverage/gaps'),
   getCoveredTechniques: () => get<CoveredTechnique[]>('/coverage/covered'),
+  getCoverageAttribution: (params?: { limit?: number; offset?: number; entity_type?: string; actor?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.limit !== undefined) q.set('limit', String(params.limit));
+    if (params?.offset !== undefined) q.set('offset', String(params.offset));
+    if (params?.entity_type) q.set('entity_type', params.entity_type);
+    if (params?.actor) q.set('actor', params.actor);
+    const qs = q.toString();
+    return get<{ rows: CoverageAttributionEntry[]; total: number }>(`/coverage/attribution${qs ? `?${qs}` : ''}`);
+  },
 
   // Tags
   getTags: () => get<Tag[]>('/tags'),
@@ -201,6 +211,7 @@ export const api = {
   getSnapshots: () => get<CoverageSnapshot[]>('/snapshots'),
   createSnapshot: (notes?: string) => post<CoverageSnapshot>('/snapshots', { notes }),
   deleteSnapshot: (id: number) => del(`/snapshots/${id}`),
+  updateSnapshotAnnotation: (id: number, notes: string | null) => patch<CoverageSnapshot>(`/snapshots/${id}`, { notes }),
 
   // Threat groups
   getThreatGroups: () => get<ThreatGroup[]>('/threat-groups'),
@@ -416,4 +427,7 @@ export const api = {
 
   // Settings (key lookup)
   getSetting: (key: string) => get<{ key: string; value: string | null }>(`/settings/${key}`),
+
+  // Prioritization
+  getPrioritizationQueue: () => get<PrioritizationQueue>('/prioritization/queue'),
 };

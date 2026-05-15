@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, LineChart, Line, CartesianGrid } from 'recharts';
 import { api } from '../api';
-import type { CoverageStats, CoverageSnapshot } from '../types';
+import type { CoverageAttributionEntry, CoverageStats, CoverageSnapshot } from '../types';
 import CoverageBar from '../components/CoverageBar';
 import { SkeletonDashboard } from '../components/Skeleton';
 
@@ -16,17 +16,49 @@ function TrendBadge({ delta, invert = false, unit = '' }: { delta: number | null
   );
 }
 
+function actionLabel(action: string): string {
+  switch (action) {
+    case 'created': return 'Created';
+    case 'updated': return 'Updated';
+    case 'deleted': return 'Deleted';
+    case 'bulk_updated': return 'Bulk updated';
+    case 'bulk_deleted': return 'Bulk deleted';
+    case 'imported': return 'Imported';
+    default: return action;
+  }
+}
+
+function actionColor(action: string): string {
+  if (action === 'created' || action === 'imported') return 'text-emerald-400';
+  if (action === 'deleted' || action === 'bulk_deleted') return 'text-red-400';
+  return 'text-slate-400';
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState<CoverageStats | null>(null);
   const [snapshots, setSnapshots] = useState<CoverageSnapshot[]>([]);
+  const [attribution, setAttribution] = useState<CoverageAttributionEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [trendRange, setTrendRange] = useState<'7D' | '30D' | '90D' | 'All'>('90D');
+  const [selectedSnapId, setSelectedSnapId] = useState<number | null>(null);
+  const [annotationText, setAnnotationText] = useState('');
+  const [savingAnnotation, setSavingAnnotation] = useState(false);
 
   const load = () => {
     setLoading(true);
     setError(false);
-    Promise.all([api.getCoverageStats(), api.getSnapshots().catch(() => [])])
-      .then(([data, snaps]) => { setStats(data); setSnapshots(snaps); setError(false); })
+    Promise.all([
+      api.getCoverageStats(),
+      api.getSnapshots().catch(() => []),
+      api.getCoverageAttribution({ limit: 20 }).catch(() => ({ rows: [], total: 0 })),
+    ])
+      .then(([data, snaps, attr]) => {
+        setStats(data);
+        setSnapshots(snaps);
+        setAttribution(attr.rows);
+        setError(false);
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   };
@@ -36,6 +68,38 @@ export default function Dashboard() {
   const baseline = snapshots.length >= 2
     ? snapshots[snapshots.length - 2]
     : null;
+
+  const trendData = useMemo(() => {
+    let filtered = snapshots;
+    if (trendRange !== 'All') {
+      const days = trendRange === '7D' ? 7 : trendRange === '30D' ? 30 : 90;
+      const cutoff = Date.now() - days * 86400 * 1000;
+      filtered = snapshots.filter(s => new Date(s.taken_at).getTime() >= cutoff);
+    }
+    return filtered.map(s => ({
+      id: s.id,
+      dateLabel: new Date(s.taken_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      dateISO: s.taken_at,
+      coverage_pct: s.coverage_pct,
+      covered: s.covered_techniques,
+      total: s.total_techniques,
+      annotation: s.notes && s.notes !== 'Auto-snapshot (nightly)' ? s.notes : null,
+    }));
+  }, [snapshots, trendRange]);
+
+  const selectedSnap = selectedSnapId != null ? snapshots.find(s => s.id === selectedSnapId) ?? null : null;
+
+  async function saveAnnotation() {
+    if (!selectedSnapId) return;
+    setSavingAnnotation(true);
+    try {
+      const updated = await api.updateSnapshotAnnotation(selectedSnapId, annotationText.trim() || null);
+      setSnapshots(prev => prev.map(s => s.id === updated.id ? updated : s));
+      setSelectedSnapId(null);
+    } finally {
+      setSavingAnnotation(false);
+    }
+  }
 
   if (loading) return (
     <div className="flex flex-col h-full">
@@ -244,6 +308,118 @@ export default function Dashboard() {
 
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Coverage Trend</h2>
+          <div className="flex gap-1">
+            {(['7D', '30D', '90D', 'All'] as const).map(r => (
+              <button key={r} onClick={() => setTrendRange(r)}
+                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${trendRange === r ? 'bg-blue-600/30 text-blue-400 border border-blue-500/40' : 'text-slate-500 hover:text-slate-400'}`}>
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+        {trendData.length < 2 ? (
+          <div className="flex items-center justify-center h-28 text-xs text-slate-600">
+            Not enough snapshots yet — nightly auto-snapshots build history over time.
+          </div>
+        ) : (
+          <>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={trendData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}
+                onClick={(e) => {
+                  if (e?.activePayload?.[0]?.payload) {
+                    const p = e.activePayload[0].payload;
+                    setSelectedSnapId(p.id);
+                    const snap = snapshots.find(s => s.id === p.id);
+                    setAnnotationText(snap?.notes && snap.notes !== 'Auto-snapshot (nightly)' ? snap.notes : '');
+                  }
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <XAxis dataKey="dateLabel" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis domain={[0, 100]} tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} unit="%" width={36} />
+                <Tooltip
+                  contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: 12 }}
+                  labelStyle={{ color: '#94a3b8', marginBottom: 4 }}
+                  formatter={(_v: unknown, _n: string, props: any) => {
+                    const p = props.payload;
+                    return [
+                      <span key="v">{p.coverage_pct}% <span className="text-slate-500 text-[10px]">({p.covered}/{p.total})</span>{p.annotation ? <span className="block text-amber-400 text-[10px] mt-1">★ {p.annotation}</span> : null}</span>,
+                      'Coverage',
+                    ];
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="coverage_pct"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    const isSelected = payload.id === selectedSnapId;
+                    const hasAnnotation = !!payload.annotation;
+                    return (
+                      <g key={payload.id} style={{ cursor: 'pointer' }}>
+                        <circle cx={cx} cy={cy} r={isSelected ? 6 : hasAnnotation ? 5 : 3.5}
+                          fill={isSelected ? '#60a5fa' : hasAnnotation ? '#f59e0b' : '#3b82f6'}
+                          stroke="#0f172a" strokeWidth={1.5} />
+                      </g>
+                    );
+                  }}
+                  activeDot={{ r: 6, fill: '#60a5fa', strokeWidth: 0 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+
+            {/* Annotation markers below chart */}
+            {trendData.some(d => d.annotation) && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {trendData.filter(d => d.annotation).map(d => (
+                  <button key={d.id} onClick={() => { setSelectedSnapId(d.id); setAnnotationText(d.annotation ?? ''); }}
+                    className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-0.5 hover:bg-amber-500/20 transition-colors">
+                    <span>★</span>
+                    <span className="text-slate-400">{d.dateLabel}</span>
+                    <span className="truncate max-w-[140px]">{d.annotation}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Annotation editor */}
+            <div className="mt-3 pt-3 border-t border-slate-800">
+              {selectedSnap ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                    {new Date(selectedSnap.taken_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} — {selectedSnap.coverage_pct}%
+                  </span>
+                  <input
+                    type="text"
+                    value={annotationText}
+                    onChange={e => setAnnotationText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveAnnotation(); if (e.key === 'Escape') setSelectedSnapId(null); }}
+                    placeholder="Add annotation (e.g. 'APT29 group added')"
+                    className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded px-2 py-1 placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
+                    autoFocus
+                  />
+                  <button onClick={saveAnnotation} disabled={savingAnnotation}
+                    className="px-3 py-1 text-xs bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/40 transition-colors disabled:opacity-50">
+                    {savingAnnotation ? '…' : 'Save'}
+                  </button>
+                  <button onClick={() => setSelectedSnapId(null)}
+                    className="px-2 py-1 text-xs text-slate-500 hover:text-slate-400 transition-colors">
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="text-[10px] text-slate-600">Click a point on the chart to annotate it.</div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
           <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Lowest Coverage Tactics</h2>
           <Link to="/gaps" className="text-xs text-blue-400 hover:text-blue-300">View all gaps →</Link>
         </div>
@@ -261,6 +437,74 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Coverage Attribution</h2>
+          <span className="text-xs text-slate-600">Recent coverage changes — what moved the needle and who</span>
+        </div>
+        {attribution.length === 0 ? (
+          <div className="text-xs text-slate-600 py-4 text-center">No coverage changes recorded yet. Changes appear here when detections or tools are created, updated, or deleted.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-slate-600 border-b border-slate-800">
+                  <th className="text-left pb-2 font-medium pr-4">When</th>
+                  <th className="text-left pb-2 font-medium pr-4">Source</th>
+                  <th className="text-left pb-2 font-medium pr-4">Action</th>
+                  <th className="text-left pb-2 font-medium pr-4">By</th>
+                  <th className="text-right pb-2 font-medium">Coverage</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {attribution.map(entry => {
+                  const delta = entry.coverage_pct_after - entry.coverage_pct_before;
+                  const covDelta = entry.covered_techniques_after - entry.covered_techniques_before;
+                  return (
+                    <tr key={entry.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-2 pr-4 text-slate-500 whitespace-nowrap">
+                        {new Date(entry.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="py-2 pr-4 max-w-[180px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                            entry.triggered_by_entity_type === 'detection'
+                              ? 'bg-blue-500/10 text-blue-400'
+                              : 'bg-purple-500/10 text-purple-400'
+                          }`}>
+                            {entry.triggered_by_entity_type === 'detection' ? 'Det' : 'Tool'}
+                          </span>
+                          <span className="text-slate-300 truncate">{entry.triggered_by_entity_name ?? entry.triggered_by_entity_id}</span>
+                        </div>
+                      </td>
+                      <td className={`py-2 pr-4 ${actionColor(entry.action)}`}>
+                        {actionLabel(entry.action)}
+                      </td>
+                      <td className="py-2 pr-4 text-slate-400 font-mono">{entry.actor}</td>
+                      <td className="py-2 text-right whitespace-nowrap">
+                        <span className="text-slate-500">{entry.coverage_pct_before}%</span>
+                        <span className="text-slate-600 mx-1">→</span>
+                        <span className="text-slate-300 font-semibold">{entry.coverage_pct_after}%</span>
+                        {delta !== 0 && (
+                          <span className={`ml-2 font-semibold ${delta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {delta > 0 ? '+' : ''}{delta}%
+                          </span>
+                        )}
+                        {covDelta !== 0 && delta === 0 && (
+                          <span className={`ml-2 ${covDelta > 0 ? 'text-emerald-400/60' : 'text-red-400/60'}`}>
+                            ({covDelta > 0 ? '+' : ''}{covDelta} techniques)
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
       </div>
     </div>
