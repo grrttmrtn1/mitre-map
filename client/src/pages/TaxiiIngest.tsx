@@ -21,7 +21,7 @@ const ACTION_COLORS: Record<string, string> = {
   link_technique: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
 };
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-slate-700 text-slate-300 border-slate-600',
+  pending: 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border-gray-400 dark:border-slate-600',
   approved: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
@@ -29,7 +29,7 @@ const JOB_STATUS_COLORS: Record<string, string> = {
   success: 'text-emerald-400',
   error: 'text-red-400',
   running: 'text-amber-400',
-  pending: 'text-slate-400',
+  pending: 'text-gray-500 dark:text-slate-400',
 };
 
 // Common cron presets
@@ -53,7 +53,7 @@ function Badge({ text, className }: { text: string; className: string }) {
 function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-sm font-semibold text-slate-200">{title}</h2>
+      <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-200">{title}</h2>
       {action}
     </div>
   );
@@ -105,44 +105,44 @@ function ServerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
-          <h3 className="text-sm font-semibold text-slate-200">{server ? 'Edit TAXII Server' : 'Add TAXII Server'}</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300">✕</button>
+      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-slate-800">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">{server ? 'Edit TAXII Server' : 'Add TAXII Server'}</h3>
+          <button onClick={onClose} className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && <p className="text-xs text-red-400 bg-red-500/10 rounded px-3 py-2">{error}</p>}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="block text-xs text-slate-400 mb-1">Display Name *</label>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Display Name *</label>
               <input value={form.name} onChange={e => set('name', e.target.value)} required
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs text-slate-400 mb-1">TAXII Server URL *</label>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">TAXII Server URL *</label>
               <input value={form.url} onChange={e => set('url', e.target.value)} required
                 placeholder="https://taxii.example.com"
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">API Root Path</label>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">API Root Path</label>
               <input value={form.api_root} onChange={e => set('api_root', e.target.value)}
                 placeholder="/taxii2"
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Collection ID</label>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Collection ID</label>
               <input value={form.collection_id} onChange={e => set('collection_id', e.target.value)}
                 placeholder="enterprise-attack"
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Authentication</label>
+            <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Authentication</label>
             <select value={form.auth_type} onChange={e => set('auth_type', e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500">
               <option value="none">None</option>
               <option value="basic">HTTP Basic</option>
               <option value="bearer">Bearer Token</option>
@@ -152,54 +152,54 @@ function ServerModal({
           {form.auth_type === 'basic' && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Username</label>
+                <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Username</label>
                 <input value={form.username} onChange={e => set('username', e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Password</label>
+                <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Password</label>
                 <input type="password" value={form.password} onChange={e => set('password', e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
               </div>
             </div>
           )}
 
           {form.auth_type === 'bearer' && (
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Bearer Token</label>
+              <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Bearer Token</label>
               <input type="password" value={form.token} onChange={e => set('token', e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
             </div>
           )}
 
           <div className="flex items-center gap-2">
             <input type="checkbox" id="ssl_verify" checked={form.ssl_verify === 1}
               onChange={e => set('ssl_verify', e.target.checked ? 1 : 0)}
-              className="rounded border-slate-600 bg-slate-800" />
-            <label htmlFor="ssl_verify" className="text-xs text-slate-400">Verify SSL certificate</label>
+              className="rounded border-gray-400 dark:border-slate-600 bg-gray-100 dark:bg-slate-800" />
+            <label htmlFor="ssl_verify" className="text-xs text-gray-500 dark:text-slate-400">Verify SSL certificate</label>
           </div>
 
           <div className="flex items-start gap-2 bg-blue-500/5 border border-blue-500/20 rounded px-3 py-2">
             <input type="checkbox" id="auto_merge" checked={form.auto_merge === 1}
               onChange={e => set('auto_merge', e.target.checked ? 1 : 0)}
-              className="rounded border-slate-600 bg-slate-800 mt-0.5" />
+              className="rounded border-gray-400 dark:border-slate-600 bg-gray-100 dark:bg-slate-800 mt-0.5" />
             <div>
-              <label htmlFor="auto_merge" className="text-xs text-slate-300 font-medium cursor-pointer">Auto-merge fetched items</label>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <label htmlFor="auto_merge" className="text-xs text-gray-700 dark:text-slate-300 font-medium cursor-pointer">Auto-merge fetched items</label>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
                 Ingested items are applied directly without manual review. Only enable for trusted sources (e.g. MITRE official feed).
               </p>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Notes</label>
+            <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Notes</label>
             <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2}
-              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose}
-              className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
+              className="px-3 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 transition-colors">Cancel</button>
             <button type="submit" disabled={saving}
               className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded transition-colors">
               {saving ? 'Saving…' : (server ? 'Save Changes' : 'Add Server')}
@@ -246,37 +246,37 @@ function JobModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
-          <h3 className="text-sm font-semibold text-slate-200">{job ? 'Edit Schedule' : 'New Scheduled Ingest'}</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300">✕</button>
+      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-slate-800">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">{job ? 'Edit Schedule' : 'New Scheduled Ingest'}</h3>
+          <button onClick={onClose} className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && <p className="text-xs text-red-400 bg-red-500/10 rounded px-3 py-2">{error}</p>}
 
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Job Name *</label>
+            <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Job Name *</label>
             <input value={form.name} onChange={e => set('name', e.target.value)} required
-              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
           </div>
 
           <div>
-            <label className="block text-xs text-slate-400 mb-1">TAXII Server *</label>
+            <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">TAXII Server *</label>
             <select value={form.server_id} onChange={e => set('server_id', Number(e.target.value))}
-              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500">
               {servers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
 
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Schedule (cron)</label>
+            <label className="block text-xs text-gray-500 dark:text-slate-400 mb-1">Schedule (cron)</label>
             <input value={form.schedule} onChange={e => set('schedule', e.target.value)}
               placeholder="0 0 * * *"
-              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 font-mono" />
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 font-mono" />
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {CRON_PRESETS.map(p => (
                 <button key={p.value} type="button" onClick={() => set('schedule', p.value)}
-                  className="text-xs text-slate-400 hover:text-blue-400 px-2 py-0.5 rounded bg-slate-800 border border-slate-700 hover:border-blue-500 transition-colors">
+                  className="text-xs text-gray-500 dark:text-slate-400 hover:text-blue-400 px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:border-blue-500 transition-colors">
                   {p.label}
                 </button>
               ))}
@@ -286,13 +286,13 @@ function JobModal({
           <div className="flex items-center gap-2">
             <input type="checkbox" id="job_enabled" checked={form.enabled === 1}
               onChange={e => set('enabled', e.target.checked ? 1 : 0)}
-              className="rounded border-slate-600 bg-slate-800" />
-            <label htmlFor="job_enabled" className="text-xs text-slate-400">Enable job</label>
+              className="rounded border-gray-400 dark:border-slate-600 bg-gray-100 dark:bg-slate-800" />
+            <label htmlFor="job_enabled" className="text-xs text-gray-500 dark:text-slate-400">Enable job</label>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose}
-              className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
+              className="px-3 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 transition-colors">Cancel</button>
             <button type="submit" disabled={saving}
               className="px-4 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded transition-colors">
               {saving ? 'Saving…' : (job ? 'Save Changes' : 'Create Job')}
@@ -355,13 +355,13 @@ function BatchDetail({ batch, onDone }: { batch: TaxiiBatch; onDone: () => void 
       {/* Batch header */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-mono text-slate-400">{batch.batch_id}</div>
-          <div className="text-xs text-slate-500 mt-0.5">
-            From <span className="text-slate-300">{batch.server_name}</span> · {new Date(batch.created_at).toLocaleString()}
+          <div className="text-xs font-mono text-gray-500 dark:text-slate-400">{batch.batch_id}</div>
+          <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+            From <span className="text-gray-700 dark:text-slate-300">{batch.server_name}</span> · {new Date(batch.created_at).toLocaleString()}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-400">{batch.pending_count} pending</span>
+          <span className="text-xs text-gray-500 dark:text-slate-400">{batch.pending_count} pending</span>
           <span className="text-slate-700">·</span>
           <span className="text-xs text-emerald-400">{batch.approved_count} approved</span>
           <span className="text-slate-700">·</span>
@@ -388,32 +388,32 @@ function BatchDetail({ batch, onDone }: { batch: TaxiiBatch; onDone: () => void 
         {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
             className={`px-3 py-1 text-xs rounded transition-colors ${
-              filter === f ? 'bg-slate-700 text-slate-200' : 'text-slate-500 hover:text-slate-300'
+              filter === f ? 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200' : 'text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300'
             }`}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
-            {f !== 'all' && <span className="ml-1 text-slate-500">({items.filter(i => i.status === f).length})</span>}
+            {f !== 'all' && <span className="ml-1 text-gray-400 dark:text-slate-500">({items.filter(i => i.status === f).length})</span>}
           </button>
         ))}
       </div>
 
       {/* Item list */}
       {loading ? (
-        <div className="text-xs text-slate-500 py-4 text-center">Loading…</div>
+        <div className="text-xs text-gray-400 dark:text-slate-500 py-4 text-center">Loading…</div>
       ) : (
         <div className="flex-1 overflow-y-auto space-y-2">
           {visible.length === 0 && (
-            <div className="text-xs text-slate-500 py-6 text-center">No items</div>
+            <div className="text-xs text-gray-400 dark:text-slate-500 py-6 text-center">No items</div>
           )}
           {visible.map(item => (
-            <div key={item.id} className="bg-slate-800/60 border border-slate-700/60 rounded-lg p-3">
+            <div key={item.id} className="bg-gray-100/60 dark:bg-slate-800/60 border border-gray-300 dark:border-slate-700/60 rounded-lg p-3">
               <div className="flex items-start gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <Badge text={ACTION_LABELS[item.proposed_action] ?? item.proposed_action}
-                      className={ACTION_COLORS[item.proposed_action] ?? 'bg-slate-700 text-slate-300 border-slate-600'} />
+                      className={ACTION_COLORS[item.proposed_action] ?? 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border-gray-400 dark:border-slate-600'} />
                     <Badge text={item.status} className={STATUS_COLORS[item.status] ?? STATUS_COLORS.pending} />
                   </div>
-                  <div className="text-xs text-slate-200 font-medium truncate">{item.name ?? item.stix_id}</div>
+                  <div className="text-xs text-gray-800 dark:text-slate-200 font-medium truncate">{item.name ?? item.stix_id}</div>
                   <ProposedDataSummary action={item.proposed_action} data={item.proposed_data} />
                 </div>
                 {item.status === 'pending' && (
@@ -450,7 +450,7 @@ function BatchDetail({ batch, onDone }: { batch: TaxiiBatch; onDone: () => void 
 function ProposedDataSummary({ action, data }: { action: string; data: Record<string, unknown> }) {
   if (action === 'link_technique') {
     return (
-      <div className="text-xs text-slate-400 mt-0.5 font-mono">
+      <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 font-mono">
         {String(data.group_id)} → {String(data.technique_id)}
       </div>
     );
@@ -458,16 +458,16 @@ function ProposedDataSummary({ action, data }: { action: string; data: Record<st
   if (action === 'create_group' || action === 'update_group') {
     const aliases = (data.aliases as string[] | undefined) ?? [];
     return (
-      <div className="text-xs text-slate-400 mt-0.5">
-        ID: <span className="font-mono text-slate-300">{String(data.id)}</span>
+      <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+        ID: <span className="font-mono text-gray-700 dark:text-slate-300">{String(data.id)}</span>
         {aliases.length > 0 && ` · aliases: ${aliases.slice(0, 3).join(', ')}`}
       </div>
     );
   }
   if (action === 'create_technique') {
     return (
-      <div className="text-xs text-slate-400 mt-0.5">
-        ID: <span className="font-mono text-slate-300">{String(data.id)}</span>
+      <div className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+        ID: <span className="font-mono text-gray-700 dark:text-slate-300">{String(data.id)}</span>
       </div>
     );
   }
@@ -567,19 +567,19 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
       />
 
       {servers.length === 0 ? (
-        <div className="text-center py-12 text-slate-500 text-sm">
+        <div className="text-center py-12 text-gray-400 dark:text-slate-500 text-sm">
           <div className="text-2xl mb-2">⚡</div>
           No TAXII servers configured. Add one to start ingesting threat intel.
         </div>
       ) : (
         <div className="space-y-3">
           {servers.map(server => (
-            <div key={server.id} className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-4">
+            <div key={server.id} className="bg-gray-100/60 dark:bg-slate-800/60 border border-gray-300 dark:border-slate-700/50 rounded-lg p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-sm font-medium text-slate-200">{server.name}</span>
-                    <span className="text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{server.auth_type}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{server.name}</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500 bg-gray-200/50 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">{server.auth_type}</span>
                     {server.auto_merge === 1 && (
                       <span className="text-xs text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">Auto-merge</span>
                     )}
@@ -588,9 +588,9 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
                     )}
                     <FetchStatusBadge server={server} />
                   </div>
-                  <div className="text-xs text-slate-400 font-mono truncate">{server.url}</div>
-                  {server.api_root && <div className="text-xs text-slate-500">API root: {server.api_root}</div>}
-                  {server.collection_id && <div className="text-xs text-slate-500">Collection: {server.collection_id}</div>}
+                  <div className="text-xs text-gray-500 dark:text-slate-400 font-mono truncate">{server.url}</div>
+                  {server.api_root && <div className="text-xs text-gray-400 dark:text-slate-500">API root: {server.api_root}</div>}
+                  {server.collection_id && <div className="text-xs text-gray-400 dark:text-slate-500">Collection: {server.collection_id}</div>}
                   {server.last_fetch_status === 'error' && server.last_fetch_error && (
                     <div className="mt-1 text-xs text-red-400 bg-red-500/10 rounded px-2 py-1 font-mono truncate" title={server.last_fetch_error}>
                       {server.last_fetch_error}
@@ -599,7 +599,7 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button onClick={() => handleTest(server)} disabled={testing === server.id}
-                    className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-700 hover:bg-slate-600 rounded transition-colors disabled:opacity-50">
+                    className="px-2.5 py-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 bg-gray-200 dark:bg-slate-700 hover:bg-slate-600 rounded transition-colors disabled:opacity-50">
                     {testing === server.id ? '…' : 'Test'}
                   </button>
                   <button onClick={() => handleFetch(server)} disabled={fetching === server.id}
@@ -607,7 +607,7 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
                     {fetching === server.id ? 'Fetching…' : 'Fetch Now'}
                   </button>
                   <button onClick={() => setModal(server)}
-                    className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-700 hover:bg-slate-600 rounded transition-colors">
+                    className="px-2.5 py-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 bg-gray-200 dark:bg-slate-700 hover:bg-slate-600 rounded transition-colors">
                     Edit
                   </button>
                   <button onClick={() => handleDelete(server)}
@@ -618,14 +618,14 @@ function ServersTab({ servers, onRefresh, onFetchStarted }: { servers: TaxiiServ
               </div>
 
               {testResult?.id === server.id && (
-                <div className={`mt-3 pt-3 border-t border-slate-700 text-xs ${testResult.error ? 'text-red-400' : 'text-emerald-400'}`}>
+                <div className={`mt-3 pt-3 border-t border-gray-300 dark:border-slate-700 text-xs ${testResult.error ? 'text-red-400' : 'text-emerald-400'}`}>
                   {testResult.error ? (
                     <span>Connection failed: {testResult.error}</span>
                   ) : (
                     <div>
                       <span className="font-medium">Connection OK</span> — {testResult.collections?.length ?? 0} collection(s) found
                       {testResult.collections && testResult.collections.length > 0 && (
-                        <ul className="mt-1 space-y-0.5 text-slate-400">
+                        <ul className="mt-1 space-y-0.5 text-gray-500 dark:text-slate-400">
                           {testResult.collections.map(c => (
                             <li key={c.id} className="font-mono">{c.id}: {c.title}</li>
                           ))}
@@ -690,7 +690,7 @@ function PreviewTab({ fetchStartedAt, servers }: { fetchStartedAt: number | null
   }, [batches.length, fetchStartedAt]);
 
   if (loading) {
-    return <div className="text-xs text-slate-500 py-8 text-center">Loading…</div>;
+    return <div className="text-xs text-gray-400 dark:text-slate-500 py-8 text-center">Loading…</div>;
   }
 
   if (batches.length === 0) {
@@ -701,9 +701,9 @@ function PreviewTab({ fetchStartedAt, servers }: { fetchStartedAt: number | null
 
     if (fetchStartedAt === null) {
       return (
-        <div className="text-center py-12 text-slate-500 text-sm">
+        <div className="text-center py-12 text-gray-400 dark:text-slate-500 text-sm">
           <div className="text-2xl mb-2">◷</div>
-          No staged batches yet. Use <span className="text-slate-400">Fetch Now</span> on the Servers tab to pull threat intel.
+          No staged batches yet. Use <span className="text-gray-500 dark:text-slate-400">Fetch Now</span> on the Servers tab to pull threat intel.
         </div>
       );
     }
@@ -716,7 +716,7 @@ function PreviewTab({ fetchStartedAt, servers }: { fetchStartedAt: number | null
           <div className="text-red-400/70 text-xs max-w-sm mx-auto font-mono mt-1 break-all">
             {lastServer.last_fetch_error}
           </div>
-          <div className="text-slate-500 text-xs mt-2">Check the server URL, API root, and collection ID, then try again.</div>
+          <div className="text-gray-400 dark:text-slate-500 text-xs mt-2">Check the server URL, API root, and collection ID, then try again.</div>
         </div>
       );
     }
@@ -727,7 +727,7 @@ function PreviewTab({ fetchStartedAt, servers }: { fetchStartedAt: number | null
         <div className="text-center py-12 text-sm">
           <div className="text-2xl mb-2">✓</div>
           <div className="text-emerald-400 font-medium mb-1">Already up to date</div>
-          <div className="text-slate-500 text-xs max-w-xs mx-auto">
+          <div className="text-gray-400 dark:text-slate-500 text-xs max-w-xs mx-auto">
             The feed was fetched successfully but contained no new data to stage.
             {skipped != null && skipped > 0 && (
               <span className="block mt-1">{skipped.toLocaleString()} objects skipped (already imported or not applicable).</span>
@@ -742,7 +742,7 @@ function PreviewTab({ fetchStartedAt, servers }: { fetchStartedAt: number | null
         <div className="text-center py-12 text-sm">
           <div className="text-2xl mb-2">⚠</div>
           <div className="text-red-400 font-medium mb-1">Fetch timed out — no items staged</div>
-          <div className="text-slate-500 text-xs max-w-xs mx-auto">
+          <div className="text-gray-400 dark:text-slate-500 text-xs max-w-xs mx-auto">
             The background fetch did not produce results within 2 minutes. Check that the server URL and API root are correct, then try again.
           </div>
         </div>
@@ -750,7 +750,7 @@ function PreviewTab({ fetchStartedAt, servers }: { fetchStartedAt: number | null
     }
 
     return (
-      <div className="text-center py-12 text-slate-500 text-sm">
+      <div className="text-center py-12 text-gray-400 dark:text-slate-500 text-sm">
         <div className="text-2xl mb-2">◷</div>
         Fetch running in background — staged items will appear here automatically.
       </div>
@@ -766,14 +766,14 @@ function PreviewTab({ fetchStartedAt, servers }: { fetchStartedAt: number | null
             className={`w-full text-left p-3 rounded-lg border transition-colors ${
               selected?.batch_id === batch.batch_id
                 ? 'bg-blue-600/20 border-blue-500/40'
-                : 'bg-slate-800/60 border-slate-700/50 hover:border-slate-600'
+                : 'bg-gray-100/60 dark:bg-slate-800/60 border-gray-300 dark:border-slate-700/50 hover:border-gray-400 dark:border-slate-600'
             }`}>
-            <div className="text-xs text-slate-200 font-medium mb-0.5">{batch.server_name}</div>
-            <div className="text-xs font-mono text-slate-500 truncate mb-1">{batch.batch_id.slice(0, 16)}…</div>
-            <div className="text-xs text-slate-500">{new Date(batch.created_at).toLocaleDateString()}</div>
+            <div className="text-xs text-gray-800 dark:text-slate-200 font-medium mb-0.5">{batch.server_name}</div>
+            <div className="text-xs font-mono text-gray-400 dark:text-slate-500 truncate mb-1">{batch.batch_id.slice(0, 16)}…</div>
+            <div className="text-xs text-gray-400 dark:text-slate-500">{new Date(batch.created_at).toLocaleDateString()}</div>
             <div className="flex gap-2 mt-1.5">
               {batch.pending_count > 0 && (
-                <span className="text-xs text-slate-300 bg-slate-700 px-1.5 py-0.5 rounded">{batch.pending_count} pending</span>
+                <span className="text-xs text-gray-700 dark:text-slate-300 bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">{batch.pending_count} pending</span>
               )}
               {batch.approved_count > 0 && (
                 <span className="text-xs text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded">{batch.approved_count} approved</span>
@@ -791,7 +791,7 @@ function PreviewTab({ fetchStartedAt, servers }: { fetchStartedAt: number | null
         {selected ? (
           <BatchDetail batch={selected} onDone={load} />
         ) : (
-          <div className="text-xs text-slate-500 py-8 text-center">Select a batch to review</div>
+          <div className="text-xs text-gray-400 dark:text-slate-500 py-8 text-center">Select a batch to review</div>
         )}
       </div>
     </div>
@@ -848,7 +848,7 @@ function ScheduleTab({ servers }: { servers: TaxiiServer[] }) {
   }
 
   if (loading) {
-    return <div className="text-xs text-slate-500 py-8 text-center">Loading…</div>;
+    return <div className="text-xs text-gray-400 dark:text-slate-500 py-8 text-center">Loading…</div>;
   }
 
   return (
@@ -871,34 +871,34 @@ function ScheduleTab({ servers }: { servers: TaxiiServer[] }) {
       )}
 
       {jobs.length === 0 && servers.length > 0 ? (
-        <div className="text-center py-12 text-slate-500 text-sm">
+        <div className="text-center py-12 text-gray-400 dark:text-slate-500 text-sm">
           <div className="text-2xl mb-2">⏱</div>
           No scheduled jobs. Create one to automatically stage threat intel for review.
         </div>
       ) : (
         <div className="space-y-3">
           {jobs.map(job => (
-            <div key={job.id} className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-4">
+            <div key={job.id} className="bg-gray-100/60 dark:bg-slate-800/60 border border-gray-300 dark:border-slate-700/50 rounded-lg p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium text-slate-200">{job.name}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{job.name}</span>
                     <span className={`text-xs px-1.5 py-0.5 rounded border ${
-                      job.enabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-slate-700 text-slate-500 border-slate-600'
+                      job.enabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500 border-gray-400 dark:border-slate-600'
                     }`}>{job.enabled ? 'enabled' : 'disabled'}</span>
                     {job.last_status && (
-                      <span className={`text-xs ${JOB_STATUS_COLORS[job.last_status] ?? 'text-slate-400'}`}>
+                      <span className={`text-xs ${JOB_STATUS_COLORS[job.last_status] ?? 'text-gray-500 dark:text-slate-400'}`}>
                         {job.last_status}
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-400">
-                    Server: <span className="text-slate-300">{job.server_name}</span>
-                    <span className="mx-1.5 text-slate-600">·</span>
-                    Schedule: <span className="font-mono text-slate-300">{job.schedule}</span>
+                  <div className="text-xs text-gray-500 dark:text-slate-400">
+                    Server: <span className="text-gray-700 dark:text-slate-300">{job.server_name}</span>
+                    <span className="mx-1.5 text-gray-400 dark:text-slate-600">·</span>
+                    Schedule: <span className="font-mono text-gray-700 dark:text-slate-300">{job.schedule}</span>
                   </div>
                   {job.last_run && (
-                    <div className="text-xs text-slate-500 mt-0.5">
+                    <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
                       Last run: {new Date(job.last_run).toLocaleString()}
                     </div>
                   )}
@@ -914,11 +914,11 @@ function ScheduleTab({ servers }: { servers: TaxiiServer[] }) {
                     {running === job.id ? 'Running…' : 'Run Now'}
                   </button>
                   <button onClick={() => handleToggle(job)}
-                    className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-700 hover:bg-slate-600 rounded transition-colors">
+                    className="px-2.5 py-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 bg-gray-200 dark:bg-slate-700 hover:bg-slate-600 rounded transition-colors">
                     {job.enabled ? 'Disable' : 'Enable'}
                   </button>
                   <button onClick={() => setModal(job)}
-                    className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-700 hover:bg-slate-600 rounded transition-colors">
+                    className="px-2.5 py-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 bg-gray-200 dark:bg-slate-700 hover:bg-slate-600 rounded transition-colors">
                     Edit
                   </button>
                   <button onClick={() => handleDelete(job)}
@@ -981,21 +981,21 @@ export default function TaxiiIngest() {
   return (
     <div className="p-6 h-full flex flex-col">
       <div className="mb-6">
-        <h1 className="text-lg font-semibold text-slate-100">TAXII 2.1 Threat Intel Ingest</h1>
-        <p className="text-xs text-slate-400 mt-1">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-slate-100">TAXII 2.1 Threat Intel Ingest</h1>
+        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
           Pull TTPs (techniques & threat groups) from TAXII 2.1 feeds. IOCs are never imported.
           Stage changes for review before committing to the database.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-slate-800 pb-0">
+      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-slate-800 pb-0">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t.id
                 ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-500 hover:text-slate-300'
+                : 'border-transparent text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300'
             }`}>
             {t.label}
           </button>
@@ -1005,7 +1005,7 @@ export default function TaxiiIngest() {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {loadingServers && tab === 'servers' ? (
-          <div className="text-xs text-slate-500 py-8 text-center">Loading…</div>
+          <div className="text-xs text-gray-400 dark:text-slate-500 py-8 text-center">Loading…</div>
         ) : tab === 'servers' ? (
           <ServersTab servers={servers} onRefresh={loadServers} onFetchStarted={() => { setFetchStartedAt(Date.now()); setTab('preview'); }} />
         ) : tab === 'preview' ? (

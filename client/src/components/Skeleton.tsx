@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 function S({ className = '', style }: { className?: string; style?: CSSProperties }) {
   return (
     <div
-      className={`bg-gradient-to-r from-slate-800 via-slate-700/80 to-slate-800 bg-[length:200%_100%] animate-shimmer rounded ${className}`}
+      className={`bg-gradient-to-r from-gray-200 via-gray-100/80 to-gray-200 dark:from-slate-800 dark:via-slate-700/80 dark:to-slate-800 bg-[length:200%_100%] animate-shimmer rounded ${className}`}
       style={style}
     />
   );
@@ -29,7 +29,7 @@ export function SkeletonCard({ className = '' }: { className?: string }) {
 
 export function SkeletonKPI() {
   return (
-    <div className="rounded-xl border border-slate-800 p-4 space-y-2">
+    <div className="rounded-xl border border-gray-200 dark:border-slate-800 p-4 space-y-2">
       <S className="h-3 w-24" />
       <S className="h-8 w-16" />
       <S className="h-2.5 w-20" />
@@ -59,7 +59,7 @@ export function SkeletonDetailPanel() {
         {[0, 1, 2].map(i => <SkeletonKPI key={i} />)}
       </div>
       <div className="space-y-2">
-        {[0, 1, 2, 3].map(i => <SkeletonRow key={i} className="bg-slate-800/40 rounded-lg" />)}
+        {[0, 1, 2, 3].map(i => <SkeletonRow key={i} className="bg-gray-100/40 dark:bg-slate-800/40 rounded-lg" />)}
       </div>
     </div>
   );
@@ -72,7 +72,7 @@ export function SkeletonDashboard() {
         {[0, 1, 2, 3].map(i => <SkeletonKPI key={i} />)}
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div className="col-span-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
           <S className="h-4 w-36" />
           {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
             <div key={i} className="grid grid-cols-[1fr_120px_36px] items-center gap-3">
@@ -82,7 +82,7 @@ export function SkeletonDashboard() {
             </div>
           ))}
         </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 space-y-4">
           <S className="h-4 w-28" />
           {[0, 1, 2, 3].map(i => (
             <div key={i} className="flex items-center justify-between">
@@ -96,11 +96,11 @@ export function SkeletonDashboard() {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
           <S className="h-4 w-44 mb-4" />
           <S className="h-[280px] w-full rounded-lg" />
         </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
           <S className="h-4 w-52 mb-4" />
           <S className="h-[280px] w-full rounded-lg" />
         </div>

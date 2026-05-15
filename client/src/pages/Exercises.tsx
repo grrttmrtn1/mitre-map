@@ -16,17 +16,17 @@ const TYPE_COLORS: Record<string, string> = {
   tabletop: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
 };
 const STATUS_COLORS: Record<string, string> = {
-  planning: 'bg-slate-700 text-slate-300',
+  planning: 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300',
   active: 'bg-blue-500/20 text-blue-300',
   completed: 'bg-emerald-500/20 text-emerald-300',
   cancelled: 'bg-red-500/20 text-red-400',
 };
 const OUTCOME_COLORS: Record<string, string> = {
-  pending: 'bg-slate-800 text-slate-400 border-slate-700',
+  pending: 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border-gray-300 dark:border-slate-700',
   detected: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   not_detected: 'bg-red-500/20 text-red-400 border-red-500/30',
   partial: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  n_a: 'bg-slate-800/50 text-slate-600 border-slate-800',
+  n_a: 'bg-gray-100/50 dark:bg-slate-800/50 text-gray-400 dark:text-slate-600 border-gray-200 dark:border-slate-800',
 };
 const OUTCOME_LABELS: Record<string, string> = {
   pending: 'Pending', detected: 'Detected', not_detected: 'Not Detected',
@@ -37,7 +37,7 @@ const SEVERITY_COLORS: Record<string, string> = {
   high: 'bg-orange-500/20 text-orange-400 border-orange-500/40',
   medium: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
   low: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
-  informational: 'bg-slate-700 text-slate-400 border-slate-600',
+  informational: 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border-gray-400 dark:border-slate-600',
 };
 const FINDING_TYPE_LABELS: Record<string, string> = {
   gap: 'Detection Gap', detection_validated: 'Detection Validated',
@@ -62,10 +62,10 @@ function DetectionRateBar({ rate }: { rate: number }) {
   const color = rate >= 70 ? 'bg-emerald-500' : rate >= 40 ? 'bg-amber-500' : 'bg-red-500';
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
         <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${rate}%` }} />
       </div>
-      <span className="text-xs text-slate-400 w-8 text-right">{rate}%</span>
+      <span className="text-xs text-gray-500 dark:text-slate-400 w-8 text-right">{rate}%</span>
     </div>
   );
 }
@@ -99,18 +99,18 @@ function ExerciseFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-100">
+      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">
             {initial.name ? 'Edit Exercise' : 'New Exercise'}
           </h2>
-          <button onClick={onCancel} className="text-slate-500 hover:text-slate-300">✕</button>
+          <button onClick={onCancel} className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300">✕</button>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Exercise Name <span className="text-red-400">*</span></label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Exercise Name <span className="text-red-400">*</span></label>
             <input
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
               placeholder="e.g. Q2 Purple Team – Lazarus Group"
               value={form.name}
               onChange={e => set('name', e.target.value)}
@@ -118,9 +118,9 @@ function ExerciseFormModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1.5">Type</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Type</label>
               <select
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
                 value={form.type}
                 onChange={e => set('type', e.target.value)}
               >
@@ -130,9 +130,9 @@ function ExerciseFormModal({
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1.5">Status</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Status</label>
               <select
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
                 value={form.status}
                 onChange={e => set('status', e.target.value)}
               >
@@ -144,9 +144,9 @@ function ExerciseFormModal({
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Target Threat Group</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Target Threat Group</label>
             <select
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
               value={form.threat_group_id}
               onChange={e => set('threat_group_id', e.target.value)}
             >
@@ -158,9 +158,9 @@ function ExerciseFormModal({
             )}
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Lead / Operator</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Lead / Operator</label>
             <input
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
               placeholder="Name or team"
               value={form.lead}
               onChange={e => set('lead', e.target.value)}
@@ -168,28 +168,28 @@ function ExerciseFormModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1.5">Start Date</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Start Date</label>
               <input
                 type="date"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
                 value={form.start_date}
                 onChange={e => set('start_date', e.target.value)}
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1.5">End Date</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">End Date</label>
               <input
                 type="date"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
                 value={form.end_date}
                 onChange={e => set('end_date', e.target.value)}
               />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Description</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Description</label>
             <textarea
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
               rows={2}
               placeholder="Exercise objectives and context"
               value={form.description}
@@ -197,9 +197,9 @@ function ExerciseFormModal({
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Scope Notes</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Scope Notes</label>
             <textarea
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
               rows={2}
               placeholder="In-scope systems, exclusions, rules of engagement"
               value={form.scope_notes}
@@ -207,8 +207,8 @@ function ExerciseFormModal({
             />
           </div>
         </div>
-        <div className="px-6 py-4 border-t border-slate-800 flex gap-3 justify-end">
-          <button onClick={onCancel} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-800 flex gap-3 justify-end">
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200">Cancel</button>
           <button
             onClick={() => onSave(form)}
             disabled={saving || !form.name.trim()}
@@ -267,22 +267,22 @@ function PlanTab({
         <div className="space-y-3">
           {exercise.description && (
             <div>
-              <div className="text-xs font-medium text-slate-500 mb-1">Description</div>
-              <p className="text-sm text-slate-300">{exercise.description}</p>
+              <div className="text-xs font-medium text-gray-400 dark:text-slate-500 mb-1">Description</div>
+              <p className="text-sm text-gray-700 dark:text-slate-300">{exercise.description}</p>
             </div>
           )}
           {exercise.scope_notes && (
             <div>
-              <div className="text-xs font-medium text-slate-500 mb-1">Scope / Rules of Engagement</div>
-              <p className="text-sm text-slate-300 whitespace-pre-wrap">{exercise.scope_notes}</p>
+              <div className="text-xs font-medium text-gray-400 dark:text-slate-500 mb-1">Scope / Rules of Engagement</div>
+              <p className="text-sm text-gray-700 dark:text-slate-300 whitespace-pre-wrap">{exercise.scope_notes}</p>
             </div>
           )}
           {tg && (
             <div>
-              <div className="text-xs font-medium text-slate-500 mb-1">Target Threat Group</div>
-              <span className="text-sm text-slate-200 font-medium">{tg.name}</span>
+              <div className="text-xs font-medium text-gray-400 dark:text-slate-500 mb-1">Target Threat Group</div>
+              <span className="text-sm text-gray-800 dark:text-slate-200 font-medium">{tg.name}</span>
               {tg.aliases?.length > 0 && (
-                <span className="text-xs text-slate-500 ml-2">({tg.aliases.join(', ')})</span>
+                <span className="text-xs text-gray-400 dark:text-slate-500 ml-2">({tg.aliases.join(', ')})</span>
               )}
             </div>
           )}
@@ -290,20 +290,20 @@ function PlanTab({
         <div className="space-y-3 text-sm">
           {exercise.lead && (
             <div className="flex justify-between">
-              <span className="text-slate-500">Lead</span>
-              <span className="text-slate-200">{exercise.lead}</span>
+              <span className="text-gray-400 dark:text-slate-500">Lead</span>
+              <span className="text-gray-800 dark:text-slate-200">{exercise.lead}</span>
             </div>
           )}
           {exercise.start_date && (
             <div className="flex justify-between">
-              <span className="text-slate-500">Start</span>
-              <span className="text-slate-200">{exercise.start_date}</span>
+              <span className="text-gray-400 dark:text-slate-500">Start</span>
+              <span className="text-gray-800 dark:text-slate-200">{exercise.start_date}</span>
             </div>
           )}
           {exercise.end_date && (
             <div className="flex justify-between">
-              <span className="text-slate-500">End</span>
-              <span className="text-slate-200">{exercise.end_date}</span>
+              <span className="text-gray-400 dark:text-slate-500">End</span>
+              <span className="text-gray-800 dark:text-slate-200">{exercise.end_date}</span>
             </div>
           )}
         </div>
@@ -312,13 +312,13 @@ function PlanTab({
       {/* Technique scope */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-slate-200">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">
             Techniques in Scope
-            <span className="ml-2 text-xs text-slate-500 font-normal">{exercise.techniques.length} selected</span>
+            <span className="ml-2 text-xs text-gray-400 dark:text-slate-500 font-normal">{exercise.techniques.length} selected</span>
           </h3>
           <div className="flex gap-2">
             <input
-              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 w-32"
+              className="bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-gray-800 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 w-32"
               placeholder="T1059.001"
               value={addTid}
               onChange={e => setAddTid(e.target.value)}
@@ -335,27 +335,27 @@ function PlanTab({
         </div>
 
         {exercise.techniques.length === 0 ? (
-          <div className="text-center text-slate-500 py-10 text-sm">
+          <div className="text-center text-gray-400 dark:text-slate-500 py-10 text-sm">
             No techniques in scope. Add them manually or select a threat group when creating the exercise.
           </div>
         ) : (
-          <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[1fr_2fr_auto] text-xs text-slate-500 px-4 py-2 border-b border-slate-800">
+          <div className="bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
+            <div className="grid grid-cols-[1fr_2fr_auto] text-xs text-gray-400 dark:text-slate-500 px-4 py-2 border-b border-gray-200 dark:border-slate-800">
               <span>Technique ID</span>
               <span>Name</span>
               <span>Tests Available</span>
             </div>
-            <div className="divide-y divide-slate-800/50 max-h-96 overflow-y-auto">
+            <div className="divide-y divide-gray-200 dark:divide-slate-800/50 max-h-96 overflow-y-auto">
               {exercise.techniques.map(t => (
-                <div key={t.technique_id} className="grid grid-cols-[1fr_2fr_auto] items-center px-4 py-2.5 group hover:bg-slate-900/50">
+                <div key={t.technique_id} className="grid grid-cols-[1fr_2fr_auto] items-center px-4 py-2.5 group hover:bg-gray-50 dark:bg-slate-900/50">
                   <span className="font-mono text-blue-400 text-xs">{t.technique_id}</span>
-                  <span className="text-slate-300 text-sm truncate">{t.technique_name}</span>
+                  <span className="text-gray-700 dark:text-slate-300 text-sm truncate">{t.technique_name}</span>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500">{t.available_tests} test{t.available_tests !== 1 ? 's' : ''}</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500">{t.available_tests} test{t.available_tests !== 1 ? 's' : ''}</span>
                     <button
                       onClick={() => handleRemove(t.technique_id)}
                       disabled={removing === t.technique_id}
-                      className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition-all disabled:opacity-50 text-xs"
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 dark:text-slate-600 hover:text-red-400 transition-all disabled:opacity-50 text-xs"
                     >
                       ✕
                     </button>
@@ -469,7 +469,7 @@ function ExecuteTab({
 
   if (exercise.techniques.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-500 text-sm">
+      <div className="flex items-center justify-center h-64 text-gray-400 dark:text-slate-500 text-sm">
         Add techniques in the Plan tab first.
       </div>
     );
@@ -478,7 +478,7 @@ function ExecuteTab({
   return (
     <div className="p-6 space-y-2">
       {loadingTests && (
-        <div className="text-center text-slate-500 py-10">Loading tests…</div>
+        <div className="text-center text-gray-400 dark:text-slate-500 py-10">Loading tests…</div>
       )}
       {!loadingTests && exercise.techniques.map(tech => {
         const tests = techTests[tech.technique_id] ?? [];
@@ -489,18 +489,18 @@ function ExecuteTab({
         const blockedCount = techRuns.filter(r => r.blocked).length;
 
         return (
-          <div key={tech.technique_id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div key={tech.technique_id} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
             <button
-              className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-800/40 transition-colors text-left"
+              className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-100/40 dark:bg-slate-800/40 transition-colors text-left"
               onClick={() => setExpanded(isExpanded ? null : tech.technique_id)}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="font-mono text-blue-400 font-semibold text-sm flex-shrink-0">{tech.technique_id}</span>
-                <span className="text-slate-300 text-sm truncate">{tech.technique_name}</span>
+                <span className="text-gray-700 dark:text-slate-300 text-sm truncate">{tech.technique_name}</span>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 {blockedCount > 0 && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400">
                     {blockedCount} blocked
                   </span>
                 )}
@@ -509,8 +509,8 @@ function ExecuteTab({
                     {detected}/{total} detected
                   </span>
                 )}
-                <span className="text-xs text-slate-500">{tests.length} test{tests.length !== 1 ? 's' : ''}</span>
-                <svg className={`w-4 h-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                <span className="text-xs text-gray-400 dark:text-slate-500">{tests.length} test{tests.length !== 1 ? 's' : ''}</span>
+                <svg className={`w-4 h-4 text-gray-400 dark:text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                   fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -518,9 +518,9 @@ function ExecuteTab({
             </button>
 
             {isExpanded && (
-              <div className="border-t border-slate-800 divide-y divide-slate-800/50">
+              <div className="border-t border-gray-200 dark:border-slate-800 divide-y divide-gray-200 dark:divide-slate-800/50">
                 {tests.length === 0 ? (
-                  <div className="px-5 py-4 text-sm text-slate-500">No ART tests available for this technique.</div>
+                  <div className="px-5 py-4 text-sm text-gray-400 dark:text-slate-500">No ART tests available for this technique.</div>
                 ) : tests.map(test => {
                   const run = runsByTestId.get(test.id);
                   const outcome = run?.outcome ?? 'pending';
@@ -532,23 +532,23 @@ function ExecuteTab({
                     <div key={test.id} className="px-5 py-4">
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-slate-100">{test.name}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-slate-100">{test.name}</div>
                           <div className="flex gap-2 mt-1 flex-wrap">
                             {test.platform && (
-                              <span className="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{test.platform}</span>
+                              <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded">{test.platform}</span>
                             )}
                             {test.executor_type && (
-                              <span className="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{test.executor_type}</span>
+                              <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded">{test.executor_type}</span>
                             )}
                           </div>
                           {test.description && (
-                            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{test.description}</p>
+                            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1.5 leading-relaxed">{test.description}</p>
                           )}
                           {test.auto_generated_command && (
                             <div className="mt-2">
                               <button
                                 onClick={() => toggleCmd(test.id)}
-                                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                                className="flex items-center gap-1 text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors"
                               >
                                 <svg className={`w-3 h-3 transition-transform ${cmdExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -556,7 +556,7 @@ function ExecuteTab({
                                 {cmdExpanded ? 'Hide command' : 'Show command'}
                               </button>
                               {cmdExpanded && (
-                                <pre className="mt-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-xs text-emerald-300 font-mono whitespace-pre-wrap break-all overflow-x-auto">
+                                <pre className="mt-2 bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-lg px-3 py-2.5 text-xs text-emerald-300 font-mono whitespace-pre-wrap break-all overflow-x-auto">
                                   {test.auto_generated_command}
                                 </pre>
                               )}
@@ -570,8 +570,8 @@ function ExecuteTab({
                             onClick={() => handleBlocked(test.id, !isBlocked)}
                             className={`text-xs px-2.5 py-1 rounded border transition-all disabled:opacity-50 ${
                               isBlocked
-                                ? 'bg-slate-700 text-slate-200 border-slate-500'
-                                : 'bg-transparent text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'
+                                ? 'bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200 border-slate-500'
+                                : 'bg-transparent text-gray-400 dark:text-slate-500 border-gray-300 dark:border-slate-700 hover:border-slate-500 hover:text-gray-700 dark:text-slate-300'
                             }`}
                           >
                             {isBlocked ? '⊘ Blocked' : '⊘ Block'}
@@ -586,7 +586,7 @@ function ExecuteTab({
                                 className={`text-xs px-2.5 py-1 rounded border transition-all ${
                                   outcome === o
                                     ? OUTCOME_COLORS[o]
-                                    : 'bg-transparent text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'
+                                    : 'bg-transparent text-gray-400 dark:text-slate-500 border-gray-300 dark:border-slate-700 hover:border-slate-500 hover:text-gray-700 dark:text-slate-300'
                                 } disabled:opacity-50`}
                               >
                                 {OUTCOME_LABELS[o]}
@@ -600,7 +600,7 @@ function ExecuteTab({
                       {noteEditing === test.id ? (
                         <div className="mt-2 flex gap-2">
                           <input
-                            className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                            className="flex-1 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-2 py-1 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
                             value={noteValue}
                             onChange={e => setNoteValue(e.target.value)}
                             placeholder="Add note…"
@@ -608,7 +608,7 @@ function ExecuteTab({
                             autoFocus
                           />
                           <button onClick={() => handleNoteSave(test.id)} className="text-xs text-blue-400 hover:text-blue-300">Save</button>
-                          <button onClick={() => setNoteEditing(null)} className="text-xs text-slate-500 hover:text-slate-300">Cancel</button>
+                          <button onClick={() => setNoteEditing(null)} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300">Cancel</button>
                         </div>
                       ) : (
                         <div
@@ -616,9 +616,9 @@ function ExecuteTab({
                           onClick={() => { setNoteEditing(test.id); setNoteValue(run?.notes ?? ''); }}
                         >
                           {run?.notes ? (
-                            <p className="text-xs text-slate-400 hover:text-slate-300 transition-colors">{run.notes}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300 transition-colors">{run.notes}</p>
                           ) : (
-                            <p className="text-xs text-slate-700 hover:text-slate-500 transition-colors">+ add note</p>
+                            <p className="text-xs text-slate-700 hover:text-gray-400 dark:text-slate-500 transition-colors">+ add note</p>
                           )}
                         </div>
                       )}
@@ -663,18 +663,18 @@ function FindingModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-100">
+      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">
             {initial.title ? 'Edit Finding' : 'Add Finding'}
           </h2>
-          <button onClick={onCancel} className="text-slate-500 hover:text-slate-300">✕</button>
+          <button onClick={onCancel} className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300">✕</button>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Title <span className="text-red-400">*</span></label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Title <span className="text-red-400">*</span></label>
             <input
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
               placeholder="e.g. PowerShell execution undetected"
               value={form.title}
               onChange={e => set('title', e.target.value)}
@@ -682,9 +682,9 @@ function FindingModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1.5">Finding Type</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Finding Type</label>
               <select
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
                 value={form.finding_type}
                 onChange={e => set('finding_type', e.target.value as FindingType)}
               >
@@ -692,9 +692,9 @@ function FindingModal({
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1.5">Severity</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Severity</label>
               <select
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
                 value={form.severity}
                 onChange={e => set('severity', e.target.value as FindingSeverity)}
               >
@@ -705,9 +705,9 @@ function FindingModal({
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Related Technique</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Related Technique</label>
             <select
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
               value={form.technique_id}
               onChange={e => set('technique_id', e.target.value)}
             >
@@ -716,9 +716,9 @@ function FindingModal({
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Description</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Description</label>
             <textarea
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
               rows={3}
               placeholder="What was observed?"
               value={form.description}
@@ -726,9 +726,9 @@ function FindingModal({
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Recommendation</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Recommendation</label>
             <textarea
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
               rows={3}
               placeholder="How should this be remediated?"
               value={form.recommendation}
@@ -736,8 +736,8 @@ function FindingModal({
             />
           </div>
         </div>
-        <div className="px-6 py-4 border-t border-slate-800 flex gap-3 justify-end">
-          <button onClick={onCancel} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-800 flex gap-3 justify-end">
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200">Cancel</button>
           <button
             onClick={() => onSave(form)}
             disabled={saving || !form.title.trim()}
@@ -819,9 +819,9 @@ function FindingsTab({ exercise, onRefresh }: { exercise: ExerciseDetail; onRefr
 
       <div className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-slate-200">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">
             Findings
-            <span className="ml-2 text-xs text-slate-500 font-normal">{exercise.findings.length} total</span>
+            <span className="ml-2 text-xs text-gray-400 dark:text-slate-500 font-normal">{exercise.findings.length} total</span>
           </h3>
           <button
             onClick={() => { setEditTarget(null); setShowModal(true); }}
@@ -832,24 +832,24 @@ function FindingsTab({ exercise, onRefresh }: { exercise: ExerciseDetail; onRefr
         </div>
 
         {exercise.findings.length === 0 ? (
-          <div className="text-center text-slate-500 py-16 text-sm">
+          <div className="text-center text-gray-400 dark:text-slate-500 py-16 text-sm">
             No findings yet. Add findings as you execute the exercise.
           </div>
         ) : (
           <div className="space-y-3">
             {exercise.findings.map(f => (
-              <div key={f.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div key={f.id} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-slate-100">{f.title}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-slate-100">{f.title}</span>
                       <SeverityBadge severity={f.severity} />
-                      <Badge text={FINDING_TYPE_LABELS[f.finding_type] ?? f.finding_type} className="bg-slate-700 text-slate-300 border-slate-600" />
+                      <Badge text={FINDING_TYPE_LABELS[f.finding_type] ?? f.finding_type} className="bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border-gray-400 dark:border-slate-600" />
                       {f.technique_id && (
                         <span className="font-mono text-xs text-blue-400">{f.technique_id}</span>
                       )}
                     </div>
-                    {f.description && <p className="text-xs text-slate-400 mt-2 leading-relaxed">{f.description}</p>}
+                    {f.description && <p className="text-xs text-gray-500 dark:text-slate-400 mt-2 leading-relaxed">{f.description}</p>}
                     {f.recommendation && (
                       <div className="mt-2 pl-3 border-l-2 border-blue-500/40">
                         <p className="text-xs text-blue-300/80 leading-relaxed">{f.recommendation}</p>
@@ -859,7 +859,7 @@ function FindingsTab({ exercise, onRefresh }: { exercise: ExerciseDetail; onRefr
                   <div className="flex gap-1 flex-shrink-0">
                     <button
                       onClick={() => { setEditTarget(f); setShowModal(true); }}
-                      className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+                      className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors p-1"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -868,7 +868,7 @@ function FindingsTab({ exercise, onRefresh }: { exercise: ExerciseDetail; onRefr
                     <button
                       onClick={() => handleDelete(f.id)}
                       disabled={deleting === f.id}
-                      className="text-slate-500 hover:text-red-400 transition-colors p-1 disabled:opacity-50"
+                      className="text-gray-400 dark:text-slate-500 hover:text-red-400 transition-colors p-1 disabled:opacity-50"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -898,8 +898,8 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
       .finally(() => setLoading(false));
   }, [exerciseId]);
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-500">Generating report…</div>;
-  if (!report) return <div className="flex items-center justify-center h-64 text-slate-500">Failed to load report.</div>;
+  if (loading) return <div className="flex items-center justify-center h-64 text-gray-400 dark:text-slate-500">Generating report…</div>;
+  if (!report) return <div className="flex items-center justify-center h-64 text-gray-400 dark:text-slate-500">Failed to load report.</div>;
 
   const { summary, exercise, technique_breakdown, gaps, findings, findings_by_severity } = report;
 
@@ -908,31 +908,31 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">
-          <h2 className="text-xl font-bold text-slate-100">{exercise.name}</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">{exercise.name}</h2>
           <Badge text={TYPE_LABELS[exercise.type] ?? exercise.type} className={TYPE_COLORS[exercise.type] ?? ''} />
         </div>
-        <div className="flex gap-4 text-sm text-slate-500 flex-wrap">
-          {exercise.threat_group_name && <span>Target: <span className="text-slate-300">{exercise.threat_group_name}</span></span>}
-          {exercise.lead && <span>Lead: <span className="text-slate-300">{exercise.lead}</span></span>}
-          {exercise.start_date && <span>Period: <span className="text-slate-300">{exercise.start_date}{exercise.end_date ? ` – ${exercise.end_date}` : ''}</span></span>}
-          <span>Generated: <span className="text-slate-300">{new Date(report.generated_at).toLocaleString()}</span></span>
+        <div className="flex gap-4 text-sm text-gray-400 dark:text-slate-500 flex-wrap">
+          {exercise.threat_group_name && <span>Target: <span className="text-gray-700 dark:text-slate-300">{exercise.threat_group_name}</span></span>}
+          {exercise.lead && <span>Lead: <span className="text-gray-700 dark:text-slate-300">{exercise.lead}</span></span>}
+          {exercise.start_date && <span>Period: <span className="text-gray-700 dark:text-slate-300">{exercise.start_date}{exercise.end_date ? ` – ${exercise.end_date}` : ''}</span></span>}
+          <span>Generated: <span className="text-gray-700 dark:text-slate-300">{new Date(report.generated_at).toLocaleString()}</span></span>
         </div>
       </div>
 
       {/* Executive Summary */}
       <div>
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Executive Summary</h3>
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-3">Executive Summary</h3>
         <div className="grid grid-cols-4 gap-3">
           {[
             { label: 'Detection Rate', value: `${summary.detection_rate}%`, sub: `${summary.detected} of ${summary.total_runs} tests`, accent: summary.detection_rate >= 70 ? 'text-emerald-400' : summary.detection_rate >= 40 ? 'text-amber-400' : 'text-red-400' },
             { label: 'Techniques Scoped', value: String(summary.total_techniques), sub: `${gaps.length} undetected`, accent: 'text-blue-400' },
-            { label: 'Tests Executed', value: String(summary.total_runs), sub: `${summary.not_detected} not detected`, accent: 'text-slate-200' },
-            { label: 'Findings', value: String(summary.total_findings), sub: `${summary.critical_findings} critical`, accent: summary.critical_findings > 0 ? 'text-red-400' : 'text-slate-200' },
+            { label: 'Tests Executed', value: String(summary.total_runs), sub: `${summary.not_detected} not detected`, accent: 'text-gray-800 dark:text-slate-200' },
+            { label: 'Findings', value: String(summary.total_findings), sub: `${summary.critical_findings} critical`, accent: summary.critical_findings > 0 ? 'text-red-400' : 'text-gray-800 dark:text-slate-200' },
           ].map(s => (
-            <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div key={s.label} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
               <div className={`text-2xl font-bold ${s.accent} mb-0.5`}>{s.value}</div>
-              <div className="text-xs text-slate-500">{s.label}</div>
-              <div className="text-xs text-slate-600 mt-1">{s.sub}</div>
+              <div className="text-xs text-gray-400 dark:text-slate-500">{s.label}</div>
+              <div className="text-xs text-gray-400 dark:text-slate-600 mt-1">{s.sub}</div>
             </div>
           ))}
         </div>
@@ -940,9 +940,9 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
 
       {/* Detection rate bar */}
       <div>
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Technique Coverage</h3>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-[1fr_2fr_auto_auto_auto_auto] text-xs text-slate-500 px-4 py-2 border-b border-slate-800 gap-3">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-3">Technique Coverage</h3>
+        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
+          <div className="grid grid-cols-[1fr_2fr_auto_auto_auto_auto] text-xs text-gray-400 dark:text-slate-500 px-4 py-2 border-b border-gray-200 dark:border-slate-800 gap-3">
             <span>Technique</span>
             <span>Detection Rate</span>
             <span className="text-center w-16">Tests</span>
@@ -950,22 +950,22 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
             <span className="text-center w-16 text-red-400">Not Det.</span>
             <span className="text-center w-16">Status</span>
           </div>
-          <div className="divide-y divide-slate-800/50 max-h-72 overflow-y-auto">
+          <div className="divide-y divide-gray-200 dark:divide-slate-800/50 max-h-72 overflow-y-auto">
             {technique_breakdown.map(t => {
               const rate = t.total_runs > 0 ? Math.round(((t.detected + t.partial * 0.5) / t.total_runs) * 100) : 0;
               return (
-                <div key={t.technique_id} className="grid grid-cols-[1fr_2fr_auto_auto_auto_auto] items-center px-4 py-2.5 gap-3 hover:bg-slate-900/50">
+                <div key={t.technique_id} className="grid grid-cols-[1fr_2fr_auto_auto_auto_auto] items-center px-4 py-2.5 gap-3 hover:bg-gray-50 dark:bg-slate-900/50">
                   <div>
                     <span className="font-mono text-blue-400 text-xs">{t.technique_id}</span>
-                    <span className="text-slate-400 text-xs ml-2 truncate">{t.technique_name}</span>
+                    <span className="text-gray-500 dark:text-slate-400 text-xs ml-2 truncate">{t.technique_name}</span>
                   </div>
                   <div>
                     {t.total_runs > 0
                       ? <DetectionRateBar rate={rate} />
-                      : <span className="text-xs text-slate-600">Untested</span>
+                      : <span className="text-xs text-gray-400 dark:text-slate-600">Untested</span>
                     }
                   </div>
-                  <span className="text-xs text-slate-400 text-center w-16">{t.total_runs}</span>
+                  <span className="text-xs text-gray-500 dark:text-slate-400 text-center w-16">{t.total_runs}</span>
                   <span className="text-xs text-emerald-400 text-center w-16">{t.detected}</span>
                   <span className="text-xs text-red-400 text-center w-16">{t.not_detected}</span>
                   <div className="flex justify-center w-16">
@@ -981,7 +981,7 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
       {/* Findings by severity */}
       {summary.total_findings > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Findings by Severity</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-3">Findings by Severity</h3>
           <div className="flex gap-3 mb-4">
             {findings_by_severity.filter(s => s.count > 0).map(s => (
               <div key={s.severity} className="flex items-center gap-2">
@@ -991,14 +991,14 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
           </div>
           <div className="space-y-3">
             {findings.map(f => (
-              <div key={f.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+              <div key={f.id} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <SeverityBadge severity={f.severity} />
-                  <Badge text={FINDING_TYPE_LABELS[f.finding_type] ?? f.finding_type} className="bg-slate-700 text-slate-300 border-slate-600" />
-                  <span className="text-sm font-medium text-slate-100">{f.title}</span>
+                  <Badge text={FINDING_TYPE_LABELS[f.finding_type] ?? f.finding_type} className="bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border-gray-400 dark:border-slate-600" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-slate-100">{f.title}</span>
                   {f.technique_id && <span className="font-mono text-xs text-blue-400">{f.technique_id}</span>}
                 </div>
-                {f.description && <p className="text-xs text-slate-400 mt-2 leading-relaxed">{f.description}</p>}
+                {f.description && <p className="text-xs text-gray-500 dark:text-slate-400 mt-2 leading-relaxed">{f.description}</p>}
                 {f.recommendation && (
                   <div className="mt-2 pl-3 border-l-2 border-blue-500/40">
                     <p className="text-xs text-blue-300/80 font-medium mb-0.5">Recommendation</p>
@@ -1014,15 +1014,15 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
       {/* Detection gaps */}
       {gaps.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-3">
             Detection Gaps <span className="text-red-400 font-normal">({gaps.length})</span>
           </h3>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-            <div className="divide-y divide-slate-800/50">
+          <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
+            <div className="divide-y divide-gray-200 dark:divide-slate-800/50">
               {gaps.map(g => (
                 <div key={g.technique_id} className="flex items-center gap-3 px-4 py-3">
                   <span className="font-mono text-blue-400 text-xs w-24 flex-shrink-0">{g.technique_id}</span>
-                  <span className="text-sm text-slate-300">{g.technique_name}</span>
+                  <span className="text-sm text-gray-700 dark:text-slate-300">{g.technique_name}</span>
                   <span className="ml-auto text-xs text-red-400 flex-shrink-0">Not Detected</span>
                 </div>
               ))}
@@ -1034,8 +1034,8 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
       {/* Scope notes */}
       {exercise.scope_notes && (
         <div>
-          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-2">Scope / Rules of Engagement</h3>
-          <p className="text-sm text-slate-400 whitespace-pre-wrap leading-relaxed">{exercise.scope_notes}</p>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 uppercase tracking-wider mb-2">Scope / Rules of Engagement</h3>
+          <p className="text-sm text-gray-500 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">{exercise.scope_notes}</p>
         </div>
       )}
     </div>
@@ -1114,12 +1114,12 @@ function ExerciseDetail({
 
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="flex-shrink-0 px-6 pt-4 border-b border-slate-800 bg-slate-900">
+        <div className="flex-shrink-0 px-6 pt-4 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900">
           <div className="flex items-center gap-3 mb-3">
-            <button onClick={onBack} className="text-slate-500 hover:text-slate-300 transition-colors text-sm">← Back</button>
+            <button onClick={onBack} className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors text-sm">← Back</button>
             <span className="text-slate-700">/</span>
             <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-lg font-semibold text-slate-100 truncate">{exercise.name}</h1>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">{exercise.name}</h1>
               <Badge text={TYPE_LABELS[exercise.type] ?? exercise.type} className={TYPE_COLORS[exercise.type] ?? ''} />
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[exercise.status] ?? STATUS_COLORS.planning}`}>
                 {exercise.status}
@@ -1128,13 +1128,13 @@ function ExerciseDetail({
             <div className="ml-auto flex items-center gap-3 flex-shrink-0">
               {totalRuns > 0 && (
                 <div className="flex items-center gap-2 w-32">
-                  <span className="text-xs text-slate-500">Detection:</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500">Detection:</span>
                   <div className="flex-1"><DetectionRateBar rate={rate} /></div>
                 </div>
               )}
               <button
                 onClick={() => setShowEdit(true)}
-                className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-500 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 border border-gray-300 dark:border-slate-700 hover:border-slate-500 rounded-lg transition-colors"
               >
                 Edit
               </button>
@@ -1148,13 +1148,13 @@ function ExerciseDetail({
                 onClick={() => setTab(t.key)}
                 className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 flex items-center gap-2 ${
                   tab === t.key
-                    ? 'text-slate-100 border-blue-500 bg-slate-800/50'
-                    : 'text-slate-400 border-transparent hover:text-slate-300'
+                    ? 'text-gray-900 dark:text-slate-100 border-blue-500 bg-gray-100/50 dark:bg-slate-800/50'
+                    : 'text-gray-500 dark:text-slate-400 border-transparent hover:text-gray-700 dark:text-slate-300'
                 }`}
               >
                 {t.label}
                 {t.count !== undefined && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${tab === t.key ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-700 text-slate-500'}`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${tab === t.key ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
                     {t.count}
                   </span>
                 )}
@@ -1272,11 +1272,11 @@ export default function Exercises() {
       )}
 
       <div className="flex flex-col h-full">
-        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-slate-100">Red Team / Purple Team Exercises</h1>
-              <p className="text-sm text-slate-500 mt-0.5">Plan exercises, execute ART tests, record findings, and generate reports.</p>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Red Team / Purple Team Exercises</h1>
+              <p className="text-sm text-gray-400 dark:text-slate-500 mt-0.5">Plan exercises, execute ART tests, record findings, and generate reports.</p>
             </div>
             <button
               onClick={() => setShowCreate(true)}
@@ -1289,9 +1289,9 @@ export default function Exercises() {
 
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
-            <div className="flex items-center justify-center h-40 text-slate-500">Loading…</div>
+            <div className="flex items-center justify-center h-40 text-gray-400 dark:text-slate-500">Loading…</div>
           ) : exercises.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-500 gap-4">
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400 dark:text-slate-500 gap-4">
               <div className="text-4xl">⚔</div>
               <p className="text-sm">No exercises yet.</p>
               <button
@@ -1311,22 +1311,22 @@ export default function Exercises() {
                 return (
                   <div
                     key={ex.id}
-                    className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors cursor-pointer group"
+                    className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 hover:border-gray-300 dark:border-slate-700 transition-colors cursor-pointer group"
                     onClick={() => loadDetail(ex.id)}
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-slate-100 group-hover:text-white transition-colors">{ex.name}</span>
+                            <span className="text-sm font-medium text-gray-900 dark:text-slate-100 group-hover:text-white transition-colors">{ex.name}</span>
                             <Badge text={TYPE_LABELS[ex.type] ?? ex.type} className={TYPE_COLORS[ex.type] ?? ''} />
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[ex.status] ?? STATUS_COLORS.planning}`}>
                               {ex.status}
                             </span>
                           </div>
-                          <div className="flex gap-4 mt-1.5 text-xs text-slate-500 flex-wrap">
-                            {ex.threat_group_name && <span>Target: <span className="text-slate-400">{ex.threat_group_name}</span></span>}
-                            {ex.lead && <span>Lead: <span className="text-slate-400">{ex.lead}</span></span>}
+                          <div className="flex gap-4 mt-1.5 text-xs text-gray-400 dark:text-slate-500 flex-wrap">
+                            {ex.threat_group_name && <span>Target: <span className="text-gray-500 dark:text-slate-400">{ex.threat_group_name}</span></span>}
+                            {ex.lead && <span>Lead: <span className="text-gray-500 dark:text-slate-400">{ex.lead}</span></span>}
                             {ex.start_date && <span>{ex.start_date}{ex.end_date ? ` – ${ex.end_date}` : ''}</span>}
                             <span>{ex.technique_count ?? 0} techniques · {ex.test_run_count ?? 0} tests · {ex.finding_count ?? 0} findings</span>
                           </div>
@@ -1335,20 +1335,20 @@ export default function Exercises() {
                       <div className="flex items-center gap-4 flex-shrink-0">
                         {(ex.test_run_count ?? 0) > 0 && (
                           <div className="w-28">
-                            <div className="text-xs text-slate-500 mb-1">Detection Rate</div>
+                            <div className="text-xs text-gray-400 dark:text-slate-500 mb-1">Detection Rate</div>
                             <DetectionRateBar rate={rate} />
                           </div>
                         )}
                         <button
                           onClick={e => { e.stopPropagation(); handleDelete(ex.id); }}
                           disabled={deleting === ex.id}
-                          className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition-all p-1 disabled:opacity-50"
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 dark:text-slate-600 hover:text-red-400 transition-all p-1 disabled:opacity-50"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
-                        <svg className="w-4 h-4 text-slate-600 group-hover:text-slate-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-gray-400 dark:text-slate-600 group-hover:text-gray-500 dark:text-slate-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
@@ -1359,7 +1359,7 @@ export default function Exercises() {
 
               {loadingDetail && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-40">
-                  <div className="text-slate-400 text-sm">Loading exercise…</div>
+                  <div className="text-gray-500 dark:text-slate-400 text-sm">Loading exercise…</div>
                 </div>
               )}
             </div>

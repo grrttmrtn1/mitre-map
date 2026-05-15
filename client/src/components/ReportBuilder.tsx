@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
+import { useTheme } from '../context/ThemeContext';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -229,6 +230,7 @@ const PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ReportBuilder() {
+  const { theme } = useTheme();
   const [reports, setReports] = useState<ReportDefinition[]>(loadReports);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<ReportDefinition | null>(null);
@@ -374,7 +376,7 @@ export default function ReportBuilder() {
   if (reports.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3">
-        <div className="text-slate-400 text-sm">No custom reports yet</div>
+        <div className="text-gray-500 dark:text-slate-400 text-sm">No custom reports yet</div>
         <button onClick={createReport} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 transition-colors">
           Create Your First Report
         </button>
@@ -388,8 +390,8 @@ export default function ReportBuilder() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Sidebar — saved reports list */}
-      <div className="w-56 flex-shrink-0 border-r border-slate-800 flex flex-col">
-        <div className="p-2.5 border-b border-slate-800">
+      <div className="w-56 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 flex flex-col">
+        <div className="p-2.5 border-b border-gray-200 dark:border-slate-800">
           <button onClick={createReport}
             className="w-full px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors font-medium">
             + New Report
@@ -398,19 +400,19 @@ export default function ReportBuilder() {
         <div className="flex-1 overflow-y-auto py-1">
           {reports.map(r => (
             <div key={r.id}
-              className={`group flex items-center px-2.5 py-2 cursor-pointer transition-colors ${r.id === selectedId ? 'bg-blue-600/20' : 'hover:bg-slate-800/60'}`}
+              className={`group flex items-center px-2.5 py-2 cursor-pointer transition-colors ${r.id === selectedId ? 'bg-blue-600/20' : 'hover:bg-gray-100/60 dark:bg-slate-800/60'}`}
               onClick={() => setSelectedId(r.id)}>
               <div className="flex-1 min-w-0">
-                <div className={`text-xs font-medium truncate ${r.id === selectedId ? 'text-blue-300' : 'text-slate-300'}`}>{r.name}</div>
-                <div className="text-xs text-slate-600 truncate">{DATA_SOURCES[r.dataSource]?.label}</div>
+                <div className={`text-xs font-medium truncate ${r.id === selectedId ? 'text-blue-300' : 'text-gray-700 dark:text-slate-300'}`}>{r.name}</div>
+                <div className="text-xs text-gray-400 dark:text-slate-600 truncate">{DATA_SOURCES[r.dataSource]?.label}</div>
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0 ml-1">
                 <button onClick={e => { e.stopPropagation(); duplicateReport(r.id); }}
                   title="Duplicate"
-                  className="text-slate-600 hover:text-slate-300 text-xs px-0.5">⎘</button>
+                  className="text-gray-400 dark:text-slate-600 hover:text-gray-700 dark:text-slate-300 text-xs px-0.5">⎘</button>
                 <button onClick={e => { e.stopPropagation(); deleteReport(r.id); }}
                   title="Delete"
-                  className="text-slate-600 hover:text-red-400 text-xs px-0.5">×</button>
+                  className="text-gray-400 dark:text-slate-600 hover:text-red-400 text-xs px-0.5">×</button>
               </div>
             </div>
           ))}
@@ -421,20 +423,20 @@ export default function ReportBuilder() {
       {editing && src ? (
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Config area (scrollable, capped height) */}
-          <div className="flex-shrink-0 max-h-[52%] overflow-y-auto border-b border-slate-800 p-4 space-y-4">
+          <div className="flex-shrink-0 max-h-[52%] overflow-y-auto border-b border-gray-200 dark:border-slate-800 p-4 space-y-4">
             {/* Header row */}
             <div className="flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <input value={editing.name} onChange={e => update({ name: e.target.value })}
-                  className="w-full bg-transparent text-sm font-semibold text-slate-100 border-b border-transparent hover:border-slate-700 focus:border-blue-500 focus:outline-none pb-0.5 transition-colors" />
+                  className="w-full bg-transparent text-sm font-semibold text-gray-900 dark:text-slate-100 border-b border-transparent hover:border-gray-300 dark:border-slate-700 focus:border-blue-500 focus:outline-none pb-0.5 transition-colors" />
                 <input value={editing.description} onChange={e => update({ description: e.target.value })}
                   placeholder="Description (optional)"
-                  className="w-full bg-transparent text-xs text-slate-500 border-b border-transparent hover:border-slate-700 focus:border-slate-600 focus:outline-none pb-0.5 mt-1 transition-colors" />
+                  className="w-full bg-transparent text-xs text-gray-400 dark:text-slate-500 border-b border-transparent hover:border-gray-300 dark:border-slate-700 focus:border-gray-400 dark:focus:border-gray-400 dark:border-slate-600 focus:outline-none pb-0.5 mt-1 transition-colors" />
               </div>
               <div className="flex gap-1.5 flex-shrink-0 items-center">
                 {dirty && (
                   <button onClick={saveEditing}
-                    className="px-2.5 py-1.5 text-xs bg-slate-700 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
+                    className="px-2.5 py-1.5 text-xs bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors">
                     Save
                   </button>
                 )}
@@ -444,12 +446,12 @@ export default function ReportBuilder() {
                 </button>
                 {data.length > 0 && (
                   <div className="relative group/export">
-                    <button className="px-2.5 py-1.5 text-xs bg-slate-700 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
+                    <button className="px-2.5 py-1.5 text-xs bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-400 dark:border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
                       Export ▾
                     </button>
-                    <div className="absolute right-0 top-full mt-1 w-28 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 hidden group-hover/export:block">
-                      <button onClick={exportCsv} className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 rounded-t-lg transition-colors">CSV</button>
-                      <button onClick={exportJson} className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 rounded-b-lg transition-colors">JSON</button>
+                    <div className="absolute right-0 top-full mt-1 w-28 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 hidden group-hover/export:block">
+                      <button onClick={exportCsv} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:bg-slate-700 rounded-t-lg transition-colors">CSV</button>
+                      <button onClick={exportJson} className="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:bg-slate-700 rounded-b-lg transition-colors">JSON</button>
                     </div>
                   </div>
                 )}
@@ -459,7 +461,7 @@ export default function ReportBuilder() {
             {/* Controls row */}
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-xs text-slate-500 block mb-1">Data Source</label>
+                <label className="text-xs text-gray-400 dark:text-slate-500 block mb-1">Data Source</label>
                 <select value={editing.dataSource}
                   onChange={e => update({
                     dataSource: e.target.value,
@@ -469,16 +471,16 @@ export default function ReportBuilder() {
                     chartValueField: undefined,
                     sortField: undefined,
                   })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
                   {Object.entries(DATA_SOURCES).map(([k, v]) => (
                     <option key={k} value={k}>{v.label}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500 block mb-1">Visualization</label>
+                <label className="text-xs text-gray-400 dark:text-slate-500 block mb-1">Visualization</label>
                 <select value={editing.visualization} onChange={e => update({ visualization: e.target.value as VisType })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                  className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
                   <option value="table">Table</option>
                   <option value="bar">Bar Chart</option>
                   <option value="pie">Pie Chart</option>
@@ -486,15 +488,15 @@ export default function ReportBuilder() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500 block mb-1">Sort By</label>
+                <label className="text-xs text-gray-400 dark:text-slate-500 block mb-1">Sort By</label>
                 <div className="flex gap-1">
                   <select value={editing.sortField ?? ''} onChange={e => update({ sortField: e.target.value || undefined })}
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                    className="flex-1 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
                     <option value="">None</option>
                     {src.fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
                   </select>
                   <select value={editing.sortDir ?? 'asc'} onChange={e => update({ sortDir: e.target.value as 'asc' | 'desc' })}
-                    className="w-14 bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
+                    className="w-14 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-1.5 py-1.5 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 transition-colors">
                     <option value="asc">↑ Asc</option>
                     <option value="desc">↓ Desc</option>
                   </select>
@@ -504,25 +506,25 @@ export default function ReportBuilder() {
 
             {/* Chart axis config */}
             {editing.visualization !== 'table' && (
-              <div className="grid grid-cols-2 gap-3 p-3 bg-slate-800/40 rounded-lg border border-slate-800">
+              <div className="grid grid-cols-2 gap-3 p-3 bg-gray-100/40 dark:bg-slate-800/40 rounded-lg border border-gray-200 dark:border-slate-800">
                 <div>
-                  <label className="text-xs text-slate-500 block mb-1">
+                  <label className="text-xs text-gray-400 dark:text-slate-500 block mb-1">
                     {editing.visualization === 'line' ? 'X-Axis (label)' : 'Label Field'}
                   </label>
                   <select value={editing.chartLabelField ?? ''}
                     onChange={e => update({ chartLabelField: e.target.value || undefined })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                    className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500">
                     <option value="">— select field —</option>
                     {src.fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 block mb-1">
+                  <label className="text-xs text-gray-400 dark:text-slate-500 block mb-1">
                     {editing.visualization === 'line' ? 'Y-Axis (value)' : 'Value Field'}
                   </label>
                   <select value={editing.chartValueField ?? ''}
                     onChange={e => update({ chartValueField: e.target.value || undefined })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                    className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500">
                     <option value="">— select field —</option>
                     {src.fields.filter(f => f.type === 'number' || f.type === 'date').map(f => (
                       <option key={f.key} value={f.key}>{f.label}</option>
@@ -534,13 +536,13 @@ export default function ReportBuilder() {
 
             {/* Column selector */}
             <div>
-              <label className="text-xs text-slate-500 block mb-1.5">Columns</label>
+              <label className="text-xs text-gray-400 dark:text-slate-500 block mb-1.5">Columns</label>
               <div className="flex flex-wrap gap-1.5">
                 {src.fields.map(f => (
                   <button key={f.key} onClick={() => toggleColumn(f.key)}
                     className={`px-2 py-1 text-xs rounded border transition-colors ${editing.columns.includes(f.key)
                       ? 'bg-blue-600/20 border-blue-500/30 text-blue-300'
-                      : 'bg-slate-800/50 border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600'
+                      : 'bg-gray-100/50 dark:bg-slate-800/50 border-gray-300 dark:border-slate-700 text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 hover:border-gray-400 dark:border-slate-600'
                     }`}>
                     {f.label}
                   </button>
@@ -551,23 +553,23 @@ export default function ReportBuilder() {
             {/* Filters */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs text-slate-500">Filters</label>
+                <label className="text-xs text-gray-400 dark:text-slate-500">Filters</label>
                 <button onClick={addFilter} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
                   + Add Filter
                 </button>
               </div>
               {editing.filters.length === 0 && (
-                <div className="text-xs text-slate-600 py-1">No filters — showing all rows</div>
+                <div className="text-xs text-gray-400 dark:text-slate-600 py-1">No filters — showing all rows</div>
               )}
               <div className="space-y-1.5">
                 {editing.filters.map(f => (
                   <div key={f.id} className="flex items-center gap-2">
                     <select value={f.field} onChange={e => updateFilter(f.id, { field: e.target.value })}
-                      className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                      className="flex-1 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500">
                       {src.fields.map(fd => <option key={fd.key} value={fd.key}>{fd.label}</option>)}
                     </select>
                     <select value={f.operator} onChange={e => updateFilter(f.id, { operator: e.target.value as Operator })}
-                      className="w-28 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none">
+                      className="w-28 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-gray-800 dark:text-slate-200 focus:outline-none">
                       <option value="eq">equals</option>
                       <option value="neq">not equals</option>
                       <option value="gt">greater than</option>
@@ -576,16 +578,16 @@ export default function ReportBuilder() {
                     </select>
                     {fieldMap[f.field]?.options ? (
                       <select value={f.value} onChange={e => updateFilter(f.id, { value: e.target.value })}
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                        className="flex-1 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500">
                         <option value="">— any —</option>
                         {fieldMap[f.field].options!.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : (
                       <input value={f.value} onChange={e => updateFilter(f.id, { value: e.target.value })}
                         placeholder="value"
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                        className="flex-1 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded px-2 py-1 text-xs text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
                     )}
-                    <button onClick={() => removeFilter(f.id)} className="text-slate-600 hover:text-red-400 text-base leading-none">×</button>
+                    <button onClick={() => removeFilter(f.id)} className="text-gray-400 dark:text-slate-600 hover:text-red-400 text-base leading-none">×</button>
                   </div>
                 ))}
               </div>
@@ -595,20 +597,20 @@ export default function ReportBuilder() {
           {/* Results area */}
           <div className="flex-1 overflow-y-auto min-h-0 p-4">
             {loading && (
-              <div className="flex items-center justify-center h-32 text-slate-500 text-sm">Running report…</div>
+              <div className="flex items-center justify-center h-32 text-gray-400 dark:text-slate-500 text-sm">Running report…</div>
             )}
             {error && (
               <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-3">{error}</div>
             )}
             {!loading && !error && data.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-32 gap-2 text-slate-600">
+              <div className="flex flex-col items-center justify-center h-32 gap-2 text-gray-400 dark:text-slate-600">
                 <div className="text-sm">Configure your report above and click Run Report</div>
               </div>
             )}
             {!loading && !error && data.length > 0 && (
               <>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-slate-500">{data.length} row{data.length !== 1 ? 's' : ''}</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500">{data.length} row{data.length !== 1 ? 's' : ''}</span>
                 </div>
                 {editing.visualization === 'table' && (
                   <ReportTable data={data} columns={editing.columns} fieldMap={fieldMap} />
@@ -641,7 +643,7 @@ export default function ReportBuilder() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-slate-600 text-sm">
+        <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-slate-600 text-sm">
           Select a report from the list
         </div>
       )}
@@ -655,10 +657,10 @@ function ReportTable({ data, columns, fieldMap }: { data: any[]; columns: string
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
-        <thead className="sticky top-0 bg-slate-950 z-10">
-          <tr className="border-b border-slate-800">
+        <thead className="sticky top-0 bg-white dark:bg-slate-950 z-10">
+          <tr className="border-b border-gray-200 dark:border-slate-800">
             {columns.map(c => (
-              <th key={c} className="text-left py-2 px-3 text-slate-500 font-medium whitespace-nowrap">
+              <th key={c} className="text-left py-2 px-3 text-gray-400 dark:text-slate-500 font-medium whitespace-nowrap">
                 {fieldMap[c]?.label ?? c}
               </th>
             ))}
@@ -666,7 +668,7 @@ function ReportTable({ data, columns, fieldMap }: { data: any[]; columns: string
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr key={i} className="border-b border-slate-800/40 hover:bg-slate-800/20">
+            <tr key={i} className="border-b border-gray-200/40 dark:border-slate-800/40 hover:bg-gray-100/20 dark:bg-slate-800/20">
               {columns.map(c => (
                 <td key={c} className="py-2 px-3">
                   <CellValue value={row[c]} field={fieldMap[c]} />
@@ -681,28 +683,28 @@ function ReportTable({ data, columns, fieldMap }: { data: any[]; columns: string
 }
 
 function CellValue({ value, field }: { value: any; field?: FieldDef }) {
-  if (value === null || value === undefined) return <span className="text-slate-600">—</span>;
+  if (value === null || value === undefined) return <span className="text-gray-400 dark:text-slate-600">—</span>;
   if (field?.type === 'date') {
     try {
-      return <span className="text-slate-400 font-mono">{new Date(value).toLocaleString()}</span>;
+      return <span className="text-gray-500 dark:text-slate-400 font-mono">{new Date(value).toLocaleString()}</span>;
     } catch {
-      return <span className="text-slate-400">{String(value)}</span>;
+      return <span className="text-gray-500 dark:text-slate-400">{String(value)}</span>;
     }
   }
-  if (Array.isArray(value)) return <span className="text-slate-400">{value.join(', ')}</span>;
+  if (Array.isArray(value)) return <span className="text-gray-500 dark:text-slate-400">{value.join(', ')}</span>;
 
   if (field?.type === 'enum') {
     const STATUS_COLORS: Record<string, string> = {
-      active: 'text-emerald-400', planned: 'text-blue-400', deprecated: 'text-slate-500',
-      disabled: 'text-slate-500', tuning: 'text-yellow-400', archived: 'text-slate-500',
-      critical: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-slate-400',
-      informational: 'text-slate-500', Yes: 'text-emerald-400', No: 'text-slate-500',
+      active: 'text-emerald-400', planned: 'text-blue-400', deprecated: 'text-gray-400 dark:text-slate-500',
+      disabled: 'text-gray-400 dark:text-slate-500', tuning: 'text-yellow-400', archived: 'text-gray-400 dark:text-slate-500',
+      critical: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-500 dark:text-slate-400',
+      informational: 'text-gray-400 dark:text-slate-500', Yes: 'text-emerald-400', No: 'text-gray-400 dark:text-slate-500',
     };
-    const cls = STATUS_COLORS[String(value)] ?? 'text-slate-300';
+    const cls = STATUS_COLORS[String(value)] ?? 'text-gray-700 dark:text-slate-300';
     return <span className={cls}>{String(value)}</span>;
   }
-  if (typeof value === 'number') return <span className="font-mono text-slate-300">{value}</span>;
-  return <span className="text-slate-300">{String(value)}</span>;
+  if (typeof value === 'number') return <span className="font-mono text-gray-700 dark:text-slate-300">{value}</span>;
+  return <span className="text-gray-700 dark:text-slate-300">{String(value)}</span>;
 }
 
 // ─── Bar chart ────────────────────────────────────────────────────────────────
@@ -710,6 +712,7 @@ function CellValue({ value, field }: { value: any; field?: FieldDef }) {
 function ReportBarChart({ data, labelField, valueField, valueLabel }: {
   data: any[]; labelField?: string; valueField?: string; valueLabel: string;
 }) {
+  const { theme } = useTheme();
   if (!labelField || !valueField) {
     return <ChartPlaceholder />;
   }
@@ -720,11 +723,12 @@ function ReportBarChart({ data, labelField, valueField, valueLabel }: {
   return (
     <ResponsiveContainer width="100%" height={320}>
       <BarChart data={chartData} margin={{ left: 0, right: 16, top: 8, bottom: 60 }}>
-        <CartesianGrid stroke="#1e293b" vertical={false} />
-        <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 10 }} angle={-40} textAnchor="end" interval={0} />
-        <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
+        <CartesianGrid stroke={theme === 'dark' ? '#1e293b' : '#e2e8f0'} vertical={false} />
+        <XAxis dataKey="label" tick={{ fill: theme === 'dark' ? '#64748b' : '#9ca3af', fontSize: 10 }} angle={-40} textAnchor="end" interval={0} />
+        <YAxis tick={{ fill: theme === 'dark' ? '#64748b' : '#9ca3af', fontSize: 11 }} />
         <Tooltip
-          contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+          contentStyle={{ background: theme === 'dark' ? '#1e293b' : '#ffffff', border: theme === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: 8, fontSize: 12 }}
+          labelStyle={{ color: theme === 'dark' ? '#94a3b8' : '#6b7280', marginBottom: 2 }}
           formatter={(v: number) => [v, valueLabel]}
         />
         <Bar dataKey="value" fill="#3b82f6" radius={[3, 3, 0, 0]}>
@@ -740,6 +744,7 @@ function ReportBarChart({ data, labelField, valueField, valueLabel }: {
 function ReportPieChart({ data, labelField, valueField }: {
   data: any[]; labelField?: string; valueField?: string;
 }) {
+  const { theme } = useTheme();
   if (!labelField || !valueField) {
     return <ChartPlaceholder />;
   }
@@ -754,8 +759,9 @@ function ReportPieChart({ data, labelField, valueField }: {
         <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={130} innerRadius={60}>
           {chartData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
         </Pie>
-        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-        <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
+        <Tooltip contentStyle={{ background: theme === 'dark' ? '#1e293b' : '#ffffff', border: theme === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: 8, fontSize: 12 }}
+          labelStyle={{ color: theme === 'dark' ? '#94a3b8' : '#6b7280', marginBottom: 2 }} />
+        <Legend wrapperStyle={{ fontSize: 11, color: theme === 'dark' ? '#94a3b8' : '#6b7280' }} />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -766,6 +772,7 @@ function ReportPieChart({ data, labelField, valueField }: {
 function ReportLineChart({ data, labelField, valueField, valueLabel }: {
   data: any[]; labelField?: string; valueField?: string; valueLabel: string;
 }) {
+  const { theme } = useTheme();
   if (!labelField || !valueField) {
     return <ChartPlaceholder />;
   }
@@ -779,11 +786,12 @@ function ReportLineChart({ data, labelField, valueField, valueLabel }: {
   return (
     <ResponsiveContainer width="100%" height={320}>
       <LineChart data={chartData} margin={{ left: 0, right: 16, top: 8, bottom: 48 }}>
-        <CartesianGrid stroke="#1e293b" />
-        <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 10 }} angle={-35} textAnchor="end" interval={0} />
-        <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
+        <CartesianGrid stroke={theme === 'dark' ? '#1e293b' : '#e2e8f0'} />
+        <XAxis dataKey="label" tick={{ fill: theme === 'dark' ? '#64748b' : '#9ca3af', fontSize: 10 }} angle={-35} textAnchor="end" interval={0} />
+        <YAxis tick={{ fill: theme === 'dark' ? '#64748b' : '#9ca3af', fontSize: 11 }} />
         <Tooltip
-          contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+          contentStyle={{ background: theme === 'dark' ? '#1e293b' : '#ffffff', border: theme === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: 8, fontSize: 12 }}
+          labelStyle={{ color: theme === 'dark' ? '#94a3b8' : '#6b7280', marginBottom: 2 }}
           formatter={(v: number) => [v, valueLabel]}
         />
         <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 3 }} />
@@ -796,7 +804,7 @@ function ReportLineChart({ data, labelField, valueField, valueLabel }: {
 
 function ChartPlaceholder() {
   return (
-    <div className="flex items-center justify-center h-48 text-slate-600 text-xs border border-dashed border-slate-800 rounded-lg">
+    <div className="flex items-center justify-center h-48 text-gray-400 dark:text-slate-600 text-xs border border-dashed border-gray-200 dark:border-slate-800 rounded-lg">
       Select Label and Value fields above to render the chart
     </div>
   );

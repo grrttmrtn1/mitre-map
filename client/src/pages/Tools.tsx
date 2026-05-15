@@ -113,12 +113,12 @@ export default function Tools() {
   return (
     <div className="flex h-full">
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-slate-100">Tools & Capabilities</h1>
-              <p className="text-sm text-slate-400 mt-0.5">Security tooling inventory mapped to D3FEND and ATT&CK mitigations</p>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Tools & Capabilities</h1>
+              <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Security tooling inventory mapped to D3FEND and ATT&CK mitigations</p>
             </div>
             <button onClick={openCreate} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors">
               + Add Tool
@@ -130,7 +130,7 @@ export default function Tools() {
           {loading ? (
             <div className="space-y-3 p-0.5">
               {Array.from({ length: 8 }).map((_, i) => (
-                <SkeletonRow key={i} className="bg-slate-900 border border-slate-800 rounded-xl" />
+                <SkeletonRow key={i} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl" />
               ))}
             </div>
           ) : (
@@ -139,34 +139,34 @@ export default function Tools() {
                 <div
                   key={tool.id}
                   onClick={() => openDetail(tool)}
-                  className={`bg-slate-900 border rounded-xl p-4 cursor-pointer transition-all hover:border-slate-600 ${selectedTool?.id === tool.id ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-800'}`}
+                  className={`bg-gray-50 dark:bg-slate-900 border rounded-xl p-4 cursor-pointer transition-all hover:border-gray-400 dark:border-slate-600 ${selectedTool?.id === tool.id ? 'border-blue-500/50 bg-blue-500/5' : 'border-gray-200 dark:border-slate-800'}`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-200">{tool.name}</span>
-                        {tool.vendor && <span className="text-xs text-slate-500">by {tool.vendor}</span>}
+                        <span className="text-sm font-semibold text-gray-800 dark:text-slate-200">{tool.name}</span>
+                        {tool.vendor && <span className="text-xs text-gray-400 dark:text-slate-500">by {tool.vendor}</span>}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs font-medium ${categoryColors[tool.category] ?? 'text-slate-400'}`}>{tool.category}</span>
+                        <span className={`text-xs font-medium ${categoryColors[tool.category] ?? 'text-gray-500 dark:text-slate-400'}`}>{tool.category}</span>
                         <StatusBadge value={tool.status} variant="tool_status" />
                       </div>
                       {tool.description && (
-                        <p className="text-xs text-slate-500 mt-1.5 truncate max-w-xl">{tool.description}</p>
+                        <p className="text-xs text-gray-400 dark:text-slate-500 mt-1.5 truncate max-w-xl">{tool.description}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-4 ml-4 flex-shrink-0">
                       <div className="text-center">
                         <div className="text-lg font-bold text-blue-400">{tool.d3fend_count ?? 0}</div>
-                        <div className="text-xs text-slate-500">D3FEND</div>
+                        <div className="text-xs text-gray-400 dark:text-slate-500">D3FEND</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-bold text-purple-400">{tool.mitigation_count ?? 0}</div>
-                        <div className="text-xs text-slate-500">Mitigations</div>
+                        <div className="text-xs text-gray-400 dark:text-slate-500">Mitigations</div>
                       </div>
                       <div className="flex gap-1">
-                        <button onClick={e => { e.stopPropagation(); openEdit(tool); }} className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded">Edit</button>
-                        <button onClick={e => { e.stopPropagation(); del(tool.id); }} className="px-2 py-1 text-xs text-red-400 hover:text-red-300 bg-slate-800 rounded">Delete</button>
+                        <button onClick={e => { e.stopPropagation(); openEdit(tool); }} className="px-2 py-1 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 bg-gray-100 dark:bg-slate-800 rounded">Edit</button>
+                        <button onClick={e => { e.stopPropagation(); del(tool.id); }} className="px-2 py-1 text-xs text-red-400 hover:text-red-300 bg-gray-100 dark:bg-slate-800 rounded">Delete</button>
                       </div>
                     </div>
                   </div>
@@ -177,8 +177,8 @@ export default function Tools() {
                   <svg className="w-14 h-14 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.654-4.654m5.896-2.678a7.5 7.5 0 0 0-10.607 0" />
                   </svg>
-                  <p className="text-sm font-medium text-slate-400">No tools configured</p>
-                  <p className="text-xs text-slate-600 mt-1 max-w-xs">Add your security tools — EDR, SIEM, NDR and more — to track which ATT&amp;CK techniques they cover.</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-slate-400">No tools configured</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-600 mt-1 max-w-xs">Add your security tools — EDR, SIEM, NDR and more — to track which ATT&amp;CK techniques they cover.</p>
                 </div>
               )}
             </div>
@@ -187,28 +187,28 @@ export default function Tools() {
       </div>
 
       {selectedTool && (
-        <div className="w-80 flex-shrink-0 border-l border-slate-800 bg-slate-900 overflow-y-auto">
-          <div className="px-4 py-4 border-b border-slate-800 flex items-start justify-between">
+        <div className="w-80 flex-shrink-0 border-l border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 overflow-y-auto">
+          <div className="px-4 py-4 border-b border-gray-200 dark:border-slate-800 flex items-start justify-between">
             <div>
-              <div className="text-sm font-semibold text-slate-200">{selectedTool.name}</div>
-              {selectedTool.vendor && <div className="text-xs text-slate-500">{selectedTool.vendor}</div>}
+              <div className="text-sm font-semibold text-gray-800 dark:text-slate-200">{selectedTool.name}</div>
+              {selectedTool.vendor && <div className="text-xs text-gray-400 dark:text-slate-500">{selectedTool.vendor}</div>}
               <div className="flex gap-2 mt-1">
-                <span className={`text-xs font-medium ${categoryColors[selectedTool.category] ?? 'text-slate-400'}`}>{selectedTool.category}</span>
+                <span className={`text-xs font-medium ${categoryColors[selectedTool.category] ?? 'text-gray-500 dark:text-slate-400'}`}>{selectedTool.category}</span>
                 <StatusBadge value={selectedTool.status} variant="tool_status" />
               </div>
             </div>
-            <button onClick={() => setSelectedTool(null)} className="text-slate-500 hover:text-slate-300">×</button>
+            <button onClick={() => setSelectedTool(null)} className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300">×</button>
           </div>
 
           <div className="p-4 space-y-4">
             {selectedTool.description && (
-              <p className="text-xs text-slate-400">{selectedTool.description}</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">{selectedTool.description}</p>
             )}
 
             <div>
-              <div className="text-xs font-semibold text-slate-300 mb-2">D3FEND Countermeasures ({selectedTool.d3fend_techniques.length})</div>
+              <div className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-2">D3FEND Countermeasures ({selectedTool.d3fend_techniques.length})</div>
               {selectedTool.d3fend_techniques.length === 0 ? (
-                <p className="text-xs text-slate-500">None configured.</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500">None configured.</p>
               ) : (
                 <div className="space-y-1">
                   {Object.entries(
@@ -219,11 +219,11 @@ export default function Tools() {
                     }, {} as Record<string, D3FendTechnique[]>)
                   ).map(([cat, items]) => (
                     <div key={cat}>
-                      <div className="text-xs text-slate-500 mt-2 mb-1">{cat}</div>
+                      <div className="text-xs text-gray-400 dark:text-slate-500 mt-2 mb-1">{cat}</div>
                       {items.map(d => (
                         <div key={d.id} className="flex items-center gap-2 py-1">
-                          <span className="font-mono text-xs text-slate-500 w-16 flex-shrink-0">{d.id}</span>
-                          <span className="text-xs text-slate-300">{d.name}</span>
+                          <span className="font-mono text-xs text-gray-400 dark:text-slate-500 w-16 flex-shrink-0">{d.id}</span>
+                          <span className="text-xs text-gray-700 dark:text-slate-300">{d.name}</span>
                         </div>
                       ))}
                     </div>
@@ -232,16 +232,16 @@ export default function Tools() {
               )}
             </div>
 
-            <div className="pt-2 border-t border-slate-800">
-              <div className="text-xs font-semibold text-slate-300 mb-2">ATT&CK Mitigations ({selectedTool.mitigations.length})</div>
+            <div className="pt-2 border-t border-gray-200 dark:border-slate-800">
+              <div className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-2">ATT&CK Mitigations ({selectedTool.mitigations.length})</div>
               {selectedTool.mitigations.length === 0 ? (
-                <p className="text-xs text-slate-500">None configured.</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500">None configured.</p>
               ) : (
                 <div className="space-y-1">
                   {selectedTool.mitigations.map(m => (
                     <div key={m.id} className="flex items-start gap-2 py-1">
-                      <span className="font-mono text-xs text-slate-500 w-12 flex-shrink-0">{m.id}</span>
-                      <span className="text-xs text-slate-300">{m.name}</span>
+                      <span className="font-mono text-xs text-gray-400 dark:text-slate-500 w-12 flex-shrink-0">{m.id}</span>
+                      <span className="text-xs text-gray-700 dark:text-slate-300">{m.name}</span>
                     </div>
                   ))}
                 </div>
@@ -254,66 +254,66 @@ export default function Tools() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editTool ? 'Edit Tool' : 'Add Tool'} width="max-w-4xl">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-400 mb-1">Name *</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Name *</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+              className="w-full px-3 py-2 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Vendor</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Vendor</label>
             <input value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+              className="w-full px-3 py-2 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Category *</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Category *</label>
             <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-blue-500">
+              className="w-full px-3 py-2 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-700 dark:text-slate-300 focus:outline-none focus:border-blue-500">
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">Status</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Status</label>
             <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as Tool['status'] }))}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-blue-500">
+              className="w-full px-3 py-2 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-700 dark:text-slate-300 focus:outline-none focus:border-blue-500">
               {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-400 mb-1">Description</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Description</label>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
+              className="w-full px-3 py-2 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">D3FEND Techniques ({form.d3fend_ids.length} selected)</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">D3FEND Techniques ({form.d3fend_ids.length} selected)</label>
             <input value={d3fendSearch} onChange={e => setD3fendSearch(e.target.value)} placeholder="Filter..."
-              className="w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 mb-1 focus:outline-none" />
-            <div className="border border-slate-700 rounded-lg max-h-48 overflow-y-auto bg-slate-900">
+              className="w-full px-2 py-1 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded text-xs text-gray-700 dark:text-slate-300 mb-1 focus:outline-none" />
+            <div className="border border-gray-300 dark:border-slate-700 rounded-lg max-h-48 overflow-y-auto bg-gray-50 dark:bg-slate-900">
               {filteredD3.map(d => (
-                <label key={d.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800/50">
+                <label key={d.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 dark:bg-slate-800 cursor-pointer border-b border-gray-200 dark:border-slate-800/50">
                   <input type="checkbox" checked={form.d3fend_ids.includes(d.id)} onChange={() => toggleD3(d.id)} className="accent-blue-500 flex-shrink-0" />
-                  <span className="font-mono text-xs text-slate-500 w-14 flex-shrink-0">{d.id}</span>
-                  <span className="text-xs text-slate-300 truncate">{d.name}</span>
-                  <span className="text-xs text-slate-500 flex-shrink-0">{d.category}</span>
+                  <span className="font-mono text-xs text-gray-400 dark:text-slate-500 w-14 flex-shrink-0">{d.id}</span>
+                  <span className="text-xs text-gray-700 dark:text-slate-300 truncate">{d.name}</span>
+                  <span className="text-xs text-gray-400 dark:text-slate-500 flex-shrink-0">{d.category}</span>
                 </label>
               ))}
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1">ATT&CK Mitigations ({form.mitigation_ids.length} selected)</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">ATT&CK Mitigations ({form.mitigation_ids.length} selected)</label>
             <input value={mitSearch} onChange={e => setMitSearch(e.target.value)} placeholder="Filter..."
-              className="w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 mb-1 focus:outline-none" />
-            <div className="border border-slate-700 rounded-lg max-h-48 overflow-y-auto bg-slate-900">
+              className="w-full px-2 py-1 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded text-xs text-gray-700 dark:text-slate-300 mb-1 focus:outline-none" />
+            <div className="border border-gray-300 dark:border-slate-700 rounded-lg max-h-48 overflow-y-auto bg-gray-50 dark:bg-slate-900">
               {filteredMit.map(m => (
-                <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-800 cursor-pointer border-b border-slate-800/50">
+                <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 dark:bg-slate-800 cursor-pointer border-b border-gray-200 dark:border-slate-800/50">
                   <input type="checkbox" checked={form.mitigation_ids.includes(m.id)} onChange={() => toggleMit(m.id)} className="accent-purple-500 flex-shrink-0" />
-                  <span className="font-mono text-xs text-slate-500 w-12 flex-shrink-0">{m.id}</span>
-                  <span className="text-xs text-slate-300 truncate">{m.name}</span>
+                  <span className="font-mono text-xs text-gray-400 dark:text-slate-500 w-12 flex-shrink-0">{m.id}</span>
+                  <span className="text-xs text-gray-700 dark:text-slate-300 truncate">{m.name}</span>
                 </label>
               ))}
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-800">
-          <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+        <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-slate-800">
+          <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200">Cancel</button>
           <button onClick={save} disabled={saving || !form.name}
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors">
             {saving ? 'Saving...' : editTool ? 'Save Changes' : 'Add Tool'}

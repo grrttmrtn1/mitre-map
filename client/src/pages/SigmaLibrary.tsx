@@ -9,7 +9,7 @@ const LEVEL_COLORS: Record<string, string> = {
   high: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
   medium: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
   low: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  informational: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
+  informational: 'bg-slate-500/15 text-gray-500 dark:text-slate-400 border-slate-500/30',
 };
 
 // ── Community Rules (SigmaHQ) tab ─────────────────────────────────────────────
@@ -105,28 +105,28 @@ function LibraryTab() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex-shrink-0 px-4 py-3 border-b border-slate-800 bg-slate-900/30">
+      <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/30">
         <div className="flex gap-2 items-center">
           <input
             value={techInput}
             onChange={e => setTechInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && search()}
             placeholder="ATT&CK technique ID, e.g. T1059.001"
-            className="flex-1 max-w-xs px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="flex-1 max-w-xs px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
           <button onClick={search} disabled={searching}
             className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
             {searching ? 'Searching…' : 'Search SigmaHQ'}
           </button>
           {rateLimitRemaining !== null && (
-            <span className={`text-xs ${rateLimitRemaining < 3 ? 'text-orange-400' : 'text-slate-500'}`}>
+            <span className={`text-xs ${rateLimitRemaining < 3 ? 'text-orange-400' : 'text-gray-400 dark:text-slate-500'}`}>
               {rateLimitRemaining} GitHub API calls remaining
             </span>
           )}
         </div>
         {searchError && <div className="mt-2 text-xs text-red-400">{searchError}</div>}
         {results.length > 0 && (
-          <div className="mt-1 text-xs text-slate-500">
+          <div className="mt-1 text-xs text-gray-400 dark:text-slate-500">
             Showing {results.length} of {totalCount} matching rules from SigmaHQ
           </div>
         )}
@@ -134,16 +134,16 @@ function LibraryTab() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Results list */}
-        <div className="w-72 flex-shrink-0 border-r border-slate-800 flex flex-col">
+        <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 flex flex-col">
           {results.length === 0 && !searching && (
-            <div className="flex flex-col items-center justify-center flex-1 text-slate-500 px-4 text-center">
+            <div className="flex flex-col items-center justify-center flex-1 text-gray-400 dark:text-slate-500 px-4 text-center">
               <div className="text-3xl mb-2">σ</div>
-              <div className="text-sm font-medium text-slate-400 mb-1">SigmaHQ Community Rules</div>
+              <div className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-1">SigmaHQ Community Rules</div>
               <div className="text-xs">Search by ATT&CK technique to browse community detection rules from SigmaHQ.</div>
             </div>
           )}
           {searching && (
-            <div className="flex items-center justify-center flex-1 text-slate-500 text-sm">Searching GitHub…</div>
+            <div className="flex items-center justify-center flex-1 text-gray-400 dark:text-slate-500 text-sm">Searching GitHub…</div>
           )}
           {results.length > 0 && (
             <div className="flex-1 overflow-y-auto py-1">
@@ -151,7 +151,7 @@ function LibraryTab() {
                 <div
                   key={item.raw_url}
                   onClick={() => selectRule(item)}
-                  className={`flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-slate-800/50 transition-colors border-b border-slate-800/50 ${selectedItem?.raw_url === item.raw_url ? 'bg-slate-800' : ''}`}
+                  className={`flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-100/50 dark:bg-slate-800/50 transition-colors border-b border-gray-200 dark:border-slate-800/50 ${selectedItem?.raw_url === item.raw_url ? 'bg-gray-100 dark:bg-slate-800' : ''}`}
                 >
                   <input
                     type="checkbox"
@@ -161,8 +161,8 @@ function LibraryTab() {
                     className="mt-0.5 flex-shrink-0 accent-blue-500"
                   />
                   <div className="min-w-0">
-                    <div className="text-xs text-slate-200 font-medium leading-tight truncate">{item.name}</div>
-                    <div className="text-xs text-slate-500 mt-0.5 truncate">{item.category}</div>
+                    <div className="text-xs text-gray-800 dark:text-slate-200 font-medium leading-tight truncate">{item.name}</div>
+                    <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 truncate">{item.category}</div>
                   </div>
                 </div>
               ))}
@@ -173,27 +173,27 @@ function LibraryTab() {
         {/* Rule preview */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {!selectedItem && (
-            <div className="flex items-center justify-center flex-1 text-slate-500 text-sm">
+            <div className="flex items-center justify-center flex-1 text-gray-400 dark:text-slate-500 text-sm">
               Select a rule to preview
             </div>
           )}
           {selectedItem && ruleLoading && (
-            <div className="flex items-center justify-center flex-1 text-slate-500 text-sm">Loading rule…</div>
+            <div className="flex items-center justify-center flex-1 text-gray-400 dark:text-slate-500 text-sm">Loading rule…</div>
           )}
           {selectedItem && !ruleLoading && ruleDetail && (
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Header */}
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-base font-semibold text-slate-100">{ruleDetail.parsed.title ?? selectedItem.name}</div>
+                  <div className="text-base font-semibold text-gray-900 dark:text-slate-100">{ruleDetail.parsed.title ?? selectedItem.name}</div>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {ruleDetail.parsed.level && (
-                      <span className={`px-2 py-0.5 rounded border text-xs font-medium ${LEVEL_COLORS[ruleDetail.parsed.level] ?? 'bg-slate-700 text-slate-400 border-slate-600'}`}>
+                      <span className={`px-2 py-0.5 rounded border text-xs font-medium ${LEVEL_COLORS[ruleDetail.parsed.level] ?? 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border-gray-400 dark:border-slate-600'}`}>
                         {ruleDetail.parsed.level}
                       </span>
                     )}
                     {ruleDetail.parsed.status && (
-                      <span className="px-2 py-0.5 rounded border text-xs bg-slate-700 text-slate-400 border-slate-600">{ruleDetail.parsed.status}</span>
+                      <span className="px-2 py-0.5 rounded border text-xs bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border-gray-400 dark:border-slate-600">{ruleDetail.parsed.status}</span>
                     )}
                     {ruleDetail.parsed.technique_ids.map(id => (
                       <span key={id} className="px-2 py-0.5 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/30">{id}</span>
@@ -208,39 +208,39 @@ function LibraryTab() {
 
               {ruleDetail.parsed.description && (
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-1">Description</div>
-                  <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{ruleDetail.parsed.description}</p>
+                  <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">Description</div>
+                  <p className="text-xs text-gray-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{ruleDetail.parsed.description}</p>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 {ruleDetail.parsed.logsource && Object.keys(ruleDetail.parsed.logsource).length > 0 && (
                   <div>
-                    <div className="text-xs font-semibold text-slate-400 mb-1">Log Source</div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">Log Source</div>
                     <div className="space-y-0.5">
                       {Object.entries(ruleDetail.parsed.logsource).map(([k, v]) => (
                         <div key={k} className="text-xs">
-                          <span className="text-slate-500">{k}: </span>
-                          <span className="text-slate-300">{v}</span>
+                          <span className="text-gray-400 dark:text-slate-500">{k}: </span>
+                          <span className="text-gray-700 dark:text-slate-300">{v}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-1">Metadata</div>
+                  <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">Metadata</div>
                   <div className="space-y-0.5 text-xs">
-                    {ruleDetail.parsed.author && <div><span className="text-slate-500">author: </span><span className="text-slate-300">{ruleDetail.parsed.author}</span></div>}
-                    {ruleDetail.parsed.date && <div><span className="text-slate-500">date: </span><span className="text-slate-300">{ruleDetail.parsed.date}</span></div>}
-                    {ruleDetail.parsed.id && <div><span className="text-slate-500">id: </span><span className="font-mono text-slate-400">{ruleDetail.parsed.id}</span></div>}
+                    {ruleDetail.parsed.author && <div><span className="text-gray-400 dark:text-slate-500">author: </span><span className="text-gray-700 dark:text-slate-300">{ruleDetail.parsed.author}</span></div>}
+                    {ruleDetail.parsed.date && <div><span className="text-gray-400 dark:text-slate-500">date: </span><span className="text-gray-700 dark:text-slate-300">{ruleDetail.parsed.date}</span></div>}
+                    {ruleDetail.parsed.id && <div><span className="text-gray-400 dark:text-slate-500">id: </span><span className="font-mono text-gray-500 dark:text-slate-400">{ruleDetail.parsed.id}</span></div>}
                   </div>
                 </div>
               </div>
 
               {ruleDetail.parsed.detection_raw && (
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-1">Detection Logic</div>
-                  <pre className="text-xs text-slate-300 bg-slate-800 border border-slate-700 rounded-lg p-3 overflow-x-auto leading-relaxed">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">Detection Logic</div>
+                  <pre className="text-xs text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg p-3 overflow-x-auto leading-relaxed">
                     {ruleDetail.parsed.detection_raw}
                   </pre>
                 </div>
@@ -248,8 +248,8 @@ function LibraryTab() {
 
               {ruleDetail.parsed.falsepositives && ruleDetail.parsed.falsepositives.length > 0 && (
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-1">False Positives</div>
-                  <ul className="text-xs text-slate-400 space-y-0.5">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">False Positives</div>
+                  <ul className="text-xs text-gray-500 dark:text-slate-400 space-y-0.5">
                     {ruleDetail.parsed.falsepositives.map((fp, i) => <li key={i}>• {fp}</li>)}
                   </ul>
                 </div>
@@ -257,7 +257,7 @@ function LibraryTab() {
 
               {ruleDetail.parsed.references && ruleDetail.parsed.references.length > 0 && (
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-1">References</div>
+                  <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">References</div>
                   <ul className="text-xs space-y-0.5">
                     {ruleDetail.parsed.references.map((r, i) => (
                       <li key={i}><a href={r} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300 break-all">{r}</a></li>
@@ -267,8 +267,8 @@ function LibraryTab() {
               )}
 
               <div>
-                <div className="text-xs font-semibold text-slate-400 mb-1">Full Rule YAML</div>
-                <pre className="text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-lg p-3 overflow-x-auto leading-relaxed">
+                <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">Full Rule YAML</div>
+                <pre className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg p-3 overflow-x-auto leading-relaxed">
                   {ruleDetail.raw}
                 </pre>
               </div>
@@ -279,9 +279,9 @@ function LibraryTab() {
 
       {/* Import bar */}
       {results.length > 0 && (
-        <div className="flex-shrink-0 px-4 py-2.5 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+        <div className="flex-shrink-0 px-4 py-2.5 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400">{checked.size} selected</span>
+            <span className="text-xs text-gray-500 dark:text-slate-400">{checked.size} selected</span>
             {importMsg && (
               <span className={`text-xs ${importMsg.startsWith('Import failed') ? 'text-red-400' : 'text-emerald-400'}`}>
                 {importMsg}
@@ -400,32 +400,32 @@ function TemplatesTab() {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      <div className="flex-shrink-0 px-4 py-3 border-b border-slate-800 bg-slate-900/30 flex gap-2">
+      <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/30 flex gap-2">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search techniques…"
-          className="flex-1 max-w-xs px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+          className="flex-1 max-w-xs px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
         />
         <select
           value={filterTactic}
           onChange={e => setFilterTactic(e.target.value)}
-          className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none focus:border-blue-500"
         >
           <option value="">All Tactics</option>
           {allTactics.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
         </select>
-        <span className="text-xs text-slate-500 self-center">{filtered.length} techniques</span>
+        <span className="text-xs text-gray-400 dark:text-slate-500 self-center">{filtered.length} techniques</span>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Technique list */}
-        <div className="w-72 flex-shrink-0 border-r border-slate-800 overflow-y-auto">
+        <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 overflow-y-auto">
           {filtered.map(tech => (
             <div
               key={tech.id}
               onClick={() => selectTechnique(tech)}
-              className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-slate-800/50 transition-colors border-b border-slate-800/50 ${selectedTech?.id === tech.id ? 'bg-slate-800' : ''}`}
+              className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-gray-100/50 dark:bg-slate-800/50 transition-colors border-b border-gray-200 dark:border-slate-800/50 ${selectedTech?.id === tech.id ? 'bg-gray-100 dark:bg-slate-800' : ''}`}
             >
               <input
                 type="checkbox"
@@ -435,8 +435,8 @@ function TemplatesTab() {
                 className="flex-shrink-0 accent-blue-500"
               />
               <div className="min-w-0">
-                <div className="text-xs text-slate-200 font-medium leading-tight truncate">{tech.name}</div>
-                <div className="text-xs text-slate-500 font-mono">{tech.id}</div>
+                <div className="text-xs text-gray-800 dark:text-slate-200 font-medium leading-tight truncate">{tech.name}</div>
+                <div className="text-xs text-gray-400 dark:text-slate-500 font-mono">{tech.id}</div>
               </div>
             </div>
           ))}
@@ -445,49 +445,49 @@ function TemplatesTab() {
         {/* Template preview / editor */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {!selectedTech && (
-            <div className="flex flex-col items-center justify-center flex-1 text-slate-500 px-4 text-center">
+            <div className="flex flex-col items-center justify-center flex-1 text-gray-400 dark:text-slate-500 px-4 text-center">
               <div className="text-3xl mb-2">⊞</div>
-              <div className="text-sm font-medium text-slate-400 mb-1">Detection Templates</div>
+              <div className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-1">Detection Templates</div>
               <div className="text-xs max-w-xs">
                 Select a technique to generate a pre-filled detection starter. Templates import as "planned" — finish the logic before activating.
               </div>
             </div>
           )}
           {selectedTech && templateLoading && (
-            <div className="flex items-center justify-center flex-1 text-slate-500 text-sm">Generating template…</div>
+            <div className="flex items-center justify-center flex-1 text-gray-400 dark:text-slate-500 text-sm">Generating template…</div>
           )}
           {selectedTech && !templateLoading && template && (
             <div className="flex flex-col flex-1 overflow-hidden">
-              <div className="flex-shrink-0 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-slate-100">{template.technique_name} <span className="font-mono text-slate-400 font-normal text-xs">({template.technique_id})</span></div>
+                  <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">{template.technique_name} <span className="font-mono text-gray-500 dark:text-slate-400 font-normal text-xs">({template.technique_id})</span></div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`px-2 py-0.5 rounded border text-xs font-medium ${LEVEL_COLORS[template.level] ?? 'bg-slate-700 text-slate-400 border-slate-600'}`}>
+                    <span className={`px-2 py-0.5 rounded border text-xs font-medium ${LEVEL_COLORS[template.level] ?? 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border-gray-400 dark:border-slate-600'}`}>
                       {template.level}
                     </span>
                     {template.logsource.category && (
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-gray-400 dark:text-slate-500">
                         logsource: {template.logsource.category}{template.logsource.product ? `/${template.logsource.product}` : ''}
                       </span>
                     )}
                     {template.tactic_names.map(t => (
-                      <span key={t} className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-xs">{t}</span>
+                      <span key={t} className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded text-xs">{t}</span>
                     ))}
                   </div>
                 </div>
                 <button
                   onClick={saveEdit}
                   title="Save edits to this template (used when importing)"
-                  className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-xs bg-gray-200 dark:bg-slate-700 hover:bg-slate-600 text-gray-700 dark:text-slate-300 rounded-lg transition-colors"
                 >
                   Save edits
                 </button>
               </div>
               {template.data_sources.length > 0 && (
-                <div className="flex-shrink-0 px-4 py-2 border-b border-slate-800 flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-slate-500">Detected data sources:</span>
+                <div className="flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-slate-800 flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-400 dark:text-slate-500">Detected data sources:</span>
                   {template.data_sources.map(ds => (
-                    <span key={ds} className="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-xs">{ds}</span>
+                    <span key={ds} className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded text-xs">{ds}</span>
                   ))}
                 </div>
               )}
@@ -495,7 +495,7 @@ function TemplatesTab() {
                 value={editedYaml}
                 onChange={e => setEditedYaml(e.target.value)}
                 spellCheck={false}
-                className="flex-1 resize-none font-mono text-xs text-slate-300 bg-slate-900 border-0 p-4 focus:outline-none leading-relaxed"
+                className="flex-1 resize-none font-mono text-xs text-gray-700 dark:text-slate-300 bg-gray-50 dark:bg-slate-900 border-0 p-4 focus:outline-none leading-relaxed"
                 placeholder="Template YAML will appear here..."
               />
             </div>
@@ -504,10 +504,10 @@ function TemplatesTab() {
       </div>
 
       {/* Import bar */}
-      <div className="flex-shrink-0 px-4 py-2.5 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
+      <div className="flex-shrink-0 px-4 py-2.5 border-t border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400">{checked.size} selected</span>
-          <span className="text-xs text-slate-500">Templates import as "planned" status — add your detection logic before activating.</span>
+          <span className="text-xs text-gray-500 dark:text-slate-400">{checked.size} selected</span>
+          <span className="text-xs text-gray-400 dark:text-slate-500">Templates import as "planned" status — add your detection logic before activating.</span>
           {importMsg && (
             <span className={`text-xs ${importMsg.startsWith('Import failed') ? 'text-red-400' : 'text-emerald-400'}`}>
               {importMsg}
@@ -533,23 +533,23 @@ export default function SigmaLibrary() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">SIGMA Rule Library</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">SIGMA Rule Library</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
             Browse community rules from SigmaHQ and generate per-technique detection templates. Nothing is imported until you click "Import".
           </p>
         </div>
         <div className="flex gap-1 mt-3">
           <button
             onClick={() => setTab('library')}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${tab === 'library' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${tab === 'library' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-100 dark:bg-slate-800'}`}>
             Community Rules (SigmaHQ)
           </button>
           <button
             onClick={() => setTab('templates')}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${tab === 'templates' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${tab === 'templates' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-100 dark:bg-slate-800'}`}>
             Detection Templates
           </button>
         </div>

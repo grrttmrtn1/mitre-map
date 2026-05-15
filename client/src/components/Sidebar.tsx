@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { LucideIcon } from 'lucide-react';
@@ -20,6 +21,8 @@ import {
   BarChart3,
   Settings,
   Zap,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
@@ -80,6 +83,7 @@ function ShieldLogo() {
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const [version, setVersion] = useState('ATT&CK v14');
 
@@ -93,16 +97,16 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col relative">
+    <aside className="w-56 flex-shrink-0 bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col relative">
       {/* Top gradient accent strip */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-600 opacity-80" />
 
-      <div className="px-4 py-5 border-b border-slate-800">
+      <div className="px-4 py-5 border-b border-gray-200 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
           <ShieldLogo />
           <div>
-            <div className="text-sm font-semibold text-white leading-tight tracking-tight">MitreMap</div>
-            <div className="text-xs text-slate-400 leading-tight">Detection Coverage</div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-white leading-tight tracking-tight">MitreMap</div>
+            <div className="text-xs text-gray-500 dark:text-slate-400 leading-tight">Detection Coverage</div>
           </div>
         </div>
       </div>
@@ -116,7 +120,7 @@ export default function Sidebar() {
               `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150 relative ${
                 isActive
                   ? 'bg-blue-500/10 text-blue-300 font-medium border-l-2 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.18)] pl-[10px]'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 border-l-2 border-transparent pl-[10px]'
+                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100/70 dark:hover:bg-slate-800/70 border-l-2 border-transparent pl-[10px]'
               }`
             }
           >
@@ -126,17 +130,17 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-4 py-3 border-t border-slate-800 space-y-2">
+      <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
         {user ? (
           <div className="flex items-center justify-between">
             <div className="min-w-0">
-              <div className="text-xs text-slate-300 font-medium truncate">{user.name ?? user.email}</div>
-              <div className="text-xs text-slate-500 truncate">{user.role}</div>
+              <div className="text-xs text-gray-700 dark:text-slate-300 font-medium truncate">{user.name ?? user.email}</div>
+              <div className="text-xs text-gray-400 dark:text-slate-500 truncate">{user.role}</div>
             </div>
             <button
               onClick={handleLogout}
               title="Sign out"
-              className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+              className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors p-1"
             >
               ⏻
             </button>
@@ -144,13 +148,22 @@ export default function Sidebar() {
         ) : (
           <button
             onClick={() => navigate('/login')}
-            className="w-full text-left text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-2 px-1 py-0.5"
+            className="w-full text-left text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors flex items-center gap-2 px-1 py-0.5"
           >
             <span>→</span>
             <span>Sign in</span>
           </button>
         )}
-        <div className="text-xs text-slate-500">{version} · D3FEND v1</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-400 dark:text-slate-500">{version} · D3FEND v1</div>
+          <button
+            onClick={toggle}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors p-1 rounded"
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+        </div>
       </div>
     </aside>
   );

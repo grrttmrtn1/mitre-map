@@ -82,17 +82,17 @@ export default function LoginPage() {
     </>
   );
 
-  const cardClasses = "relative bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-2xl p-8 w-full max-w-md shadow-2xl shadow-black/40";
+  const cardClasses = "relative bg-gray-50 dark:bg-slate-900/80 backdrop-blur-sm border border-gray-300 dark:border-slate-700/80 rounded-2xl p-8 w-full max-w-md shadow-2xl shadow-black/40";
 
   if (isBootstrapMode) {
     return (
-      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center p-4">
+      <div className="min-h-screen bg-white dark:bg-slate-950 relative overflow-hidden flex items-center justify-center p-4">
         {bgContent}
         <div className={`${cardClasses} text-center`}>
           <div className="flex justify-center mb-4"><ShieldLogo /></div>
-          <h1 className="text-2xl font-bold text-white mb-2">MitreMap</h1>
-          <p className="text-slate-400 mb-6">Running in bootstrap mode — no authentication configured yet.</p>
-          <p className="text-slate-300 text-sm">Create an API key or user account via the Settings page to enable authentication.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">MitreMap</h1>
+          <p className="text-gray-500 dark:text-slate-400 mb-6">Running in bootstrap mode — no authentication configured yet.</p>
+          <p className="text-gray-700 dark:text-slate-300 text-sm">Create an API key or user account via the Settings page to enable authentication.</p>
           <button onClick={() => navigate('/')} className="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg transition-colors">
             Continue to App
           </button>
@@ -102,7 +102,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white dark:bg-slate-950 relative overflow-hidden flex items-center justify-center p-4">
       {bgContent}
       <div className={cardClasses}>
         {/* Top accent line */}
@@ -115,31 +115,31 @@ export default function LoginPage() {
               <div className="relative"><ShieldLogo /></div>
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">MitreMap</h1>
-          <p className="text-slate-400 text-sm mt-1">ATT&amp;CK Detection Coverage Platform</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">MitreMap</h1>
+          <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">ATT&amp;CK Detection Coverage Platform</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs uppercase tracking-widest font-semibold text-slate-500 mb-1.5">Email</label>
+            <label className="block text-xs uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-1.5">Email</label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
               autoFocus
-              className="w-full bg-slate-800/80 border border-slate-600/80 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full bg-gray-100 dark:bg-slate-800/80 border border-gray-400 dark:border-slate-600/80 rounded-lg px-4 py-2.5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               placeholder="you@example.com"
             />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-widest font-semibold text-slate-500 mb-1.5">Password</label>
+            <label className="block text-xs uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-1.5">Password</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              className="w-full bg-slate-800/80 border border-slate-600/80 rounded-lg px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full bg-gray-100 dark:bg-slate-800/80 border border-gray-400 dark:border-slate-600/80 rounded-lg px-4 py-2.5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               placeholder="••••••••"
             />
           </div>
@@ -163,10 +163,10 @@ export default function LoginPage() {
           <>
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-700/80" />
+                <div className="w-full border-t border-gray-300 dark:border-slate-700/80" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-slate-900/80 px-3 text-slate-500 text-xs uppercase tracking-widest">or continue with</span>
+                <span className="bg-gray-50 dark:bg-slate-900/80 px-3 text-gray-400 dark:text-slate-500 text-xs uppercase tracking-widest">or continue with</span>
               </div>
             </div>
             <div className="space-y-2">
@@ -174,7 +174,7 @@ export default function LoginPage() {
                 <a
                   key={p.id}
                   href={api.getOidcLoginUrl(p.slug)}
-                  className="block w-full text-center border border-slate-600/80 hover:border-blue-500 text-slate-300 hover:text-white font-medium py-2.5 rounded-lg transition-all hover:bg-blue-500/5"
+                  className="block w-full text-center border border-gray-400 dark:border-slate-600/80 hover:border-blue-500 text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white font-medium py-2.5 rounded-lg transition-all hover:bg-blue-500/5"
                 >
                   Sign in with {p.name}
                 </a>

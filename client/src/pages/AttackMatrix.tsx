@@ -27,7 +27,7 @@ const CELL_COLORS: Record<string, string> = {
   mitigated: 'bg-purple-500/60 hover:bg-purple-500/80 text-white cell-glow-mitigated',
   tuning:    'bg-yellow-500/60 hover:bg-yellow-500/80 text-slate-900 cell-glow-tuning',
   planned:   'bg-blue-900/60 hover:bg-blue-900/80 text-blue-300 border border-blue-700/50 cell-glow-planned',
-  gap:       'bg-slate-800/80 hover:bg-slate-700 text-slate-500',
+  gap:       'bg-gray-100 dark:bg-slate-800/80 hover:bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500',
 };
 
 const STATUS_HEX: Record<string, string> = {
@@ -45,7 +45,7 @@ const LEGEND = [
   { status: 'mitigated', label: 'Mitigated (tool)',     color: 'bg-purple-500' },
   { status: 'tuning',    label: 'Detection (tuning)',   color: 'bg-yellow-500' },
   { status: 'planned',   label: 'Planned detection',    color: 'bg-blue-900 border border-blue-700' },
-  { status: 'gap',       label: 'No coverage',          color: 'bg-slate-700' },
+  { status: 'gap',       label: 'No coverage',          color: 'bg-gray-200 dark:bg-slate-700' },
 ];
 
 type SelectedCell = {
@@ -179,8 +179,8 @@ function MatrixMinimap({
   };
 
   return (
-    <div className="bg-slate-950/90 backdrop-blur border border-slate-700/60 rounded-lg p-2 shadow-xl">
-      <div className="text-xs text-slate-500 mb-1 px-0.5 font-medium tracking-wide uppercase">Overview</div>
+    <div className="bg-white dark:bg-slate-950/90 backdrop-blur border border-gray-300 dark:border-slate-700/60 rounded-lg p-2 shadow-xl">
+      <div className="text-xs text-gray-400 dark:text-slate-500 mb-1 px-0.5 font-medium tracking-wide uppercase">Overview</div>
       <canvas
         ref={canvasRef}
         width={MINI_W}
@@ -205,16 +205,16 @@ function InlineLegend({
   groupName: string | null;
 }) {
   return (
-    <div className="bg-slate-950/90 backdrop-blur border border-slate-700/60 rounded-lg p-2.5 shadow-xl">
-      <div className="text-xs text-slate-500 mb-1.5 font-medium tracking-wide uppercase">Legend</div>
+    <div className="bg-white dark:bg-slate-950/90 backdrop-blur border border-gray-300 dark:border-slate-700/60 rounded-lg p-2.5 shadow-xl">
+      <div className="text-xs text-gray-400 dark:text-slate-500 mb-1.5 font-medium tracking-wide uppercase">Legend</div>
       {heatmapMode ? (
         <div>
-          <div className="text-[10px] text-slate-400 mb-1.5">Coverage density</div>
+          <div className="text-[10px] text-gray-500 dark:text-slate-400 mb-1.5">Coverage density</div>
           <div
             className="h-3 rounded w-full"
             style={{ background: 'linear-gradient(to right, #1e293b, #b45309, #10b981)' }}
           />
-          <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+          <div className="flex justify-between text-[10px] text-gray-400 dark:text-slate-500 mt-1">
             <span>0%</span>
             <span>50%</span>
             <span>100%</span>
@@ -225,11 +225,11 @@ function InlineLegend({
           {LEGEND.map(l => (
             <div key={l.status} className="flex items-center gap-1.5">
               <div className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${l.color}`} />
-              <span className="text-[10px] text-slate-400 leading-tight">{l.label}</span>
+              <span className="text-[10px] text-gray-500 dark:text-slate-400 leading-tight">{l.label}</span>
             </div>
           ))}
           {hasOverlay && (
-            <div className="flex items-center gap-1.5 pt-1 border-t border-slate-800 mt-0.5">
+            <div className="flex items-center gap-1.5 pt-1 border-t border-gray-200 dark:border-slate-800 mt-0.5">
               <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0 border-2 border-amber-400" />
               <span className="text-[10px] text-amber-400 leading-tight">{groupName ?? 'Threat group'}</span>
             </div>
@@ -314,7 +314,7 @@ export default function AttackMatrix() {
     cells: filter === 'all' ? col.cells : col.cells.filter(c => c.status === filter),
   }));
 
-  if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Loading matrix...</div>;
+  if (loading) return <div className="flex items-center justify-center h-full text-gray-400 dark:text-slate-500">Loading matrix...</div>;
 
   const totalTechs   = matrix.reduce((s, c) => s + c.cells.length, 0);
   const gapCount     = matrix.reduce((s, c) => s + c.cells.filter(x => x.status === 'gap').length, 0);
@@ -325,12 +325,12 @@ export default function AttackMatrix() {
   return (
     <div className="flex flex-col h-full">
       {/* ── Header ── */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-slate-100">ATT&amp;CK Coverage Matrix</h1>
-            <p className="text-sm text-slate-400 mt-0.5">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">ATT&amp;CK Coverage Matrix</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
               Enterprise ATT&amp;CK · {totalTechs} techniques ({totalSubs} subtechniques) · {coveredCount} covered · {gapCount} gaps
             </p>
             {overlayCoverage && (
@@ -348,7 +348,7 @@ export default function AttackMatrix() {
             <select
               value={overlayGroupId}
               onChange={e => setOverlayGroupId(e.target.value)}
-              className={`px-3 py-1.5 text-xs bg-slate-800 rounded-lg text-slate-300 focus:outline-none transition-colors ${overlayGroupId ? 'border border-amber-500/60 focus:border-amber-400' : 'border border-slate-700 focus:border-amber-500'}`}
+              className={`px-3 py-1.5 text-xs bg-gray-100 dark:bg-slate-800 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none transition-colors ${overlayGroupId ? 'border border-amber-500/60 focus:border-amber-400' : 'border border-gray-300 dark:border-slate-700 focus:border-amber-500'}`}
             >
               <option value="">Compare to threat group…</option>
               {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -358,7 +358,7 @@ export default function AttackMatrix() {
             <select
               value={filter}
               onChange={e => setFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500"
+              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none focus:border-blue-500"
             >
               <option value="all">All techniques</option>
               <option value="full">Detected + Mitigated</option>
@@ -375,7 +375,7 @@ export default function AttackMatrix() {
               className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                 heatmapMode
                   ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 hover:bg-amber-500/30'
-                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                  : 'bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-200 dark:bg-slate-700'
               }`}
               title={heatmapMode ? 'Switch to status view' : 'Switch to density heatmap'}
             >
@@ -383,20 +383,20 @@ export default function AttackMatrix() {
             </button>
 
             {/* Zoom controls */}
-            <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+            <div className="flex items-center bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg overflow-hidden">
               <button
                 onClick={() => setZoom(z => Math.max(0.5, parseFloat((z - 0.1).toFixed(1))))}
-                className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+                className="px-2 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-200 dark:bg-slate-700 transition-colors"
                 title="Zoom out"
               >−</button>
               <button
                 onClick={() => setZoom(1.0)}
-                className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors min-w-[3.25rem] text-center border-x border-slate-700"
+                className="px-2 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-200 dark:bg-slate-700 transition-colors min-w-[3.25rem] text-center border-x border-gray-300 dark:border-slate-700"
                 title="Reset zoom"
               >{Math.round(zoom * 100)}%</button>
               <button
                 onClick={() => setZoom(z => Math.min(1.5, parseFloat((z + 0.1).toFixed(1))))}
-                className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors"
+                className="px-2 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-200 dark:bg-slate-700 transition-colors"
                 title="Zoom in"
               >+</button>
             </div>
@@ -418,26 +418,26 @@ export default function AttackMatrix() {
                 <div key={col.tactic.id} className="flex flex-col gap-1">
                   {/* ── Sticky tactic header ── */}
                   <div
-                    className="px-2 py-1.5 rounded-md mb-1 sticky top-0 z-10 border-t-2 border-b border-slate-700/40 shadow-[0_4px_16px_rgba(0,0,0,0.6)]"
+                    className="px-2 py-1.5 rounded-md mb-1 sticky top-0 z-10 border-t-2 border-b border-gray-300 dark:border-slate-700/40 shadow-[0_4px_16px_rgba(0,0,0,0.6)]"
                     style={{
                       borderTopColor: tacticColor,
                       backgroundColor: 'rgba(15,23,42,0.94)',
                       backdropFilter: 'blur(10px)',
                     }}
                   >
-                    <div className="text-xs font-semibold text-slate-200 whitespace-nowrap truncate max-w-[96px]">
+                    <div className="text-xs font-semibold text-gray-800 dark:text-slate-200 whitespace-nowrap truncate max-w-[96px]">
                       {col.tactic.name}
                     </div>
                     <div className="flex items-center gap-1 mt-1">
-                      <div className="flex-1 h-1 bg-slate-700/60 rounded-full overflow-hidden">
+                      <div className="flex-1 h-1 bg-gray-200 dark:bg-slate-700/60 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full"
                           style={{ width: `${tacticPct}%`, backgroundColor: tacticColor + 'aa' }}
                         />
                       </div>
-                      <span className="text-[10px] text-slate-500 tabular-nums">{tacticPct}%</span>
+                      <span className="text-[10px] text-gray-400 dark:text-slate-500 tabular-nums">{tacticPct}%</span>
                     </div>
-                    <div className="text-[10px] text-slate-600 mt-0.5">{tacticTotal} tech</div>
+                    <div className="text-[10px] text-gray-400 dark:text-slate-600 mt-0.5">{tacticTotal} tech</div>
                   </div>
 
                   {/* ── Technique cells ── */}
@@ -532,21 +532,21 @@ export default function AttackMatrix() {
 
         {/* ── Technique detail panel ── */}
         {selected && (
-          <div className="w-72 flex-shrink-0 border-l border-slate-800 bg-slate-900 overflow-y-auto p-4">
+          <div className="w-72 flex-shrink-0 border-l border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 overflow-y-auto p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1 min-w-0 pr-2">
                 {selected.parentId && (
-                  <div className="text-xs text-slate-500 mb-1">
+                  <div className="text-xs text-gray-400 dark:text-slate-500 mb-1">
                     <span className="font-mono">{selected.parentId}</span>
                     <span className="mx-1">·</span>
                     <span className="truncate">{selected.parentName}</span>
                   </div>
                 )}
-                <div className="font-mono text-xs text-slate-500">{selected.id}</div>
-                <div className="text-sm font-semibold text-slate-200">{selected.name}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{selected.tacticName}</div>
+                <div className="font-mono text-xs text-gray-400 dark:text-slate-500">{selected.id}</div>
+                <div className="text-sm font-semibold text-gray-800 dark:text-slate-200">{selected.name}</div>
+                <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{selected.tacticName}</div>
               </div>
-              <button onClick={() => setSelected(null)} className="text-slate-500 hover:text-slate-300 ml-2 flex-shrink-0">×</button>
+              <button onClick={() => setSelected(null)} className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 ml-2 flex-shrink-0">×</button>
             </div>
 
             <div className="mb-3">
@@ -556,7 +556,7 @@ export default function AttackMatrix() {
                 selected.status === 'mitigated' ? 'bg-purple-500/20 text-purple-400' :
                 selected.status === 'tuning'    ? 'bg-yellow-500/20 text-yellow-400' :
                 selected.status === 'planned'   ? 'bg-blue-900/40 text-blue-400' :
-                'bg-slate-700 text-slate-400'
+                'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400'
               }`}>
                 {selected.status === 'full'      ? 'Detected + Mitigated' :
                  selected.status === 'detected'  ? 'Active Detection' :
@@ -573,11 +573,11 @@ export default function AttackMatrix() {
 
             {selected.detections.length > 0 && (
               <div className="mb-4">
-                <div className="text-xs font-medium text-slate-400 mb-2">Active Detections ({selected.detection_count})</div>
+                <div className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">Active Detections ({selected.detection_count})</div>
                 <div className="space-y-2">
                   {selected.detections.map(d => (
-                    <div key={d.id} className="bg-slate-800/60 rounded-lg p-2">
-                      <div className="text-xs text-slate-300 font-medium">{d.name}</div>
+                    <div key={d.id} className="bg-gray-100/60 dark:bg-slate-800/60 rounded-lg p-2">
+                      <div className="text-xs text-gray-700 dark:text-slate-300 font-medium">{d.name}</div>
                       <StatusBadge value={d.severity} variant="severity" className="mt-1" />
                     </div>
                   ))}
@@ -588,14 +588,14 @@ export default function AttackMatrix() {
             {selected.status === 'gap' && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                 <div className="text-xs font-medium text-red-400 mb-1">Coverage Gap</div>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-gray-500 dark:text-slate-400">
                   No active detections or tool mitigations for this {selected.parentId ? 'subtechnique' : 'technique'}.
                   Visit the Gap Analysis page for recommendations.
                 </p>
               </div>
             )}
 
-            <div className="mt-4 pt-3 border-t border-slate-800">
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-slate-800">
               <a
                 href={mitreUrl(selected.id)}
                 target="_blank"

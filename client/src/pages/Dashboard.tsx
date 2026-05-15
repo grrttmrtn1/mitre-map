@@ -5,6 +5,7 @@ import { api } from '../api';
 import type { CoverageAttributionEntry, CoverageStats, CoverageSnapshot } from '../types';
 import CoverageBar from '../components/CoverageBar';
 import { SkeletonDashboard } from '../components/Skeleton';
+import { useTheme } from '../context/ThemeContext';
 
 function TrendBadge({ delta, invert = false, unit = '' }: { delta: number | null; invert?: boolean; unit?: string }) {
   if (delta === null || delta === 0) return null;
@@ -31,10 +32,11 @@ function actionLabel(action: string): string {
 function actionColor(action: string): string {
   if (action === 'created' || action === 'imported') return 'text-emerald-400';
   if (action === 'deleted' || action === 'bulk_deleted') return 'text-red-400';
-  return 'text-slate-400';
+  return 'text-gray-500 dark:text-slate-400';
 }
 
 export default function Dashboard() {
+  const { theme } = useTheme();
   const [stats, setStats] = useState<CoverageStats | null>(null);
   const [snapshots, setSnapshots] = useState<CoverageSnapshot[]>([]);
   const [attribution, setAttribution] = useState<CoverageAttributionEntry[]>([]);
@@ -103,9 +105,9 @@ export default function Dashboard() {
 
   if (loading) return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
-        <div className="h-6 w-48 bg-slate-800 rounded animate-pulse" />
-        <div className="h-3.5 w-72 bg-slate-800/60 rounded animate-pulse mt-2" />
+      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+        <div className="h-6 w-48 bg-gray-200 dark:bg-slate-800 rounded animate-pulse" />
+        <div className="h-3.5 w-72 bg-gray-200/60 dark:bg-slate-800/60 rounded animate-pulse mt-2" />
       </div>
       <SkeletonDashboard />
     </div>
@@ -113,7 +115,7 @@ export default function Dashboard() {
   if (error || !stats) return (
     <div className="flex flex-col items-center justify-center h-full gap-4">
       <div className="text-red-400 text-sm">Failed to load coverage data.</div>
-      <button onClick={load} className="px-4 py-2 text-sm bg-slate-800 border border-slate-700 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">
+      <button onClick={load} className="px-4 py-2 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 rounded-lg hover:bg-gray-200 dark:bg-slate-700 transition-colors">
         Retry
       </button>
     </div>
@@ -181,12 +183,12 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-slate-100">Coverage Dashboard</h1>
-            <p className="text-sm text-slate-400 mt-0.5">MITRE ATT&CK Enterprise detection and defense coverage</p>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Coverage Dashboard</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">MITRE ATT&CK Enterprise detection and defense coverage</p>
           </div>
           <div className="flex gap-2">
             <Link to="/gaps" className="px-3 py-1.5 text-sm bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-colors">
@@ -211,7 +213,7 @@ export default function Dashboard() {
             {/* One-shot shimmer sweep on data load */}
             <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent skew-x-[-20deg] pointer-events-none" />
             <div className="relative">
-              <div className="text-xs uppercase tracking-widest text-slate-500 mb-1 font-medium">{kpi.label}</div>
+              <div className="text-xs uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1 font-medium">{kpi.label}</div>
               <div className="flex items-end gap-2">
                 <div className={`text-3xl font-bold bg-gradient-to-br bg-clip-text text-transparent ${kpi.gradient}`}>
                   {kpi.value}
@@ -220,54 +222,54 @@ export default function Dashboard() {
                   <TrendBadge delta={kpi.delta ?? null} invert={kpi.invert} unit={kpi.deltaUnit} />
                 </div>
               </div>
-              <div className="text-xs text-slate-500 mt-1">{kpi.sub}</div>
+              <div className="text-xs text-gray-400 dark:text-slate-500 mt-1">{kpi.sub}</div>
             </div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-3">Coverage by Tactic</h2>
+        <div className="col-span-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-3">Coverage by Tactic</h2>
           <div className="space-y-2.5">
             {stats.tactic_stats.map(t => (
               <div key={t.tactic_id} className="grid grid-cols-[1fr_120px_36px] items-center gap-3">
-                <div className="text-xs text-slate-400 truncate">{t.tactic_name}</div>
+                <div className="text-xs text-gray-500 dark:text-slate-400 truncate">{t.tactic_name}</div>
                 <CoverageBar covered={t.covered} total={t.total} showLabel={false} />
-                <div className="text-xs text-slate-400 text-right font-mono">{t.pct}%</div>
+                <div className="text-xs text-gray-500 dark:text-slate-400 text-right font-mono">{t.pct}%</div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-3">Detection Status</h2>
+        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-3">Detection Status</h2>
           <div className="space-y-3 mt-4">
             {detectionBreakdown.map(d => (
               <div key={d.name} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-sm" style={{ background: d.fill }} />
-                  <span className="text-xs text-slate-400">{d.name}</span>
+                  <span className="text-xs text-gray-500 dark:text-slate-400">{d.name}</span>
                 </div>
                 <span className="text-sm font-semibold" style={{ color: d.fill }}>{d.value}</span>
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-500">
+          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-slate-800 text-xs text-gray-400 dark:text-slate-500">
             Total: {stats.total_detections} detections
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-2">Coverage Radar by Tactic</h2>
+        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-2">Coverage Radar by Tactic</h2>
           <ResponsiveContainer width="100%" height={280}>
             <RadarChart data={radarData} margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
-              <PolarGrid stroke="#1e293b" strokeDasharray="3 3" />
+              <PolarGrid stroke={theme === 'dark' ? '#1e293b' : '#e2e8f0'} strokeDasharray="3 3" />
               <PolarAngleAxis
                 dataKey="tactic"
-                tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'ui-sans-serif, system-ui' }}
+                tick={{ fill: theme === 'dark' ? '#94a3b8' : '#6b7280', fontSize: 10, fontFamily: 'ui-sans-serif, system-ui' }}
               />
               <Radar
                 name="Coverage %"
@@ -280,46 +282,46 @@ export default function Dashboard() {
                 activeDot={{ r: 5, fill: '#60a5fa', strokeWidth: 0 }}
               />
               <Tooltip
-                contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8', marginBottom: 2 }}
+                contentStyle={{ background: theme === 'dark' ? '#0f172a' : '#ffffff', border: theme === 'dark' ? '1px solid #1e293b' : '1px solid #e2e8f0', borderRadius: 8, fontSize: 12 }}
+                labelStyle={{ color: theme === 'dark' ? '#94a3b8' : '#6b7280', marginBottom: 2 }}
                 formatter={(v: number) => [`${v}%`, 'Coverage']}
               />
             </RadarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-2">Technique Coverage vs. Gaps</h2>
+        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-2">Technique Coverage vs. Gaps</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={barData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 80 }}>
-              <XAxis type="number" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} width={80} axisLine={false} tickLine={false} />
+              <XAxis type="number" tick={{ fill: theme === 'dark' ? '#475569' : '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fill: theme === 'dark' ? '#94a3b8' : '#6b7280', fontSize: 10 }} width={80} axisLine={false} tickLine={false} />
               <Tooltip
-                contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#94a3b8', marginBottom: 2 }}
+                contentStyle={{ background: theme === 'dark' ? '#0f172a' : '#ffffff', border: theme === 'dark' ? '1px solid #1e293b' : '1px solid #e2e8f0', borderRadius: 8, fontSize: 12 }}
+                labelStyle={{ color: theme === 'dark' ? '#94a3b8' : '#6b7280', marginBottom: 2 }}
                 formatter={(v: number, name: string) => [v, name === 'covered' ? 'Covered' : 'Gap']}
               />
               <Bar dataKey="covered" name="Covered" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="gap" name="Gap" stackId="a" fill="#1e293b" stroke="#334155" strokeWidth={1} radius={[0, 3, 3, 0]} />
+              <Bar dataKey="gap" name="Gap" stackId="a" fill={theme === 'dark' ? '#1e293b' : '#f3f4f6'} stroke={theme === 'dark' ? '#334155' : '#d1d5db'} strokeWidth={1} radius={[0, 3, 3, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Coverage Trend</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500">Coverage Trend</h2>
           <div className="flex gap-1">
             {(['7D', '30D', '90D', 'All'] as const).map(r => (
               <button key={r} onClick={() => setTrendRange(r)}
-                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${trendRange === r ? 'bg-blue-600/30 text-blue-400 border border-blue-500/40' : 'text-slate-500 hover:text-slate-400'}`}>
+                className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${trendRange === r ? 'bg-blue-600/30 text-blue-400 border border-blue-500/40' : 'text-gray-400 dark:text-slate-500 hover:text-gray-500 dark:text-slate-400'}`}>
                 {r}
               </button>
             ))}
           </div>
         </div>
         {trendData.length < 2 ? (
-          <div className="flex items-center justify-center h-28 text-xs text-slate-600">
+          <div className="flex items-center justify-center h-28 text-xs text-gray-400 dark:text-slate-600">
             Not enough snapshots yet — nightly auto-snapshots build history over time.
           </div>
         ) : (
@@ -335,16 +337,16 @@ export default function Dashboard() {
                   }
                 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="dateLabel" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                <YAxis domain={[0, 100]} tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} unit="%" width={36} />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#1e293b' : '#e2e8f0'} vertical={false} />
+                <XAxis dataKey="dateLabel" tick={{ fill: theme === 'dark' ? '#475569' : '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis domain={[0, 100]} tick={{ fill: theme === 'dark' ? '#475569' : '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} unit="%" width={36} />
                 <Tooltip
-                  contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: '#94a3b8', marginBottom: 4 }}
+                  contentStyle={{ background: theme === 'dark' ? '#0f172a' : '#ffffff', border: theme === 'dark' ? '1px solid #1e293b' : '1px solid #e2e8f0', borderRadius: 8, fontSize: 12 }}
+                  labelStyle={{ color: theme === 'dark' ? '#94a3b8' : '#6b7280', marginBottom: 4 }}
                   formatter={(_v: unknown, _n: string, props: any) => {
                     const p = props.payload;
                     return [
-                      <span key="v">{p.coverage_pct}% <span className="text-slate-500 text-[10px]">({p.covered}/{p.total})</span>{p.annotation ? <span className="block text-amber-400 text-[10px] mt-1">★ {p.annotation}</span> : null}</span>,
+                      <span key="v">{p.coverage_pct}% <span className="text-gray-400 dark:text-slate-500 text-[10px]">({p.covered}/{p.total})</span>{p.annotation ? <span className="block text-amber-400 text-[10px] mt-1">★ {p.annotation}</span> : null}</span>,
                       'Coverage',
                     ];
                   }}
@@ -378,7 +380,7 @@ export default function Dashboard() {
                   <button key={d.id} onClick={() => { setSelectedSnapId(d.id); setAnnotationText(d.annotation ?? ''); }}
                     className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-0.5 hover:bg-amber-500/20 transition-colors">
                     <span>★</span>
-                    <span className="text-slate-400">{d.dateLabel}</span>
+                    <span className="text-gray-500 dark:text-slate-400">{d.dateLabel}</span>
                     <span className="truncate max-w-[140px]">{d.annotation}</span>
                   </button>
                 ))}
@@ -386,10 +388,10 @@ export default function Dashboard() {
             )}
 
             {/* Annotation editor */}
-            <div className="mt-3 pt-3 border-t border-slate-800">
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-800">
               {selectedSnap ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                  <span className="text-[10px] text-gray-400 dark:text-slate-500 whitespace-nowrap">
                     {new Date(selectedSnap.taken_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} — {selectedSnap.coverage_pct}%
                   </span>
                   <input
@@ -398,7 +400,7 @@ export default function Dashboard() {
                     onChange={e => setAnnotationText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') saveAnnotation(); if (e.key === 'Escape') setSelectedSnapId(null); }}
                     placeholder="Add annotation (e.g. 'APT29 group added')"
-                    className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded px-2 py-1 placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
+                    className="flex-1 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-800 dark:text-slate-200 text-xs rounded px-2 py-1 placeholder-gray-400 dark:placeholder-gray-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
                     autoFocus
                   />
                   <button onClick={saveAnnotation} disabled={savingAnnotation}
@@ -406,29 +408,29 @@ export default function Dashboard() {
                     {savingAnnotation ? '…' : 'Save'}
                   </button>
                   <button onClick={() => setSelectedSnapId(null)}
-                    className="px-2 py-1 text-xs text-slate-500 hover:text-slate-400 transition-colors">
+                    className="px-2 py-1 text-xs text-gray-400 dark:text-slate-500 hover:text-gray-500 dark:text-slate-400 transition-colors">
                     ✕
                   </button>
                 </div>
               ) : (
-                <div className="text-[10px] text-slate-600">Click a point on the chart to annotate it.</div>
+                <div className="text-[10px] text-gray-400 dark:text-slate-600">Click a point on the chart to annotate it.</div>
               )}
             </div>
           </>
         )}
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Lowest Coverage Tactics</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500">Lowest Coverage Tactics</h2>
           <Link to="/gaps" className="text-xs text-blue-400 hover:text-blue-300">View all gaps →</Link>
         </div>
         <div className="grid grid-cols-3 gap-3">
           {[...stats.tactic_stats].sort((a, b) => a.pct - b.pct).slice(0, 6).map(t => (
-            <div key={t.tactic_id} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
-              <div className="text-xs font-medium text-slate-300 truncate">{t.tactic_name}</div>
+            <div key={t.tactic_id} className="bg-gray-100/50 dark:bg-slate-800/50 rounded-lg p-3 border border-gray-300/50 dark:border-slate-700/50">
+              <div className="text-xs font-medium text-gray-700 dark:text-slate-300 truncate">{t.tactic_name}</div>
               <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-slate-500">{t.covered}/{t.total} covered</span>
+                <span className="text-gray-400 dark:text-slate-500">{t.covered}/{t.total} covered</span>
                 <span className={t.pct < 25 ? 'text-red-400' : t.pct < 50 ? 'text-orange-400' : 'text-yellow-400'}>
                   {t.pct}%
                 </span>
@@ -439,18 +441,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Coverage Attribution</h2>
-          <span className="text-xs text-slate-600">Recent coverage changes — what moved the needle and who</span>
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500">Coverage Attribution</h2>
+          <span className="text-xs text-gray-400 dark:text-slate-600">Recent coverage changes — what moved the needle and who</span>
         </div>
         {attribution.length === 0 ? (
-          <div className="text-xs text-slate-600 py-4 text-center">No coverage changes recorded yet. Changes appear here when detections or tools are created, updated, or deleted.</div>
+          <div className="text-xs text-gray-400 dark:text-slate-600 py-4 text-center">No coverage changes recorded yet. Changes appear here when detections or tools are created, updated, or deleted.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-slate-600 border-b border-slate-800">
+                <tr className="text-gray-400 dark:text-slate-600 border-b border-gray-200 dark:border-slate-800">
                   <th className="text-left pb-2 font-medium pr-4">When</th>
                   <th className="text-left pb-2 font-medium pr-4">Source</th>
                   <th className="text-left pb-2 font-medium pr-4">Action</th>
@@ -458,13 +460,13 @@ export default function Dashboard() {
                   <th className="text-right pb-2 font-medium">Coverage</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-gray-200/60 dark:divide-slate-800/60">
                 {attribution.map(entry => {
                   const delta = entry.coverage_pct_after - entry.coverage_pct_before;
                   const covDelta = entry.covered_techniques_after - entry.covered_techniques_before;
                   return (
-                    <tr key={entry.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-2 pr-4 text-slate-500 whitespace-nowrap">
+                    <tr key={entry.id} className="hover:bg-gray-100/30 dark:bg-slate-800/30 transition-colors">
+                      <td className="py-2 pr-4 text-gray-400 dark:text-slate-500 whitespace-nowrap">
                         {new Date(entry.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td className="py-2 pr-4 max-w-[180px]">
@@ -476,17 +478,17 @@ export default function Dashboard() {
                           }`}>
                             {entry.triggered_by_entity_type === 'detection' ? 'Det' : 'Tool'}
                           </span>
-                          <span className="text-slate-300 truncate">{entry.triggered_by_entity_name ?? entry.triggered_by_entity_id}</span>
+                          <span className="text-gray-700 dark:text-slate-300 truncate">{entry.triggered_by_entity_name ?? entry.triggered_by_entity_id}</span>
                         </div>
                       </td>
                       <td className={`py-2 pr-4 ${actionColor(entry.action)}`}>
                         {actionLabel(entry.action)}
                       </td>
-                      <td className="py-2 pr-4 text-slate-400 font-mono">{entry.actor}</td>
+                      <td className="py-2 pr-4 text-gray-500 dark:text-slate-400 font-mono">{entry.actor}</td>
                       <td className="py-2 text-right whitespace-nowrap">
-                        <span className="text-slate-500">{entry.coverage_pct_before}%</span>
-                        <span className="text-slate-600 mx-1">→</span>
-                        <span className="text-slate-300 font-semibold">{entry.coverage_pct_after}%</span>
+                        <span className="text-gray-400 dark:text-slate-500">{entry.coverage_pct_before}%</span>
+                        <span className="text-gray-400 dark:text-slate-600 mx-1">→</span>
+                        <span className="text-gray-700 dark:text-slate-300 font-semibold">{entry.coverage_pct_after}%</span>
                         {delta !== 0 && (
                           <span className={`ml-2 font-semibold ${delta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                             {delta > 0 ? '+' : ''}{delta}%

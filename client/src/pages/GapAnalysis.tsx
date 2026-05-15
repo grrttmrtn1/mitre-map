@@ -20,18 +20,18 @@ type View = 'gaps' | 'covered';
 
 function PriorityBar({ score, components }: { score: number; components: GapTechnique['priority_components'] }) {
   const level = score >= 70 ? 'critical' : score >= 45 ? 'high' : score >= 20 ? 'medium' : 'low';
-  const colors = { critical: 'text-red-400 bg-red-500/15 border-red-500/30', high: 'text-orange-400 bg-orange-500/15 border-orange-500/30', medium: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30', low: 'text-slate-400 bg-slate-700 border-slate-600' };
+  const colors = { critical: 'text-red-400 bg-red-500/15 border-red-500/30', high: 'text-orange-400 bg-orange-500/15 border-orange-500/30', medium: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30', low: 'text-gray-500 dark:text-slate-400 bg-gray-200 dark:bg-slate-700 border-gray-400 dark:border-slate-600' };
   return (
     <span className="group relative">
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-mono cursor-default ${colors[level]}`}>
         P{score}
       </span>
-      <div className="hidden group-hover:block absolute right-0 top-6 z-10 bg-slate-800 border border-slate-700 rounded-lg p-2.5 shadow-xl text-xs w-44 space-y-1">
-        <div className="text-slate-300 font-semibold mb-1.5">Priority breakdown</div>
-        <div className="flex justify-between text-slate-400"><span>Threat groups</span><span className="text-slate-200">{components.group}/40</span></div>
-        <div className="flex justify-between text-slate-400"><span>Industry targeting</span><span className="text-slate-200">{components.industry}/30</span></div>
-        <div className="flex justify-between text-slate-400"><span>Data readiness</span><span className="text-slate-200">{components.data_sources}/20</span></div>
-        <div className="flex justify-between text-slate-400"><span>Mitigation guidance</span><span className="text-slate-200">{components.mitigation_guidance}/10</span></div>
+      <div className="hidden group-hover:block absolute right-0 top-6 z-10 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg p-2.5 shadow-xl text-xs w-44 space-y-1">
+        <div className="text-gray-700 dark:text-slate-300 font-semibold mb-1.5">Priority breakdown</div>
+        <div className="flex justify-between text-gray-500 dark:text-slate-400"><span>Threat groups</span><span className="text-gray-800 dark:text-slate-200">{components.group}/40</span></div>
+        <div className="flex justify-between text-gray-500 dark:text-slate-400"><span>Industry targeting</span><span className="text-gray-800 dark:text-slate-200">{components.industry}/30</span></div>
+        <div className="flex justify-between text-gray-500 dark:text-slate-400"><span>Data readiness</span><span className="text-gray-800 dark:text-slate-200">{components.data_sources}/20</span></div>
+        <div className="flex justify-between text-gray-500 dark:text-slate-400"><span>Mitigation guidance</span><span className="text-gray-800 dark:text-slate-200">{components.mitigation_guidance}/10</span></div>
       </div>
     </span>
   );
@@ -128,14 +128,14 @@ export default function GapAnalysis() {
 
   if (loading) return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
-        <div className="h-6 w-36 bg-slate-800 rounded animate-pulse" />
-        <div className="h-3.5 w-64 bg-slate-800/60 rounded animate-pulse mt-2" />
+        <div className="h-6 w-36 bg-gray-100 dark:bg-slate-800 rounded animate-pulse" />
+        <div className="h-3.5 w-64 bg-gray-100/60 dark:bg-slate-800/60 rounded animate-pulse mt-2" />
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
         {Array.from({ length: 18 }).map((_, i) => (
-          <SkeletonRow key={i} className="bg-slate-900 border border-slate-800 rounded-xl" />
+          <SkeletonRow key={i} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl" />
         ))}
       </div>
     </div>
@@ -143,19 +143,19 @@ export default function GapAnalysis() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-slate-100">Gap Analysis</h1>
-            <p className="text-sm text-slate-400 mt-0.5">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Gap Analysis</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
               {view === 'gaps'
                 ? `${gaps.length} techniques with no active detection or tool mitigation`
                 : `${covered.length} techniques with active detection or tool mitigation`}
             </p>
           </div>
           <button onClick={exportCSV}
-            className="px-3 py-1.5 text-sm bg-slate-700 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
+            className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-400 dark:border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
             Export CSV
           </button>
         </div>
@@ -163,29 +163,29 @@ export default function GapAnalysis() {
         <div className="flex gap-1 mt-3">
           <button
             onClick={() => handleViewChange('gaps')}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${view === 'gaps' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${view === 'gaps' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-100 dark:bg-slate-800'}`}>
             Gaps
-            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${view === 'gaps' ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-500'}`}>{gaps.length}</span>
+            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${view === 'gaps' ? 'bg-red-500/20 text-red-400' : 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>{gaps.length}</span>
           </button>
           <button
             onClick={() => handleViewChange('covered')}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${view === 'covered' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${view === 'covered' ? 'bg-blue-600/20 text-blue-400' : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-100 dark:bg-slate-800'}`}>
             Covered
-            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${view === 'covered' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-500'}`}>{covered.length}</span>
+            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${view === 'covered' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>{covered.length}</span>
           </button>
         </div>
 
         <div className="flex gap-3 mt-3">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search techniques..."
-            className="flex-1 px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500" />
+            className="flex-1 px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500" />
           <select value={filterTactic} onChange={e => setFilterTactic(e.target.value)}
-            className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
+            className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none focus:border-blue-500">
             <option value="">All Tactics</option>
             {allTactics.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           {view === 'gaps' ? (
             <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
-              className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
+              className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none focus:border-blue-500">
               <option value="priority">Sort: Priority Score</option>
               <option value="tactic">Sort: Tactic</option>
               <option value="d3fend">Sort: D3FEND coverage</option>
@@ -193,7 +193,7 @@ export default function GapAnalysis() {
             </select>
           ) : (
             <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
-              className="px-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:border-blue-500">
+              className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none focus:border-blue-500">
               <option value="tactic">Sort: Tactic</option>
               <option value="detections">Sort: Detections</option>
               <option value="tools">Sort: Tools</option>
@@ -202,17 +202,17 @@ export default function GapAnalysis() {
         </div>
         {view === 'gaps' && (
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs text-slate-500">Industry sector:</span>
+            <span className="text-xs text-gray-400 dark:text-slate-500">Industry sector:</span>
             <select
               value={orgSector}
               onChange={e => { setOrgSector(e.target.value); saveSector(e.target.value); }}
               disabled={savingSector}
-              className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded text-slate-300 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+              className="px-2 py-1 text-xs bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded text-gray-700 dark:text-slate-300 focus:outline-none focus:border-blue-500 disabled:opacity-50"
             >
               <option value="">Not set (industry targeting N/A)</option>
               {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            <span className="text-xs text-slate-600">Used to weigh industry-relevant threat groups in priority score.</span>
+            <span className="text-xs text-gray-400 dark:text-slate-600">Used to weigh industry-relevant threat groups in priority score.</span>
           </div>
         )}
       </div>
@@ -225,19 +225,19 @@ export default function GapAnalysis() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
               <p className="text-sm font-medium text-emerald-400">No gaps with current filters</p>
-              <p className="text-xs text-slate-500 mt-1">All techniques are covered — or try adjusting your filters.</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">All techniques are covered — or try adjusting your filters.</p>
             </div>
           ) : (
             filteredGaps.map(g => (
-              <div key={g.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+              <div key={g.id} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setExpanded(expanded === g.id ? null : g.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800/30 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-100/30 dark:bg-slate-800/30 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 flex-shrink-0">GAP</span>
-                    <span className="font-mono text-xs text-slate-400 flex-shrink-0">{g.id}</span>
-                    <span className="text-sm text-slate-200 font-medium">{g.name}</span>
+                    <span className="font-mono text-xs text-gray-500 dark:text-slate-400 flex-shrink-0">{g.id}</span>
+                    <span className="text-sm text-gray-800 dark:text-slate-200 font-medium">{g.name}</span>
                     {(g as any).gap_reason === 'no_data_source' && (
                       <span className="text-xs px-2 py-0.5 rounded border bg-orange-500/10 text-orange-400 border-orange-500/30 hidden sm:inline">No Data Source</span>
                     )}
@@ -248,11 +248,11 @@ export default function GapAnalysis() {
                   <div className="flex items-center gap-4 ml-4">
                     <div className="flex gap-1.5">
                       {g.tactic_names.slice(0, 2).map(t => (
-                        <span key={t} className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-xs hidden sm:inline">{t}</span>
+                        <span key={t} className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded text-xs hidden sm:inline">{t}</span>
                       ))}
-                      {g.tactic_names.length > 2 && <span className="text-xs text-slate-500">+{g.tactic_names.length - 2}</span>}
+                      {g.tactic_names.length > 2 && <span className="text-xs text-gray-400 dark:text-slate-500">+{g.tactic_names.length - 2}</span>}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-slate-500">
                       {g.recommended_d3fend.length > 0 && (
                         <span className="text-blue-400">{g.recommended_d3fend.length} D3FEND</span>
                       )}
@@ -264,25 +264,25 @@ export default function GapAnalysis() {
                       )}
                     </div>
                     {g.priority_components && <PriorityBar score={g.priority_score} components={g.priority_components} />}
-                    <span className="text-slate-600 text-sm">{expanded === g.id ? '▲' : '▼'}</span>
+                    <span className="text-gray-400 dark:text-slate-600 text-sm">{expanded === g.id ? '▲' : '▼'}</span>
                   </div>
                 </button>
 
                 {expanded === g.id && (
-                  <div className="border-t border-slate-800 px-4 py-4 grid grid-cols-2 gap-4">
+                  <div className="border-t border-gray-200 dark:border-slate-800 px-4 py-4 grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-xs font-semibold text-slate-400 mb-2">Recommended D3FEND Countermeasures</div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Recommended D3FEND Countermeasures</div>
                       {g.recommended_d3fend.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No D3FEND mappings available.</div>
+                        <div className="text-xs text-gray-400 dark:text-slate-500 italic">No D3FEND mappings available.</div>
                       ) : (
                         <div className="space-y-1.5">
                           {g.recommended_d3fend.map(d => (
                             <div key={d.id} className="flex items-center gap-2">
-                              <span className={`px-1.5 py-0.5 rounded border text-xs font-medium ${D3FEND_CATEGORY_COLORS[d.category] ?? 'bg-slate-700 text-slate-400 border-slate-600'}`}>
+                              <span className={`px-1.5 py-0.5 rounded border text-xs font-medium ${D3FEND_CATEGORY_COLORS[d.category] ?? 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border-gray-400 dark:border-slate-600'}`}>
                                 {d.category}
                               </span>
-                              <span className="font-mono text-xs text-slate-500">{d.id}</span>
-                              <span className="text-xs text-slate-300">{d.name}</span>
+                              <span className="font-mono text-xs text-gray-400 dark:text-slate-500">{d.id}</span>
+                              <span className="text-xs text-gray-700 dark:text-slate-300">{d.name}</span>
                             </div>
                           ))}
                         </div>
@@ -290,15 +290,15 @@ export default function GapAnalysis() {
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-slate-400 mb-2">Recommended ATT&CK Mitigations</div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Recommended ATT&CK Mitigations</div>
                       {g.recommended_mitigations.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No mitigations available.</div>
+                        <div className="text-xs text-gray-400 dark:text-slate-500 italic">No mitigations available.</div>
                       ) : (
                         <div className="space-y-1.5">
                           {g.recommended_mitigations.map(m => (
                             <div key={m.id} className="flex items-start gap-2">
                               <span className="font-mono text-xs text-purple-400 w-12 flex-shrink-0">{m.id}</span>
-                              <span className="text-xs text-slate-300">{m.name}</span>
+                              <span className="text-xs text-gray-700 dark:text-slate-300">{m.name}</span>
                             </div>
                           ))}
                         </div>
@@ -306,33 +306,33 @@ export default function GapAnalysis() {
                     </div>
 
                     {g.priority_components && (
-                      <div className="col-span-2 bg-slate-800/50 rounded-lg p-3">
-                        <div className="text-xs font-semibold text-slate-400 mb-2">Priority Score: <span className="text-slate-200">{g.priority_score}/100</span></div>
+                      <div className="col-span-2 bg-gray-100/50 dark:bg-slate-800/50 rounded-lg p-3">
+                        <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Priority Score: <span className="text-gray-800 dark:text-slate-200">{g.priority_score}/100</span></div>
                         <div className="grid grid-cols-4 gap-2 text-xs">
-                          <div className="bg-slate-900 rounded p-2 text-center">
+                          <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
                             <div className="text-amber-400 font-bold text-base">{g.priority_components.group}</div>
-                            <div className="text-slate-500 mt-0.5">Threat groups<br/><span className="text-slate-600">/40</span></div>
+                            <div className="text-gray-400 dark:text-slate-500 mt-0.5">Threat groups<br/><span className="text-gray-400 dark:text-slate-600">/40</span></div>
                           </div>
-                          <div className="bg-slate-900 rounded p-2 text-center">
+                          <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
                             <div className="text-sky-400 font-bold text-base">{g.priority_components.industry}</div>
-                            <div className="text-slate-500 mt-0.5">Industry targeting<br/><span className="text-slate-600">/30</span></div>
+                            <div className="text-gray-400 dark:text-slate-500 mt-0.5">Industry targeting<br/><span className="text-gray-400 dark:text-slate-600">/30</span></div>
                           </div>
-                          <div className="bg-slate-900 rounded p-2 text-center">
+                          <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
                             <div className="text-emerald-400 font-bold text-base">{g.priority_components.data_sources}</div>
-                            <div className="text-slate-500 mt-0.5">Data readiness<br/><span className="text-slate-600">/20</span></div>
+                            <div className="text-gray-400 dark:text-slate-500 mt-0.5">Data readiness<br/><span className="text-gray-400 dark:text-slate-600">/20</span></div>
                           </div>
-                          <div className="bg-slate-900 rounded p-2 text-center">
+                          <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
                             <div className="text-purple-400 font-bold text-base">{g.priority_components.mitigation_guidance}</div>
-                            <div className="text-slate-500 mt-0.5">Mit. guidance<br/><span className="text-slate-600">/10</span></div>
+                            <div className="text-gray-400 dark:text-slate-500 mt-0.5">Mit. guidance<br/><span className="text-gray-400 dark:text-slate-600">/10</span></div>
                           </div>
                         </div>
                       </div>
                     )}
 
-                    <div className="col-span-2 pt-2 border-t border-slate-800 flex items-center justify-between">
+                    <div className="col-span-2 pt-2 border-t border-gray-200 dark:border-slate-800 flex items-center justify-between">
                       <div className="flex gap-2">
                         {g.tactic_names.map(t => (
-                          <span key={t} className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-xs">{t}</span>
+                          <span key={t} className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded text-xs">{t}</span>
                         ))}
                       </div>
                       <a href={`https://attack.mitre.org/techniques/${g.id}/`} target="_blank" rel="noreferrer"
@@ -351,29 +351,29 @@ export default function GapAnalysis() {
               <svg className="w-14 h-14 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
               </svg>
-              <p className="text-sm font-medium text-slate-400">No covered techniques match filters</p>
-              <p className="text-xs text-slate-500 mt-1">Try clearing filters or add detections and tools to build coverage.</p>
+              <p className="text-sm font-medium text-gray-500 dark:text-slate-400">No covered techniques match filters</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Try clearing filters or add detections and tools to build coverage.</p>
             </div>
           ) : (
             filteredCovered.map(c => (
-              <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+              <div key={c.id} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setExpanded(expanded === c.id ? null : c.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800/30 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-100/30 dark:bg-slate-800/30 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
                     <span className={`font-mono text-xs px-2 py-0.5 rounded border flex-shrink-0 uppercase ${STATUS_BADGE[c.status]}`}>
                       {c.status}
                     </span>
-                    <span className="font-mono text-xs text-slate-400 flex-shrink-0">{c.id}</span>
-                    <span className="text-sm text-slate-200 font-medium">{c.name}</span>
+                    <span className="font-mono text-xs text-gray-500 dark:text-slate-400 flex-shrink-0">{c.id}</span>
+                    <span className="text-sm text-gray-800 dark:text-slate-200 font-medium">{c.name}</span>
                   </div>
                   <div className="flex items-center gap-4 ml-4">
                     <div className="flex gap-1.5">
                       {c.tactic_names.slice(0, 2).map(t => (
-                        <span key={t} className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-xs hidden sm:inline">{t}</span>
+                        <span key={t} className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded text-xs hidden sm:inline">{t}</span>
                       ))}
-                      {c.tactic_names.length > 2 && <span className="text-xs text-slate-500">+{c.tactic_names.length - 2}</span>}
+                      {c.tactic_names.length > 2 && <span className="text-xs text-gray-400 dark:text-slate-500">+{c.tactic_names.length - 2}</span>}
                     </div>
                     <div className="flex items-center gap-3 text-xs">
                       {c.detections.length > 0 && (
@@ -383,22 +383,22 @@ export default function GapAnalysis() {
                         <span className="text-blue-400">{c.tools.length} tool{c.tools.length !== 1 ? 's' : ''}</span>
                       )}
                     </div>
-                    <span className="text-slate-600 text-sm">{expanded === c.id ? '▲' : '▼'}</span>
+                    <span className="text-gray-400 dark:text-slate-600 text-sm">{expanded === c.id ? '▲' : '▼'}</span>
                   </div>
                 </button>
 
                 {expanded === c.id && (
-                  <div className="border-t border-slate-800 px-4 py-4 grid grid-cols-2 gap-4">
+                  <div className="border-t border-gray-200 dark:border-slate-800 px-4 py-4 grid grid-cols-2 gap-4">
                     <div>
-                      <div className="text-xs font-semibold text-slate-400 mb-2">Active Detections</div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Active Detections</div>
                       {c.detections.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No active detections.</div>
+                        <div className="text-xs text-gray-400 dark:text-slate-500 italic">No active detections.</div>
                       ) : (
                         <div className="space-y-1.5">
                           {c.detections.map(d => (
                             <div key={d.id} className="flex items-center gap-2">
                               <StatusBadge value={d.severity} variant="severity" />
-                              <span className="text-xs text-slate-300 truncate">{d.name}</span>
+                              <span className="text-xs text-gray-700 dark:text-slate-300 truncate">{d.name}</span>
                             </div>
                           ))}
                         </div>
@@ -406,25 +406,25 @@ export default function GapAnalysis() {
                     </div>
 
                     <div>
-                      <div className="text-xs font-semibold text-slate-400 mb-2">Covering Tools</div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Covering Tools</div>
                       {c.tools.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No tools assigned via mitigations.</div>
+                        <div className="text-xs text-gray-400 dark:text-slate-500 italic">No tools assigned via mitigations.</div>
                       ) : (
                         <div className="space-y-1.5">
                           {c.tools.map(t => (
                             <div key={t.id} className="flex items-center gap-2">
-                              <span className="px-1.5 py-0.5 rounded text-xs bg-slate-700 text-slate-400">{t.category}</span>
-                              <span className="text-xs text-slate-300">{t.name}</span>
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400">{t.category}</span>
+                              <span className="text-xs text-gray-700 dark:text-slate-300">{t.name}</span>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
 
-                    <div className="col-span-2 pt-2 border-t border-slate-800 flex items-center justify-between">
+                    <div className="col-span-2 pt-2 border-t border-gray-200 dark:border-slate-800 flex items-center justify-between">
                       <div className="flex gap-2">
                         {c.tactic_names.map(t => (
-                          <span key={t} className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-xs">{t}</span>
+                          <span key={t} className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded text-xs">{t}</span>
                         ))}
                       </div>
                       <a href={`https://attack.mitre.org/techniques/${c.id}/`} target="_blank" rel="noreferrer"

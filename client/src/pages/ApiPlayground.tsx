@@ -35,12 +35,12 @@ const METHOD_COLORS: Record<Method, string> = {
 };
 
 const STATUS_COLOR = (s: number) =>
-  s >= 500 ? 'text-red-400' : s >= 400 ? 'text-amber-400' : s >= 200 ? 'text-emerald-400' : 'text-slate-400';
+  s >= 500 ? 'text-red-400' : s >= 400 ? 'text-amber-400' : s >= 200 ? 'text-emerald-400' : 'text-gray-500 dark:text-slate-400';
 
 const GROUPS: Group[] = [
   {
     name: 'Health',
-    color: 'text-slate-400',
+    color: 'text-gray-500 dark:text-slate-400',
     endpoints: [
       { id: 'health', method: 'GET', path: '/api/health', description: 'Server health check' },
     ],
@@ -450,7 +450,7 @@ const GROUPS: Group[] = [
   },
   {
     name: 'Audit',
-    color: 'text-slate-300',
+    color: 'text-gray-700 dark:text-slate-300',
     endpoints: [
       {
         id: 'audit-list',
@@ -665,7 +665,7 @@ const GROUPS: Group[] = [
   },
   {
     name: 'API Keys',
-    color: 'text-slate-300',
+    color: 'text-gray-700 dark:text-slate-300',
     endpoints: [
       { id: 'apikeys-list', method: 'GET', path: '/api/api-keys', description: 'List API keys' },
       {
@@ -931,7 +931,7 @@ const GROUPS: Group[] = [
   },
   {
     name: 'Settings',
-    color: 'text-slate-400',
+    color: 'text-gray-500 dark:text-slate-400',
     endpoints: [
       {
         id: 'settings-get',
@@ -985,7 +985,7 @@ function colorizeJson(json: string): string {
       if (m.endsWith(':')) return `<span class="text-blue-300">${m}</span>`;
       if (m.startsWith('"')) return `<span class="text-emerald-300">${m}</span>`;
       if (m === 'true' || m === 'false') return `<span class="text-amber-300">${m}</span>`;
-      if (m === 'null') return `<span class="text-slate-500">${m}</span>`;
+      if (m === 'null') return `<span class="text-gray-400 dark:text-slate-500">${m}</span>`;
       return `<span class="text-cyan-300">${m}</span>`;
     }
   );
@@ -1082,15 +1082,15 @@ export default function ApiPlayground() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left panel */}
-      <div className="w-72 flex-shrink-0 border-r border-slate-800 flex flex-col bg-slate-900">
-        <div className="px-4 py-4 border-b border-slate-800">
+      <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 flex flex-col bg-gray-50 dark:bg-slate-900">
+        <div className="px-4 py-4 border-b border-gray-200 dark:border-slate-800">
           <h1 className="text-sm font-semibold text-white mb-3">API Playground</h1>
           <input
             type="text"
             placeholder="Search endpoints..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs text-gray-800 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
         </div>
         <nav className="flex-1 overflow-y-auto py-2">
@@ -1098,10 +1098,10 @@ export default function ApiPlayground() {
             <div key={group.name}>
               <button
                 onClick={() => toggleGroup(group.name)}
-                className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-slate-800/50 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-1.5 hover:bg-gray-100/50 dark:bg-slate-800/50 transition-colors"
               >
                 <span className={`text-xs font-semibold uppercase tracking-wider ${group.color}`}>{group.name}</span>
-                <span className="text-slate-600 text-xs">{expandedGroups.has(group.name) ? '▾' : '▸'}</span>
+                <span className="text-gray-400 dark:text-slate-600 text-xs">{expandedGroups.has(group.name) ? '▾' : '▸'}</span>
               </button>
               {expandedGroups.has(group.name) && (
                 <div className="mb-1">
@@ -1109,14 +1109,14 @@ export default function ApiPlayground() {
                     <button
                       key={ep.id}
                       onClick={() => selectEndpoint(ep)}
-                      className={`w-full flex items-center gap-2 px-4 py-1.5 text-left hover:bg-slate-800 transition-colors ${
-                        selected?.id === ep.id ? 'bg-slate-800' : ''
+                      className={`w-full flex items-center gap-2 px-4 py-1.5 text-left hover:bg-gray-100 dark:bg-slate-800 transition-colors ${
+                        selected?.id === ep.id ? 'bg-gray-100 dark:bg-slate-800' : ''
                       }`}
                     >
                       <span className={`text-[10px] font-bold w-11 flex-shrink-0 px-1 py-0.5 rounded text-center ${METHOD_COLORS[ep.method]}`}>
                         {ep.method}
                       </span>
-                      <span className="text-xs text-slate-400 truncate font-mono">{ep.path.replace('/api', '')}</span>
+                      <span className="text-xs text-gray-500 dark:text-slate-400 truncate font-mono">{ep.path.replace('/api', '')}</span>
                     </button>
                   ))}
                 </div>
@@ -1124,7 +1124,7 @@ export default function ApiPlayground() {
             </div>
           ))}
         </nav>
-        <div className="px-4 py-3 border-t border-slate-800 space-y-2">
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
           {(() => {
             const stored = getStoredApiKey();
             return stored ? (
@@ -1141,9 +1141,9 @@ export default function ApiPlayground() {
             value={apiKeyOverride}
             onChange={e => setApiKeyOverride(e.target.value)}
             placeholder="Override key for this session..."
-            className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 font-mono placeholder-slate-600 focus:outline-none focus:border-blue-500"
+            className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-2 py-1 text-xs text-gray-700 dark:text-slate-300 font-mono placeholder-gray-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500"
           />
-          <div className="text-xs text-slate-600">
+          <div className="text-xs text-gray-400 dark:text-slate-600">
             {GROUPS.reduce((n, g) => n + g.endpoints.length, 0)} endpoints
           </div>
         </div>
@@ -1155,28 +1155,28 @@ export default function ApiPlayground() {
           <div className="flex-1 flex items-center justify-center text-center px-8">
             <div>
               <div className="text-4xl mb-4 text-slate-700">⚡</div>
-              <p className="text-slate-400 text-sm font-medium">Select an endpoint to get started</p>
-              <p className="text-slate-600 text-xs mt-1">Browse {GROUPS.reduce((n, g) => n + g.endpoints.length, 0)} endpoints across {GROUPS.length} resource groups</p>
+              <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Select an endpoint to get started</p>
+              <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">Browse {GROUPS.reduce((n, g) => n + g.endpoints.length, 0)} endpoints across {GROUPS.length} resource groups</p>
             </div>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
             {/* Endpoint header */}
-            <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/50 sticky top-0 z-10">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50 sticky top-0 z-10">
               <div className="flex items-center gap-3">
                 <span className={`text-xs font-bold px-2 py-1 rounded ${METHOD_COLORS[selected.method]}`}>
                   {selected.method}
                 </span>
-                <code className="text-sm text-slate-200 font-mono">{resolvedUrl}</code>
+                <code className="text-sm text-gray-800 dark:text-slate-200 font-mono">{resolvedUrl}</code>
               </div>
-              <p className="text-xs text-slate-500 mt-1.5">{selected.description}</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1.5">{selected.description}</p>
             </div>
 
             <div className="px-6 py-4 space-y-5">
               {/* Path parameters */}
               {hasPathParams && (
                 <section>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Path Parameters</h3>
+                  <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">Path Parameters</h3>
                   <div className="space-y-2">
                     {selected.pathParams!.map((p) => (
                       <div key={p.name} className="flex items-start gap-3">
@@ -1185,14 +1185,14 @@ export default function ApiPlayground() {
                             <code className="text-xs font-mono text-blue-300">{p.name}</code>
                             {p.required && <span className="text-red-400 text-xs">*</span>}
                           </div>
-                          <div className="text-xs text-slate-600 mt-0.5">{p.description}</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-600 mt-0.5">{p.description}</div>
                         </div>
                         <input
                           type="text"
                           placeholder={p.example ?? p.name}
                           value={pathParams[p.name] ?? ''}
                           onChange={(e) => setPathParams((prev) => ({ ...prev, [p.name]: e.target.value }))}
-                          className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                          className="flex-1 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-gray-800 dark:text-slate-200 font-mono placeholder-gray-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500"
                         />
                       </div>
                     ))}
@@ -1203,20 +1203,20 @@ export default function ApiPlayground() {
               {/* Query parameters */}
               {hasQueryParams && (
                 <section>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Query Parameters</h3>
+                  <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">Query Parameters</h3>
                   <div className="space-y-2">
                     {selected.queryParams!.map((p) => (
                       <div key={p.name} className="flex items-start gap-3">
                         <div className="w-36 flex-shrink-0">
                           <code className="text-xs font-mono text-cyan-300">{p.name}</code>
-                          <div className="text-xs text-slate-600 mt-0.5">{p.description}</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-600 mt-0.5">{p.description}</div>
                         </div>
                         <input
                           type="text"
                           placeholder={p.example ?? ''}
                           value={queryParams[p.name] ?? ''}
                           onChange={(e) => setQueryParams((prev) => ({ ...prev, [p.name]: e.target.value }))}
-                          className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-blue-500"
+                          className="flex-1 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-gray-800 dark:text-slate-200 font-mono placeholder-gray-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500"
                         />
                       </div>
                     ))}
@@ -1228,15 +1228,15 @@ export default function ApiPlayground() {
               {hasBody && (
                 <section>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Request Body</h3>
-                    <span className="text-xs text-slate-600">{selected.body!.description}</span>
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Request Body</h3>
+                    <span className="text-xs text-gray-400 dark:text-slate-600">{selected.body!.description}</span>
                   </div>
                   <textarea
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                     rows={8}
                     spellCheck={false}
-                    className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-xs text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-y"
+                    className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-3 py-2 text-xs text-gray-800 dark:text-slate-200 font-mono placeholder-gray-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-y"
                   />
                 </section>
               )}
@@ -1245,7 +1245,7 @@ export default function ApiPlayground() {
               <button
                 onClick={sendRequest}
                 disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-md transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-200 dark:bg-slate-700 disabled:text-gray-400 dark:text-slate-500 text-white text-sm font-medium rounded-md transition-colors"
               >
                 {loading ? (
                   <>
@@ -1261,17 +1261,17 @@ export default function ApiPlayground() {
               {response && (
                 <section>
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Response</h3>
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Response</h3>
                     <span className={`text-xs font-bold font-mono ${STATUS_COLOR(response.status)}`}>
                       {response.status === 0 ? 'Error' : response.status}
                     </span>
-                    <span className="text-xs text-slate-600">{response.time}ms</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-600">{response.time}ms</span>
                   </div>
-                  <div className="relative bg-slate-900 border border-slate-700 rounded-md overflow-hidden">
+                  <div className="relative bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-md overflow-hidden">
                     <div className="absolute top-2 right-2">
                       <button
                         onClick={() => navigator.clipboard.writeText(response.body)}
-                        className="text-xs text-slate-600 hover:text-slate-400 px-2 py-0.5 bg-slate-800 rounded transition-colors"
+                        className="text-xs text-gray-400 dark:text-slate-600 hover:text-gray-500 dark:text-slate-400 px-2 py-0.5 bg-gray-100 dark:bg-slate-800 rounded transition-colors"
                       >
                         copy
                       </button>

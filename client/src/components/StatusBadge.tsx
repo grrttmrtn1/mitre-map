@@ -1,23 +1,23 @@
 const DETECTION_STATUS: Record<string, string> = {
   active:   'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
   tuning:   'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30',
-  disabled: 'bg-slate-500/15 text-slate-400 border border-slate-500/30',
+  disabled: 'bg-slate-500/15 text-gray-500 dark:text-slate-400 border border-slate-500/30',
   planned:  'bg-blue-500/15 text-blue-400 border border-blue-500/30',
-  archived: 'bg-slate-700/40 text-slate-500 border border-slate-600/30',
+  archived: 'bg-gray-200 dark:bg-slate-700/40 text-gray-400 dark:text-slate-500 border border-gray-400 dark:border-slate-600/30',
 };
 
 const SEVERITY: Record<string, string> = {
   critical:    'bg-red-500/15 text-red-400 border border-red-500/30',
   high:        'bg-orange-500/15 text-orange-400 border border-orange-500/30',
   medium:      'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30',
-  low:         'bg-slate-500/15 text-slate-400 border border-slate-500/30',
+  low:         'bg-slate-500/15 text-gray-500 dark:text-slate-400 border border-slate-500/30',
   informational: 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
 };
 
 const TOOL_STATUS: Record<string, string> = {
   active:     'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
   planned:    'bg-blue-500/15 text-blue-400 border border-blue-500/30',
-  deprecated: 'bg-slate-500/15 text-slate-400 border border-slate-500/30',
+  deprecated: 'bg-slate-500/15 text-gray-500 dark:text-slate-400 border border-slate-500/30',
 };
 
 interface Props {
@@ -30,7 +30,7 @@ export default function StatusBadge({ value, variant, className = '' }: Props) {
   const map = variant === 'detection_status' ? DETECTION_STATUS
             : variant === 'severity' ? SEVERITY
             : TOOL_STATUS;
-  const cls = map[value] ?? 'bg-slate-700 text-slate-300';
+  const cls = map[value] ?? 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300';
   const showPulse = value === 'active' && (variant === 'detection_status' || variant === 'tool_status');
 
   return (

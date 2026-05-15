@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { onAuthError } from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ToastContainer from './components/ToastContainer';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -78,7 +79,7 @@ function AppShell() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
+      <div className="flex h-screen items-center justify-center bg-white dark:bg-slate-950 text-gray-500 dark:text-slate-400">
         Loading…
       </div>
     );
@@ -91,7 +92,7 @@ function AppShell() {
         !user && !isBootstrapMode && localStorage.getItem('mitremap_api_key') === null ? (
           <Navigate to="/login" replace />
         ) : (
-          <div className="flex h-screen overflow-hidden bg-slate-950">
+          <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-950">
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
               {authError && <AuthBanner onDismiss={() => setAuthError(false)} />}
@@ -108,11 +109,13 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppShell />
-        <ToastContainer />
-      </ToastProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <AppShell />
+          <ToastContainer />
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

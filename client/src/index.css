@@ -8,20 +8,20 @@
   }
   body {
     font-family: 'Inter', sans-serif;
-    @apply bg-slate-950 text-slate-100 antialiased;
+    @apply bg-white text-gray-900 antialiased dark:bg-slate-950 dark:text-slate-100;
   }
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-slate-900;
+    @apply bg-gray-100 dark:bg-slate-900;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-600 rounded;
+    @apply bg-gray-400 dark:bg-slate-600 rounded;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-500;
+    @apply bg-gray-500 dark:bg-slate-500;
   }
 }
 

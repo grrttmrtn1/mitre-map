@@ -32,14 +32,14 @@ export default function CoverageBar({ covered, total, showLabel = true, height =
 
   return (
     <div className="flex items-center gap-2">
-      <div className={`flex-1 ${trackH} bg-slate-800 rounded-full overflow-hidden`}>
+      <div className={`flex-1 ${trackH} bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden`}>
         <div
           className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${gradient} ${glow}`}
           style={{ width: `${width}%` }}
         />
       </div>
       {showLabel && (
-        <span className="text-xs text-slate-400 w-8 text-right tabular-nums">{pct}%</span>
+        <span className="text-xs text-gray-500 dark:text-slate-400 w-8 text-right tabular-nums">{pct}%</span>
       )}
     </div>
   );

@@ -41,7 +41,7 @@ function PlatformFilterBar({ selected, onChange }: { selected: string[]; onChang
   }
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <span className="text-xs text-slate-500 flex-shrink-0 mr-0.5">Platform:</span>
+      <span className="text-xs text-gray-400 dark:text-slate-500 flex-shrink-0 mr-0.5">Platform:</span>
       {PLATFORMS.map(p => {
         const active = selected.includes(p);
         return (
@@ -52,7 +52,7 @@ function PlatformFilterBar({ selected, onChange }: { selected: string[]; onChang
             className={`text-xs px-2 py-0.5 rounded border transition-colors ${
               active
                 ? (PLATFORM_ACTIVE_COLORS[p] ?? 'bg-blue-600/30 border-blue-500 text-blue-300')
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'
+                : 'bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-slate-500'
             }`}
           >
             {p}
@@ -63,7 +63,7 @@ function PlatformFilterBar({ selected, onChange }: { selected: string[]; onChang
         <button
           type="button"
           onClick={() => onChange([])}
-          className="text-xs text-slate-500 hover:text-slate-300 transition-colors ml-1"
+          className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors ml-1"
         >
           Clear
         </button>
@@ -78,7 +78,7 @@ function PlatformBadges({ platform }: { platform: string }) {
   return (
     <div className="flex gap-1.5 flex-wrap">
       {parts.map(p => (
-        <span key={p} className={`text-xs px-2 py-0.5 rounded ${PLATFORM_COLORS[p.toLowerCase()] ?? 'bg-slate-800 text-slate-400'}`}>{p}</span>
+        <span key={p} className={`text-xs px-2 py-0.5 rounded ${PLATFORM_COLORS[p.toLowerCase()] ?? 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>{p}</span>
       ))}
     </div>
   );
@@ -148,17 +148,17 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
 
   return (
     <>
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-gray-500 dark:text-slate-400">
               {loading ? 'Loading…' : `${allTests.length} tests across ${Object.keys(grouped).length} techniques`}
             </p>
             {syncResult && (
-              <p className="text-xs mt-1 text-slate-500">
+              <p className="text-xs mt-1 text-gray-400 dark:text-slate-500">
                 Synced: <span className="text-emerald-400 font-medium">{syncResult.imported}</span> new,{' '}
-                <span className="text-slate-500">{syncResult.skipped}</span> already present
+                <span className="text-gray-400 dark:text-slate-500">{syncResult.skipped}</span> already present
                 {' '}({syncResult.total} in index)
               </p>
             )}
@@ -168,7 +168,7 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
               onClick={handleSync}
               disabled={syncing}
               title="Fetch the full Atomic Red Team test suite from GitHub"
-              className="px-3 py-1.5 text-sm bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200 rounded-lg hover:bg-slate-600 disabled:opacity-50 transition-colors"
             >
               {syncing ? 'Syncing…' : 'Sync from GitHub'}
             </button>
@@ -182,11 +182,11 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
         </div>
 
         {showImport && (
-          <div className="mt-4 bg-slate-800 border border-slate-700 rounded-xl p-4">
-            <h3 className="text-sm font-medium text-slate-300 mb-1">Import Atomic Red Team YAML</h3>
-            <p className="text-xs text-slate-500 mb-3">Paste YAML from the AtomicRedTeam GitHub repository (atomics/*.yaml files).</p>
+          <div className="mt-4 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-xl p-4">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Import Atomic Red Team YAML</h3>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mb-3">Paste YAML from the AtomicRedTeam GitHub repository (atomics/*.yaml files).</p>
             <textarea
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 resize-y"
+              className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 resize-y"
               rows={8}
               placeholder="Paste YAML here…"
               value={yamlInput}
@@ -201,13 +201,13 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
                 {importing ? 'Importing…' : 'Import'}
               </button>
               <button onClick={() => { setShowImport(false); setYamlInput(''); setImportResult(null); }}
-                className="px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors">
+                className="px-3 py-1.5 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 transition-colors">
                 Cancel
               </button>
               {importResult && (
-                <span className="text-sm text-slate-400">
+                <span className="text-sm text-gray-500 dark:text-slate-400">
                   Imported <span className="text-emerald-400 font-medium">{importResult.imported}</span>,
-                  skipped <span className="text-slate-500">{importResult.skipped}</span>
+                  skipped <span className="text-gray-400 dark:text-slate-500">{importResult.skipped}</span>
                 </span>
               )}
             </div>
@@ -218,7 +218,7 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="mb-3">
           <input
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
+            className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-lg px-4 py-2 text-gray-800 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
             placeholder="Search by technique ID or test name…"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -229,49 +229,49 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-40 text-slate-500">Loading…</div>
+          <div className="flex items-center justify-center h-40 text-gray-400 dark:text-slate-500">Loading…</div>
         ) : (
           <div className="space-y-2">
             {filteredGroups.map(([techniqueId, techniqueTests]) => {
               const isExpanded = expanded === techniqueId;
               const techniqueName = techniqueTests[0]?.technique_name;
               return (
-                <div key={techniqueId} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                <div key={techniqueId} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
                   <button
-                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-800/50 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-100/50 dark:bg-slate-800/50 transition-colors text-left"
                     onClick={() => setExpanded(isExpanded ? null : techniqueId)}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="font-mono text-blue-400 font-semibold flex-shrink-0">{techniqueId}</span>
-                      {techniqueName && <span className="text-slate-300 text-sm truncate">{techniqueName}</span>}
-                      <span className="text-xs text-slate-500 flex-shrink-0 ml-1">
+                      {techniqueName && <span className="text-gray-700 dark:text-slate-300 text-sm truncate">{techniqueName}</span>}
+                      <span className="text-xs text-gray-400 dark:text-slate-500 flex-shrink-0 ml-1">
                         {techniqueTests.length} test{techniqueTests.length !== 1 ? 's' : ''}
                       </span>
                     </div>
-                    <svg className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    <svg className={`w-4 h-4 text-gray-400 dark:text-slate-500 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                       fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
                   {isExpanded && (
-                    <div className="border-t border-slate-800 divide-y divide-slate-800/50">
+                    <div className="border-t border-gray-200 dark:border-slate-800 divide-y divide-gray-200 dark:divide-slate-800/50">
                       {techniqueTests.map(test => (
                         <div key={test.id} className="px-5 py-4">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="min-w-0">
-                              <div className="font-medium text-slate-100 text-sm">{test.name}</div>
-                              <div className="text-slate-500 text-xs font-mono mt-0.5">{test.technique_id} · {test.test_guid}</div>
+                              <div className="font-medium text-gray-900 dark:text-slate-100 text-sm">{test.name}</div>
+                              <div className="text-gray-400 dark:text-slate-500 text-xs font-mono mt-0.5">{test.technique_id} · {test.test_guid}</div>
                             </div>
                             <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
                               <PlatformBadges platform={test.platform} />
                               {test.executor_type && (
-                                <span className="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded">{test.executor_type}</span>
+                                <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border border-gray-300 dark:border-slate-700 px-2 py-0.5 rounded">{test.executor_type}</span>
                               )}
                             </div>
                           </div>
-                          {test.description && <p className="text-slate-400 text-xs mb-3 leading-relaxed">{test.description}</p>}
+                          {test.description && <p className="text-gray-500 dark:text-slate-400 text-xs mb-3 leading-relaxed">{test.description}</p>}
                           {test.auto_generated_command && (
-                            <pre className="bg-slate-950 text-emerald-400 text-xs font-mono rounded-lg p-3 overflow-x-auto whitespace-pre-wrap border border-slate-800">{test.auto_generated_command}</pre>
+                            <pre className="bg-white dark:bg-slate-950 text-emerald-400 text-xs font-mono rounded-lg p-3 overflow-x-auto whitespace-pre-wrap border border-gray-200 dark:border-slate-800">{test.auto_generated_command}</pre>
                           )}
                         </div>
                       ))}
@@ -281,7 +281,7 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
               );
             })}
             {filteredGroups.length === 0 && !loading && (
-              <div className="text-center text-slate-500 py-12">No tests match your search</div>
+              <div className="text-center text-gray-400 dark:text-slate-500 py-12">No tests match your search</div>
             )}
           </div>
         )}
@@ -306,12 +306,12 @@ function CustomTestModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-100">
+      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">
             {initialValues.name ? 'Edit Custom Test' : 'New Custom Test'}
           </h2>
-          <button onClick={onCancel} className="text-slate-500 hover:text-slate-300 transition-colors">
+          <button onClick={onCancel} className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -319,27 +319,27 @@ function CustomTestModal({
         </div>
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Technique ID <span className="text-red-400">*</span></label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Technique ID <span className="text-red-400">*</span></label>
             <input
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 font-mono"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 font-mono"
               placeholder="e.g. T1059.001"
               value={form.technique_id}
               onChange={e => set('technique_id', e.target.value.toUpperCase())}
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Test Name <span className="text-red-400">*</span></label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Test Name <span className="text-red-400">*</span></label>
             <input
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
               placeholder="Name of the test"
               value={form.name}
               onChange={e => set('name', e.target.value)}
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Description</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Description</label>
             <textarea
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500 resize-y"
               rows={3}
               placeholder="What does this test simulate?"
               value={form.description}
@@ -348,7 +348,7 @@ function CustomTestModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1.5">Platform(s)</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Platform(s)</label>
               <div className="flex flex-wrap gap-1.5">
                 {PLATFORMS.map(p => {
                   const selected = form.platform.split(',').map(x => x.trim()).includes(p);
@@ -361,7 +361,7 @@ function CustomTestModal({
                         const next = selected ? parts.filter(x => x !== p) : [...parts, p];
                         set('platform', next.join(', '));
                       }}
-                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${selected ? 'bg-blue-600/30 border-blue-500 text-blue-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${selected ? 'bg-blue-600/30 border-blue-500 text-blue-300' : 'bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:border-slate-500'}`}
                     >
                       {p}
                     </button>
@@ -370,9 +370,9 @@ function CustomTestModal({
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1.5">Executor Type</label>
+              <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Executor Type</label>
               <select
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-sm focus:outline-none focus:border-blue-500"
                 value={form.executor_type}
                 onChange={e => set('executor_type', e.target.value)}
               >
@@ -382,9 +382,9 @@ function CustomTestModal({
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-400 block mb-1.5">Command / Steps</label>
+            <label className="text-xs font-medium text-gray-500 dark:text-slate-400 block mb-1.5">Command / Steps</label>
             <textarea
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 resize-y"
+              className="w-full bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-800 dark:text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 resize-y"
               rows={5}
               placeholder="Commands or manual steps to execute…"
               value={form.command}
@@ -392,8 +392,8 @@ function CustomTestModal({
             />
           </div>
         </div>
-        <div className="px-6 py-4 border-t border-slate-800 flex gap-3 justify-end">
-          <button onClick={onCancel} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors">
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-800 flex gap-3 justify-end">
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 transition-colors">
             Cancel
           </button>
           <button
@@ -502,10 +502,10 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
         />
       )}
 
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-gray-500 dark:text-slate-400">
             {loading ? 'Loading…' : `${tests.length} custom test${tests.length !== 1 ? 's' : ''}`}
           </p>
           <button
@@ -520,7 +520,7 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
       <div className="flex-1 overflow-y-auto p-6">
         <div className="mb-3">
           <input
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
+            className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-lg px-4 py-2 text-gray-800 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
             placeholder="Search by technique ID or test name…"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -531,9 +531,9 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-40 text-slate-500">Loading…</div>
+          <div className="flex items-center justify-center h-40 text-gray-400 dark:text-slate-500">Loading…</div>
         ) : tests.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-slate-500 gap-3">
+          <div className="flex flex-col items-center justify-center h-40 text-gray-400 dark:text-slate-500 gap-3">
             <p>No custom tests yet.</p>
             <button onClick={openCreate} className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors">
               Create your first custom test →
@@ -545,46 +545,46 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
               const isExpanded = expanded === techniqueId;
               const techniqueName = techniqueTests[0]?.technique_name;
               return (
-                <div key={techniqueId} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                <div key={techniqueId} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
                   <button
-                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-800/50 transition-colors text-left"
+                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-100/50 dark:bg-slate-800/50 transition-colors text-left"
                     onClick={() => setExpanded(isExpanded ? null : techniqueId)}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="font-mono text-blue-400 font-semibold flex-shrink-0">{techniqueId}</span>
-                      {techniqueName && <span className="text-slate-300 text-sm truncate">{techniqueName}</span>}
-                      <span className="text-xs text-slate-500 flex-shrink-0 ml-1">
+                      {techniqueName && <span className="text-gray-700 dark:text-slate-300 text-sm truncate">{techniqueName}</span>}
+                      <span className="text-xs text-gray-400 dark:text-slate-500 flex-shrink-0 ml-1">
                         {techniqueTests.length} test{techniqueTests.length !== 1 ? 's' : ''}
                       </span>
                     </div>
-                    <svg className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    <svg className={`w-4 h-4 text-gray-400 dark:text-slate-500 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                       fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
 
                   {isExpanded && (
-                    <div className="border-t border-slate-800 divide-y divide-slate-800/50">
+                    <div className="border-t border-gray-200 dark:border-slate-800 divide-y divide-gray-200 dark:divide-slate-800/50">
                       {techniqueTests.map(test => (
                         <div key={test.id} className="px-5 py-4">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium text-slate-100 text-sm">{test.name}</span>
+                                <span className="font-medium text-gray-900 dark:text-slate-100 text-sm">{test.name}</span>
                                 <span className="text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded">custom</span>
                               </div>
-                              <div className="text-slate-500 text-xs font-mono mt-0.5">{test.technique_id}</div>
+                              <div className="text-gray-400 dark:text-slate-500 text-xs font-mono mt-0.5">{test.technique_id}</div>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <div className="flex gap-1.5 flex-wrap justify-end">
                                 <PlatformBadges platform={test.platform ?? ''} />
                                 {test.executor_type && (
-                                  <span className="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded">{test.executor_type}</span>
+                                  <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border border-gray-300 dark:border-slate-700 px-2 py-0.5 rounded">{test.executor_type}</span>
                                 )}
                               </div>
                               <button
                                 onClick={() => openEdit(test)}
-                                className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+                                className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors p-1"
                                 title="Edit"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -594,7 +594,7 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
                               <button
                                 onClick={() => handleDelete(test.id)}
                                 disabled={deleting === test.id}
-                                className="text-slate-500 hover:text-red-400 transition-colors p-1 disabled:opacity-50"
+                                className="text-gray-400 dark:text-slate-500 hover:text-red-400 transition-colors p-1 disabled:opacity-50"
                                 title="Delete"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -603,9 +603,9 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
                               </button>
                             </div>
                           </div>
-                          {test.description && <p className="text-slate-400 text-xs mb-3 leading-relaxed">{test.description}</p>}
+                          {test.description && <p className="text-gray-500 dark:text-slate-400 text-xs mb-3 leading-relaxed">{test.description}</p>}
                           {test.auto_generated_command && (
-                            <pre className="bg-slate-950 text-emerald-400 text-xs font-mono rounded-lg p-3 overflow-x-auto whitespace-pre-wrap border border-slate-800">{test.auto_generated_command}</pre>
+                            <pre className="bg-white dark:bg-slate-950 text-emerald-400 text-xs font-mono rounded-lg p-3 overflow-x-auto whitespace-pre-wrap border border-gray-200 dark:border-slate-800">{test.auto_generated_command}</pre>
                           )}
                         </div>
                       ))}
@@ -615,7 +615,7 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
               );
             })}
             {Object.keys(grouped).length === 0 && (
-              <div className="text-center text-slate-500 py-12">No tests match your search</div>
+              <div className="text-center text-gray-400 dark:text-slate-500 py-12">No tests match your search</div>
             )}
           </div>
         )}
@@ -645,9 +645,9 @@ export default function AtomicTests() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 pt-4 border-b border-slate-800 bg-slate-900">
+      <div className="flex-shrink-0 px-6 pt-4 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-semibold text-slate-100">Red Team Tests</h1>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Red Team Tests</h1>
         </div>
         <div className="flex gap-0.5">
           {(['atomic', 'custom'] as const).map(t => (
@@ -656,12 +656,12 @@ export default function AtomicTests() {
               onClick={() => setTab(t)}
               className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 ${
                 tab === t
-                  ? 'text-slate-100 border-blue-500 bg-slate-800/50'
-                  : 'text-slate-400 border-transparent hover:text-slate-300'
+                  ? 'text-gray-900 dark:text-slate-100 border-blue-500 bg-gray-100/50 dark:bg-slate-800/50'
+                  : 'text-gray-500 dark:text-slate-400 border-transparent hover:text-gray-700 dark:text-slate-300'
               }`}
             >
               {t === 'atomic' ? 'Atomic Red Team' : 'Custom'}
-              <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${tab === t ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-700 text-slate-500'}`}>
+              <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${tab === t ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
                 {t === 'atomic' ? atomicTests.length : customTests.length}
               </span>
             </button>
