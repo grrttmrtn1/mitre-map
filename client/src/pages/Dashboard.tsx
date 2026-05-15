@@ -39,7 +39,7 @@ export default function Dashboard() {
 
   if (loading) return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
         <div className="h-6 w-48 bg-slate-800 rounded animate-pulse" />
         <div className="h-3.5 w-72 bg-slate-800/60 rounded animate-pulse mt-2" />
       </div>
@@ -59,28 +59,36 @@ export default function Dashboard() {
     {
       label: 'Overall Coverage', value: `${stats.coverage_pct}%`,
       sub: `${stats.covered_techniques} / ${stats.total_techniques} techniques`,
-      color: 'text-blue-400', bg: 'border-blue-500/20 bg-blue-500/5',
+      gradient: 'from-blue-400 to-cyan-400',
+      bg: 'border-blue-500/20 bg-blue-500/5',
+      glow: 'rgba(59,130,246,0.18)',
       delta: baseline ? stats.coverage_pct - baseline.coverage_pct : null,
       deltaUnit: '%',
     },
     {
       label: 'Active Detections', value: stats.active_detections,
       sub: `of ${stats.total_detections} total`,
-      color: 'text-emerald-400', bg: 'border-emerald-500/20 bg-emerald-500/5',
+      gradient: 'from-emerald-400 to-teal-300',
+      bg: 'border-emerald-500/20 bg-emerald-500/5',
+      glow: 'rgba(16,185,129,0.18)',
       delta: baseline ? stats.active_detections - baseline.active_detections : null,
       deltaUnit: '',
     },
     {
       label: 'Coverage Gaps', value: stats.gap_techniques,
       sub: 'techniques uncovered',
-      color: 'text-red-400', bg: 'border-red-500/20 bg-red-500/5',
+      gradient: 'from-red-400 to-orange-400',
+      bg: 'border-red-500/20 bg-red-500/5',
+      glow: 'rgba(239,68,68,0.18)',
       delta: baseline ? stats.gap_techniques - baseline.gap_techniques : null,
       deltaUnit: '', invert: true,
     },
     {
       label: 'Active Tools', value: stats.active_tools,
       sub: `of ${stats.total_tools} total`,
-      color: 'text-purple-400', bg: 'border-purple-500/20 bg-purple-500/5',
+      gradient: 'from-purple-400 to-violet-300',
+      bg: 'border-purple-500/20 bg-purple-500/5',
+      glow: 'rgba(168,85,247,0.18)',
       delta: null, deltaUnit: '',
     },
   ];
@@ -109,7 +117,8 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-100">Coverage Dashboard</h1>
@@ -129,22 +138,33 @@ export default function Dashboard() {
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <div className="grid grid-cols-4 gap-4">
         {kpis.map(kpi => (
-          <div key={kpi.label} className={`rounded-xl border p-4 ${kpi.bg}`}>
-            <div className="text-xs text-slate-400 mb-1">{kpi.label}</div>
-            <div className="flex items-end gap-2">
-              <div className={`text-3xl font-bold ${kpi.color}`}>{kpi.value}</div>
-              <div className="mb-1">
-                <TrendBadge delta={kpi.delta ?? null} invert={kpi.invert} unit={kpi.deltaUnit} />
+          <div key={kpi.label} className={`rounded-xl border p-4 relative overflow-hidden ${kpi.bg}`}>
+            {/* Radial glow */}
+            <div
+              className="absolute -top-4 -right-4 w-28 h-28 rounded-full blur-2xl pointer-events-none"
+              style={{ background: kpi.glow }}
+            />
+            {/* One-shot shimmer sweep on data load */}
+            <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent skew-x-[-20deg] pointer-events-none" />
+            <div className="relative">
+              <div className="text-xs uppercase tracking-widest text-slate-500 mb-1 font-medium">{kpi.label}</div>
+              <div className="flex items-end gap-2">
+                <div className={`text-3xl font-bold bg-gradient-to-br bg-clip-text text-transparent ${kpi.gradient}`}>
+                  {kpi.value}
+                </div>
+                <div className="mb-1">
+                  <TrendBadge delta={kpi.delta ?? null} invert={kpi.invert} unit={kpi.deltaUnit} />
+                </div>
               </div>
+              <div className="text-xs text-slate-500 mt-1">{kpi.sub}</div>
             </div>
-            <div className="text-xs text-slate-500 mt-1">{kpi.sub}</div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-sm font-medium text-slate-300 mb-3">Coverage by Tactic</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-3">Coverage by Tactic</h2>
           <div className="space-y-2.5">
             {stats.tactic_stats.map(t => (
               <div key={t.tactic_id} className="grid grid-cols-[1fr_120px_36px] items-center gap-3">
@@ -157,7 +177,7 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-sm font-medium text-slate-300 mb-3">Detection Status</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-3">Detection Status</h2>
           <div className="space-y-3 mt-4">
             {detectionBreakdown.map(d => (
               <div key={d.name} className="flex items-center justify-between">
@@ -177,7 +197,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-sm font-medium text-slate-300 mb-2">Coverage Radar by Tactic</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-2">Coverage Radar by Tactic</h2>
           <ResponsiveContainer width="100%" height={280}>
             <RadarChart data={radarData} margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
               <PolarGrid stroke="#1e293b" strokeDasharray="3 3" />
@@ -205,7 +225,7 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <h2 className="text-sm font-medium text-slate-300 mb-2">Technique Coverage vs. Gaps</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500 mb-2">Technique Coverage vs. Gaps</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={barData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 80 }}>
               <XAxis type="number" tick={{ fill: '#475569', fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -224,7 +244,7 @@ export default function Dashboard() {
 
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-slate-300">Lowest Coverage Tactics</h2>
+          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-slate-500">Lowest Coverage Tactics</h2>
           <Link to="/gaps" className="text-xs text-blue-400 hover:text-blue-300">View all gaps →</Link>
         </div>
         <div className="grid grid-cols-3 gap-3">

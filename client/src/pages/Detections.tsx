@@ -294,7 +294,8 @@ export default function Detections() {
   return (
     <div className="flex h-full">
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold text-slate-100">SIEM Detections</h1>
@@ -486,11 +487,16 @@ export default function Detections() {
               ))}
               {sorted.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <svg className="w-14 h-14 text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-                  </svg>
-                  <p className="text-sm font-medium text-slate-400">No detections found</p>
-                  <p className="text-xs text-slate-600 mt-1 max-w-xs">Try adjusting your filters, or add detections via CSV import or the SIGMA browser.</p>
+                  <div className="relative mb-4">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-20 h-20 rounded-full bg-blue-500/10 blur-xl" />
+                    </div>
+                    <svg className="relative w-14 h-14 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-300">No detections found</p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xs">Try adjusting your filters, or add detections via CSV import or the SIGMA browser.</p>
                 </div>
               )}
             </div>

@@ -31,8 +31,16 @@ export default function StatusBadge({ value, variant, className = '' }: Props) {
             : variant === 'severity' ? SEVERITY
             : TOOL_STATUS;
   const cls = map[value] ?? 'bg-slate-700 text-slate-300';
+  const showPulse = value === 'active' && (variant === 'detection_status' || variant === 'tool_status');
+
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls} ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium ${cls} ${className}`}>
+      {showPulse && (
+        <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+        </span>
+      )}
       {value}
     </span>
   );

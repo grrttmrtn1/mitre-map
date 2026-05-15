@@ -4,12 +4,29 @@ import { api } from '../api';
 import type { MatrixColumn, SubtechniqueCell, ThreatGroup, ThreatGroupDetail } from '../types';
 import StatusBadge from '../components/StatusBadge';
 
+const TACTIC_COLORS: Record<string, string> = {
+  'TA0043': '#a78bfa', // Reconnaissance       — violet
+  'TA0042': '#f472b6', // Resource Development  — pink
+  'TA0001': '#fb923c', // Initial Access        — orange
+  'TA0002': '#f87171', // Execution             — red
+  'TA0003': '#facc15', // Persistence           — yellow
+  'TA0004': '#4ade80', // Privilege Escalation  — green
+  'TA0005': '#22d3ee', // Defense Evasion       — cyan
+  'TA0006': '#60a5fa', // Credential Access     — blue
+  'TA0007': '#a3e635', // Discovery             — lime
+  'TA0008': '#f97316', // Lateral Movement      — orange-600
+  'TA0009': '#e879f9', // Collection            — fuchsia
+  'TA0011': '#38bdf8', // Command & Control     — sky
+  'TA0010': '#fb7185', // Exfiltration          — rose
+  'TA0040': '#ff4d4f', // Impact                — red-500
+};
+
 const CELL_COLORS: Record<string, string> = {
-  full:      'bg-emerald-500/80 hover:bg-emerald-500 text-white',
-  detected:  'bg-blue-500/70 hover:bg-blue-500/90 text-white',
-  mitigated: 'bg-purple-500/60 hover:bg-purple-500/80 text-white',
-  tuning:    'bg-yellow-500/60 hover:bg-yellow-500/80 text-slate-900',
-  planned:   'bg-blue-900/60 hover:bg-blue-900/80 text-blue-300 border border-blue-700/50',
+  full:      'bg-emerald-500/80 hover:bg-emerald-500 text-white cell-glow-full',
+  detected:  'bg-blue-500/70 hover:bg-blue-500/90 text-white cell-glow-detected',
+  mitigated: 'bg-purple-500/60 hover:bg-purple-500/80 text-white cell-glow-mitigated',
+  tuning:    'bg-yellow-500/60 hover:bg-yellow-500/80 text-slate-900 cell-glow-tuning',
+  planned:   'bg-blue-900/60 hover:bg-blue-900/80 text-blue-300 border border-blue-700/50 cell-glow-planned',
   gap:       'bg-slate-800/80 hover:bg-slate-700 text-slate-500',
 };
 
@@ -190,7 +207,8 @@ export default function AttackMatrix() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-xl font-semibold text-slate-100">ATT&amp;CK Coverage Matrix</h1>
@@ -276,11 +294,11 @@ export default function AttackMatrix() {
           <div className="flex gap-1.5 min-w-max items-start" style={{ zoom: zoom }}>
             {filteredMatrix.map(col => (
               <div key={col.tactic.id} className="flex flex-col gap-1">
-                <div className="px-2 py-1 bg-slate-800 rounded-md mb-1 sticky top-0 z-10">
-                  <div className="text-xs font-semibold text-slate-300 whitespace-nowrap truncate max-w-[96px]">
+                <div className="px-2 py-1.5 bg-slate-800/90 rounded-md mb-1 sticky top-0 z-10 border-t-2 border-b border-slate-700/50" style={{ borderTopColor: TACTIC_COLORS[col.tactic.id] ?? '#475569' }}>
+                  <div className="text-xs font-semibold text-slate-200 whitespace-nowrap truncate max-w-[96px]">
                     {col.tactic.name}
                   </div>
-                  <div className="text-xs text-slate-500">{col.cells.length} tech</div>
+                  <div className="text-[10px] text-slate-500 font-medium">{col.cells.length} tech</div>
                 </div>
 
                 {col.cells.map(cell => {

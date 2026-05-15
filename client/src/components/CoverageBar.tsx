@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 interface Props {
   covered: number;
   total: number;
@@ -7,6 +9,12 @@ interface Props {
 
 export default function CoverageBar({ covered, total, showLabel = true, height = 'sm' }: Props) {
   const pct = total > 0 ? Math.round((covered / total) * 100) : 0;
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setWidth(pct));
+    return () => cancelAnimationFrame(id);
+  }, [pct]);
 
   const gradient =
     pct >= 80 ? 'from-emerald-500 to-emerald-400' :
@@ -26,8 +34,8 @@ export default function CoverageBar({ covered, total, showLabel = true, height =
     <div className="flex items-center gap-2">
       <div className={`flex-1 ${trackH} bg-slate-800 rounded-full overflow-hidden`}>
         <div
-          className={`h-full rounded-full bg-gradient-to-r transition-all duration-500 ${gradient} ${glow}`}
-          style={{ width: `${pct}%` }}
+          className={`h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out ${gradient} ${glow}`}
+          style={{ width: `${width}%` }}
         />
       </div>
       {showLabel && (

@@ -96,7 +96,8 @@ export default function Reports() {
   if (activeTab === 'builder') {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
           <div>
             <h1 className="text-xl font-semibold text-slate-100">Reports &amp; Exports</h1>
             <p className="text-sm text-slate-400 mt-0.5">Build and save custom reports from any data source</p>
@@ -126,7 +127,8 @@ export default function Reports() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-100">Reports &amp; Exports</h1>

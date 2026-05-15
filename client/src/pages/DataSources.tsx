@@ -168,7 +168,8 @@ export default function DataSources() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+      <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-100">ATT&CK Data Sources</h1>
