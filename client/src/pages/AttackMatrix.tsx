@@ -1,24 +1,24 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
-import type { MatrixColumn, SubtechniqueCell, ThreatGroup, ThreatGroupDetail } from '../types';
+import type { MatrixColumn, MatrixCell, SubtechniqueCell, ThreatGroup, ThreatGroupDetail } from '../types';
 import StatusBadge from '../components/StatusBadge';
 
 const TACTIC_COLORS: Record<string, string> = {
-  'TA0043': '#a78bfa', // Reconnaissance       — violet
-  'TA0042': '#f472b6', // Resource Development  — pink
-  'TA0001': '#fb923c', // Initial Access        — orange
-  'TA0002': '#f87171', // Execution             — red
-  'TA0003': '#facc15', // Persistence           — yellow
-  'TA0004': '#4ade80', // Privilege Escalation  — green
-  'TA0005': '#22d3ee', // Defense Evasion       — cyan
-  'TA0006': '#60a5fa', // Credential Access     — blue
-  'TA0007': '#a3e635', // Discovery             — lime
-  'TA0008': '#f97316', // Lateral Movement      — orange-600
-  'TA0009': '#e879f9', // Collection            — fuchsia
-  'TA0011': '#38bdf8', // Command & Control     — sky
-  'TA0010': '#fb7185', // Exfiltration          — rose
-  'TA0040': '#ff4d4f', // Impact                — red-500
+  'TA0043': '#a78bfa', // Reconnaissance
+  'TA0042': '#f472b6', // Resource Development
+  'TA0001': '#fb923c', // Initial Access
+  'TA0002': '#f87171', // Execution
+  'TA0003': '#facc15', // Persistence
+  'TA0004': '#4ade80', // Privilege Escalation
+  'TA0005': '#22d3ee', // Defense Evasion
+  'TA0006': '#60a5fa', // Credential Access
+  'TA0007': '#a3e635', // Discovery
+  'TA0008': '#f97316', // Lateral Movement
+  'TA0009': '#e879f9', // Collection
+  'TA0011': '#38bdf8', // Command & Control
+  'TA0010': '#fb7185', // Exfiltration
+  'TA0040': '#ff4d4f', // Impact
 };
 
 const CELL_COLORS: Record<string, string> = {
@@ -63,6 +63,53 @@ function mitreUrl(id: string) {
   return `https://attack.mitre.org/techniques/${id.replace('.', '/')}/`;
 }
 
+// ── Heatmap density helpers ──────────────────────────────────────────────────
+
+function cellDensityRatio(cell: MatrixCell): number {
+  if (cell.subtechnique_count > 0) return cell.subtechnique_covered / cell.subtechnique_count;
+  return statusDensity(cell.status);
+}
+
+function statusDensity(status: string): number {
+  switch (status) {
+    case 'full':      return 1;
+    case 'detected':  return 0.8;
+    case 'mitigated': return 0.7;
+    case 'tuning':    return 0.4;
+    case 'planned':   return 0.2;
+    default:          return 0;
+  }
+}
+
+function lerpChannel(a: number, b: number, t: number): number {
+  return Math.round(a + (b - a) * t);
+}
+
+// Interpolates slate-800 → amber-700 → emerald-500
+function densityHex(ratio: number): string {
+  const low:  [number, number, number] = [30,  41,  59];
+  const mid:  [number, number, number] = [180, 83,  9];
+  const high: [number, number, number] = [16,  185, 129];
+  if (ratio <= 0) return '#1e293b';
+  let c1: [number, number, number], c2: [number, number, number], t: number;
+  if (ratio <= 0.5) { c1 = low; c2 = mid; t = ratio * 2; }
+  else              { c1 = mid; c2 = high; t = (ratio - 0.5) * 2; }
+  const r = lerpChannel(c1[0], c2[0], t);
+  const g = lerpChannel(c1[1], c2[1], t);
+  const b = lerpChannel(c1[2], c2[2], t);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+function densityStyle(ratio: number): React.CSSProperties {
+  if (ratio <= 0) return { backgroundColor: 'rgba(30,41,59,0.9)', color: 'rgba(100,116,139,1)' };
+  return {
+    backgroundColor: densityHex(ratio) + 'cc',
+    color: ratio < 0.15 ? 'rgba(148,163,184,0.8)' : 'white',
+  };
+}
+
+// ── Minimap ──────────────────────────────────────────────────────────────────
+
 const MINI_W = 224;
 const MINI_H = 112;
 
@@ -70,10 +117,12 @@ function MatrixMinimap({
   matrix,
   scrollEl,
   scrollVersion,
+  heatmapMode,
 }: {
   matrix: MatrixColumn[];
   scrollEl: HTMLElement | null;
   scrollVersion: number;
+  heatmapMode: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -94,8 +143,13 @@ function MatrixMinimap({
 
     matrix.forEach((col, ci) => {
       col.cells.forEach((cell, ri) => {
-        ctx.fillStyle = STATUS_HEX[cell.status] ?? '#334155';
-        ctx.fillRect(1 + ci * cellW, 1 + ri * cellH, Math.max(0.5, cellW - 0.5), Math.max(0.5, cellH - 0.5));
+        ctx.fillStyle = heatmapMode
+          ? densityHex(cellDensityRatio(cell))
+          : (STATUS_HEX[cell.status] ?? '#334155');
+        ctx.fillRect(
+          1 + ci * cellW, 1 + ri * cellH,
+          Math.max(0.5, cellW - 0.5), Math.max(0.5, cellH - 0.5),
+        );
       });
     });
 
@@ -110,15 +164,83 @@ function MatrixMinimap({
       ctx.lineWidth = 1.5;
       ctx.strokeRect(vx, vy, vw, vh);
     }
-  }, [matrix, scrollEl, scrollVersion]);
+  }, [matrix, scrollEl, scrollVersion, heatmapMode]);
+
+  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!scrollEl || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const rx = Math.max(0, Math.min(1, (e.clientX - rect.left  - 1) / (MINI_W - 2)));
+    const ry = Math.max(0, Math.min(1, (e.clientY - rect.top   - 1) / (MINI_H - 2)));
+    scrollEl.scrollTo({
+      left: rx * (scrollEl.scrollWidth  - scrollEl.clientWidth),
+      top:  ry * (scrollEl.scrollHeight - scrollEl.clientHeight),
+      behavior: 'smooth',
+    });
+  };
 
   return (
     <div className="bg-slate-950/90 backdrop-blur border border-slate-700/60 rounded-lg p-2 shadow-xl">
-      <div className="text-xs text-slate-500 mb-1 px-0.5 font-medium tracking-wide uppercase">Minimap</div>
-      <canvas ref={canvasRef} width={MINI_W} height={MINI_H} className="block rounded" />
+      <div className="text-xs text-slate-500 mb-1 px-0.5 font-medium tracking-wide uppercase">Overview</div>
+      <canvas
+        ref={canvasRef}
+        width={MINI_W}
+        height={MINI_H}
+        className="block rounded cursor-crosshair"
+        onClick={handleClick}
+        title="Click to navigate"
+      />
     </div>
   );
 }
+
+// ── Inline legend ────────────────────────────────────────────────────────────
+
+function InlineLegend({
+  heatmapMode,
+  hasOverlay,
+  groupName,
+}: {
+  heatmapMode: boolean;
+  hasOverlay: boolean;
+  groupName: string | null;
+}) {
+  return (
+    <div className="bg-slate-950/90 backdrop-blur border border-slate-700/60 rounded-lg p-2.5 shadow-xl">
+      <div className="text-xs text-slate-500 mb-1.5 font-medium tracking-wide uppercase">Legend</div>
+      {heatmapMode ? (
+        <div>
+          <div className="text-[10px] text-slate-400 mb-1.5">Coverage density</div>
+          <div
+            className="h-3 rounded w-full"
+            style={{ background: 'linear-gradient(to right, #1e293b, #b45309, #10b981)' }}
+          />
+          <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {LEGEND.map(l => (
+            <div key={l.status} className="flex items-center gap-1.5">
+              <div className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${l.color}`} />
+              <span className="text-[10px] text-slate-400 leading-tight">{l.label}</span>
+            </div>
+          ))}
+          {hasOverlay && (
+            <div className="flex items-center gap-1.5 pt-1 border-t border-slate-800 mt-0.5">
+              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0 border-2 border-amber-400" />
+              <span className="text-[10px] text-amber-400 leading-tight">{groupName ?? 'Threat group'}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 
 export default function AttackMatrix() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -129,14 +251,13 @@ export default function AttackMatrix() {
   const [filter, setFilter] = useState<string>(searchParams.get('filter') ?? 'all');
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set());
   const [zoom, setZoom] = useState(1.0);
+  const [heatmapMode, setHeatmapMode] = useState(false);
 
-  // Threat group overlay
   const [groups, setGroups] = useState<ThreatGroup[]>([]);
   const [overlayGroupId, setOverlayGroupId] = useState<string>(searchParams.get('group') ?? '');
   const [overlayTechIds, setOverlayTechIds] = useState<Set<string>>(new Set());
   const [overlayCoverage, setOverlayCoverage] = useState<{ name: string; covered: number; total: number } | null>(null);
 
-  // Scroll tracking for minimap
   const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
   const [scrollVersion, setScrollVersion] = useState(0);
   const scrollRef = useCallback((el: HTMLDivElement | null) => setScrollEl(el), []);
@@ -153,7 +274,6 @@ export default function AttackMatrix() {
     return () => scrollEl.removeEventListener('scroll', onScroll);
   }, [scrollEl]);
 
-  // Persist filter in URL
   useEffect(() => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
@@ -162,7 +282,6 @@ export default function AttackMatrix() {
     }, { replace: true });
   }, [filter, setSearchParams]);
 
-  // Persist overlay group in URL + fetch technique IDs
   useEffect(() => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
@@ -197,16 +316,15 @@ export default function AttackMatrix() {
 
   if (loading) return <div className="flex items-center justify-center h-full text-slate-500">Loading matrix...</div>;
 
-  const totalTechs  = matrix.reduce((s, c) => s + c.cells.length, 0);
-  const gapCount    = matrix.reduce((s, c) => s + c.cells.filter(x => x.status === 'gap').length, 0);
+  const totalTechs   = matrix.reduce((s, c) => s + c.cells.length, 0);
+  const gapCount     = matrix.reduce((s, c) => s + c.cells.filter(x => x.status === 'gap').length, 0);
   const coveredCount = totalTechs - gapCount;
-  const totalSubs   = matrix.reduce((s, c) => s + c.cells.reduce((cs, cell) => cs + cell.subtechnique_count, 0), 0);
-
-  const hasOverlay = overlayTechIds.size > 0;
+  const totalSubs    = matrix.reduce((s, c) => s + c.cells.reduce((cs, cell) => cs + cell.subtechnique_count, 0), 0);
+  const hasOverlay   = overlayTechIds.size > 0;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex-shrink-0 px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between gap-4">
@@ -251,6 +369,19 @@ export default function AttackMatrix() {
               <option value="gap">Gaps only</option>
             </select>
 
+            {/* Heatmap toggle */}
+            <button
+              onClick={() => setHeatmapMode(m => !m)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                heatmapMode
+                  ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 hover:bg-amber-500/30'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+              }`}
+              title={heatmapMode ? 'Switch to status view' : 'Switch to density heatmap'}
+            >
+              {heatmapMode ? '◉ Heatmap' : '○ Heatmap'}
+            </button>
+
             {/* Zoom controls */}
             <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
               <button
@@ -271,107 +402,135 @@ export default function AttackMatrix() {
             </div>
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-3 mt-3">
-          {LEGEND.map(l => (
-            <div key={l.status} className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 rounded-sm ${l.color}`} />
-              <span className="text-xs text-slate-400">{l.label}</span>
-            </div>
-          ))}
-          {hasOverlay && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm border-2 border-amber-400" />
-              <span className="text-xs text-amber-400">Used by group</span>
-            </div>
-          )}
-        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Scrollable matrix */}
+        {/* ── Scrollable matrix ── */}
         <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto p-4">
           <div className="flex gap-1.5 min-w-max items-start" style={{ zoom: zoom }}>
-            {filteredMatrix.map(col => (
-              <div key={col.tactic.id} className="flex flex-col gap-1">
-                <div className="px-2 py-1.5 bg-slate-800/90 rounded-md mb-1 sticky top-0 z-10 border-t-2 border-b border-slate-700/50" style={{ borderTopColor: TACTIC_COLORS[col.tactic.id] ?? '#475569' }}>
-                  <div className="text-xs font-semibold text-slate-200 whitespace-nowrap truncate max-w-[96px]">
-                    {col.tactic.name}
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-medium">{col.cells.length} tech</div>
-                </div>
+            {filteredMatrix.map(col => {
+              const tacticColor  = TACTIC_COLORS[col.tactic.id] ?? '#475569';
+              const tacticTotal  = col.cells.length;
+              const tacticCovered = col.cells.filter(c => c.status !== 'gap').length;
+              const tacticPct    = tacticTotal > 0 ? Math.round(tacticCovered / tacticTotal * 100) : 0;
 
-                {col.cells.map(cell => {
-                  const inOverlay = hasOverlay && overlayTechIds.has(cell.id);
-                  const ringClass = selected?.id === cell.id
-                    ? 'ring-1 ring-white/40'
-                    : inOverlay
-                      ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-slate-900'
-                      : '';
-                  const dimClass = hasOverlay && !inOverlay ? 'opacity-40' : '';
-
-                  return (
-                    <div key={cell.id} className="flex flex-col gap-0.5">
-                      <button
-                        onClick={() => setSelected({ id: cell.id, name: cell.name, status: cell.status, detection_count: cell.detection_count, detections: cell.detections, tacticName: col.tactic.name })}
-                        title={`${cell.id} · ${cell.name}`}
-                        className={`w-24 text-left px-1.5 py-1 rounded text-xs transition-colors cursor-pointer ${CELL_COLORS[cell.status]} ${ringClass} ${dimClass}`}
-                      >
-                        <div className="font-mono text-xs opacity-75">{cell.id}</div>
-                        <div className="truncate leading-tight">{cell.name}</div>
-                        {cell.subtechnique_count > 0 && (
-                          <div className="flex items-center justify-between mt-0.5">
-                            <span className="text-xs opacity-60">
-                              {cell.subtechnique_covered}/{cell.subtechnique_count} sub
-                            </span>
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={e => { e.stopPropagation(); toggleExpand(cell.id); }}
-                              onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); toggleExpand(cell.id); } }}
-                              className="text-xs opacity-60 hover:opacity-100 cursor-pointer px-0.5"
-                              title={expandedCells.has(cell.id) ? 'Collapse subtechniques' : 'Expand subtechniques'}
-                            >
-                              {expandedCells.has(cell.id) ? '▴' : '▾'}
-                            </span>
-                          </div>
-                        )}
-                      </button>
-
-                      {expandedCells.has(cell.id) && cell.subtechniques.map((sub: SubtechniqueCell) => {
-                        const subInOverlay = hasOverlay && overlayTechIds.has(sub.id);
-                        const subRing = selected?.id === sub.id
-                          ? 'ring-1 ring-white/40'
-                          : subInOverlay
-                            ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-slate-900'
-                            : '';
-                        const subDim = hasOverlay && !subInOverlay ? 'opacity-40' : '';
-                        return (
-                          <button
-                            key={sub.id}
-                            onClick={() => setSelected({ id: sub.id, name: sub.name, status: sub.status, detection_count: sub.detection_count, detections: sub.detections, parentId: cell.id, parentName: cell.name, tacticName: col.tactic.name })}
-                            title={`${sub.id} · ${sub.name}`}
-                            className={`w-24 text-left pl-3 pr-1.5 py-0.5 rounded-sm text-xs transition-colors cursor-pointer border-l-2 border-slate-500/30 ${CELL_COLORS[sub.status]} ${subRing} ${subDim}`}
-                          >
-                            <div className="font-mono text-xs opacity-75">{sub.id}</div>
-                            <div className="truncate leading-tight">{sub.name}</div>
-                          </button>
-                        );
-                      })}
+              return (
+                <div key={col.tactic.id} className="flex flex-col gap-1">
+                  {/* ── Sticky tactic header ── */}
+                  <div
+                    className="px-2 py-1.5 rounded-md mb-1 sticky top-0 z-10 border-t-2 border-b border-slate-700/40 shadow-[0_4px_16px_rgba(0,0,0,0.6)]"
+                    style={{
+                      borderTopColor: tacticColor,
+                      backgroundColor: 'rgba(15,23,42,0.94)',
+                      backdropFilter: 'blur(10px)',
+                    }}
+                  >
+                    <div className="text-xs font-semibold text-slate-200 whitespace-nowrap truncate max-w-[96px]">
+                      {col.tactic.name}
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                    <div className="flex items-center gap-1 mt-1">
+                      <div className="flex-1 h-1 bg-slate-700/60 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${tacticPct}%`, backgroundColor: tacticColor + 'aa' }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-slate-500 tabular-nums">{tacticPct}%</span>
+                    </div>
+                    <div className="text-[10px] text-slate-600 mt-0.5">{tacticTotal} tech</div>
+                  </div>
+
+                  {/* ── Technique cells ── */}
+                  {col.cells.map(cell => {
+                    const inOverlay = hasOverlay && overlayTechIds.has(cell.id);
+                    const ringClass = selected?.id === cell.id
+                      ? 'ring-1 ring-white/40'
+                      : inOverlay
+                        ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-slate-900'
+                        : '';
+                    const dimClass = hasOverlay && !inOverlay ? 'opacity-40' : '';
+
+                    return (
+                      <div key={cell.id} className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => setSelected({
+                            id: cell.id, name: cell.name, status: cell.status,
+                            detection_count: cell.detection_count, detections: cell.detections,
+                            tacticName: col.tactic.name,
+                          })}
+                          title={`${cell.id} · ${cell.name}`}
+                          className={`w-24 text-left px-1.5 py-1 rounded text-xs transition-colors cursor-pointer ${heatmapMode ? '' : CELL_COLORS[cell.status]} ${ringClass} ${dimClass}`}
+                          style={heatmapMode ? densityStyle(cellDensityRatio(cell)) : undefined}
+                        >
+                          <div className="font-mono text-xs opacity-75">{cell.id}</div>
+                          <div className="truncate leading-tight">{cell.name}</div>
+                          {cell.subtechnique_count > 0 && (
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-xs opacity-60">
+                                {cell.subtechnique_covered}/{cell.subtechnique_count} sub
+                              </span>
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={e => { e.stopPropagation(); toggleExpand(cell.id); }}
+                                onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); toggleExpand(cell.id); } }}
+                                className="text-xs opacity-60 hover:opacity-100 cursor-pointer px-0.5"
+                                title={expandedCells.has(cell.id) ? 'Collapse subtechniques' : 'Expand subtechniques'}
+                              >
+                                {expandedCells.has(cell.id) ? '▴' : '▾'}
+                              </span>
+                            </div>
+                          )}
+                        </button>
+
+                        {expandedCells.has(cell.id) && cell.subtechniques.map((sub: SubtechniqueCell) => {
+                          const subInOverlay = hasOverlay && overlayTechIds.has(sub.id);
+                          const subRing = selected?.id === sub.id
+                            ? 'ring-1 ring-white/40'
+                            : subInOverlay ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-slate-900' : '';
+                          const subDim = hasOverlay && !subInOverlay ? 'opacity-40' : '';
+                          return (
+                            <button
+                              key={sub.id}
+                              onClick={() => setSelected({
+                                id: sub.id, name: sub.name, status: sub.status,
+                                detection_count: sub.detection_count, detections: sub.detections,
+                                parentId: cell.id, parentName: cell.name, tacticName: col.tactic.name,
+                              })}
+                              title={`${sub.id} · ${sub.name}`}
+                              className={`w-24 text-left pl-3 pr-1.5 py-0.5 rounded-sm text-xs transition-colors cursor-pointer border-l-2 border-slate-500/30 ${heatmapMode ? '' : CELL_COLORS[sub.status]} ${subRing} ${subDim}`}
+                              style={heatmapMode ? densityStyle(statusDensity(sub.status)) : undefined}
+                            >
+                              <div className="font-mono text-xs opacity-75">{sub.id}</div>
+                              <div className="truncate leading-tight">{sub.name}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Minimap — floats over bottom-left, outside scroll area */}
-        <div className="absolute bottom-4 left-4 z-20 pointer-events-none">
-          <MatrixMinimap matrix={matrix} scrollEl={scrollEl} scrollVersion={scrollVersion} />
+        {/* ── Floating overlays (bottom-left) ── */}
+        <div className="absolute bottom-4 left-4 z-20 flex flex-col gap-2">
+          <MatrixMinimap
+            matrix={matrix}
+            scrollEl={scrollEl}
+            scrollVersion={scrollVersion}
+            heatmapMode={heatmapMode}
+          />
+          <InlineLegend
+            heatmapMode={heatmapMode}
+            hasOverlay={hasOverlay}
+            groupName={overlayCoverage?.name ?? null}
+          />
         </div>
 
-        {/* Technique detail panel */}
+        {/* ── Technique detail panel ── */}
         {selected && (
           <div className="w-72 flex-shrink-0 border-l border-slate-800 bg-slate-900 overflow-y-auto p-4">
             <div className="flex items-start justify-between mb-3">
