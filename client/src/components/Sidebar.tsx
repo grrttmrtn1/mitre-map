@@ -25,23 +25,51 @@ import {
   Moon,
 } from 'lucide-react';
 
-const NAV: { to: string; label: string; icon: LucideIcon }[] = [
-  { to: '/dashboard',    label: 'Dashboard',         icon: LayoutDashboard },
-  { to: '/matrix',       label: 'ATT&CK Matrix',     icon: LayoutGrid },
-  { to: '/detections',   label: 'Detections',        icon: ShieldAlert },
-  { to: '/tools',        label: 'Tools & Capabilities', icon: Wrench },
-  { to: '/defense',      label: 'Defense Mapping',   icon: Shield },
-  { to: '/gaps',         label: 'Gap Analysis',      icon: AlertTriangle },
-  { to: '/prioritization', label: 'Priority Queue',  icon: ListOrdered },
-  { to: '/threats',      label: 'Threat Groups',     icon: Users },
-  { to: '/data-sources', label: 'Data Sources',      icon: Database },
-  { to: '/atomic',       label: 'Atomic Tests',      icon: FlaskConical },
-  { to: '/exercises',    label: 'Exercises',         icon: Target },
-  { to: '/sigma',        label: 'SIGMA Library',     icon: FileCode2 },
-  { to: '/taxii',        label: 'TAXII Ingest',      icon: ArrowLeftRight },
-  { to: '/reports',      label: 'Reports & Exports', icon: BarChart3 },
-  { to: '/settings',     label: 'Settings',          icon: Settings },
-  { to: '/api',          label: 'API Playground',    icon: Zap },
+type NavItem = { to: string; label: string; icon: LucideIcon };
+type NavGroup = { section: string | null; items: NavItem[] };
+
+const NAV: NavGroup[] = [
+  {
+    section: null,
+    items: [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    section: 'Coverage',
+    items: [
+      { to: '/matrix',         label: 'ATT&CK Matrix',   icon: LayoutGrid },
+      { to: '/detections',     label: 'Detections',      icon: ShieldAlert },
+      { to: '/defense',        label: 'Defense Mapping', icon: Shield },
+      { to: '/gaps',           label: 'Gap Analysis',    icon: AlertTriangle },
+      { to: '/prioritization', label: 'Priority Queue',  icon: ListOrdered },
+    ],
+  },
+  {
+    section: 'Intelligence',
+    items: [
+      { to: '/threats',      label: 'Threat Groups', icon: Users },
+      { to: '/data-sources', label: 'Data Sources',  icon: Database },
+      { to: '/taxii',        label: 'TAXII Ingest',  icon: ArrowLeftRight },
+    ],
+  },
+  {
+    section: 'Detection Eng.',
+    items: [
+      { to: '/sigma',    label: 'SIGMA Library',       icon: FileCode2 },
+      { to: '/atomic',   label: 'Atomic Tests',        icon: FlaskConical },
+      { to: '/exercises', label: 'Exercises',          icon: Target },
+      { to: '/tools',    label: 'Tools & Capabilities', icon: Wrench },
+    ],
+  },
+  {
+    section: 'System',
+    items: [
+      { to: '/reports',  label: 'Reports & Exports', icon: BarChart3 },
+      { to: '/settings', label: 'Settings',          icon: Settings },
+      { to: '/api',      label: 'API Playground',    icon: Zap },
+    ],
+  },
 ];
 
 function ShieldLogo() {
@@ -111,22 +139,33 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150 relative ${
-                isActive
-                  ? 'bg-blue-500/10 text-blue-300 font-medium border-l-2 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.18)] pl-[10px]'
-                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100/70 dark:hover:bg-slate-800/70 border-l-2 border-transparent pl-[10px]'
-              }`
-            }
-          >
-            <Icon size={15} className={`flex-shrink-0 transition-all duration-150`} />
-            <span className="flex-1">{label}</span>
-          </NavLink>
+      <nav className="flex-1 px-2 py-3 overflow-y-auto">
+        {NAV.map(({ section, items }) => (
+          <div key={section ?? '__top'} className="mb-1">
+            {section && (
+              <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-slate-600 select-none">
+                {section}
+              </div>
+            )}
+            <div className="space-y-0.5">
+              {items.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150 relative ${
+                      isActive
+                        ? 'bg-blue-500/10 text-blue-300 font-medium border-l-2 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.18)] pl-[10px]'
+                        : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100/70 dark:hover:bg-slate-800/70 border-l-2 border-transparent pl-[10px]'
+                    }`
+                  }
+                >
+                  <Icon size={15} className="flex-shrink-0 transition-all duration-150" />
+                  <span className="flex-1">{label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
