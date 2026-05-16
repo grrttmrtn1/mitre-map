@@ -92,11 +92,11 @@ function AppShell() {
         !user && !isBootstrapMode && localStorage.getItem('mitremap_api_key') === null ? (
           <Navigate to="/login" replace />
         ) : (
-          <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-950">
+          <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-950 print:block print:h-auto">
             <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden print:block print:h-auto">
               {authError && <AuthBanner onDismiss={() => setAuthError(false)} />}
-              <main className="flex-1 overflow-hidden">
+              <main className="flex-1 overflow-hidden print:overflow-visible print:h-auto">
                 <AnimatedRoutes />
               </main>
             </div>

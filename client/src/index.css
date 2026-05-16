@@ -67,3 +67,102 @@
   .cell-glow-tuning:hover    { box-shadow: 0 0 10px rgba(234, 179, 8, 0.45); }
   .cell-glow-planned:hover   { box-shadow: 0 0 8px rgba(59, 130, 246, 0.3); }
 }
+
+/* ── Print / PDF stylesheet ─────────────────────────────────────────── */
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 0.8in 0.65in;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Unblock scrolling/clipping containers so all content renders */
+  .h-screen                { height: auto !important; }
+  .overflow-hidden         { overflow: visible !important; }
+  .overflow-y-auto         { overflow: visible !important; height: auto !important; max-height: none !important; }
+  .flex-1.overflow-hidden  { height: auto !important; }
+
+  /* Unstick headers so they don't repeat awkwardly */
+  .sticky { position: static !important; }
+
+  /* ── Print chrome helpers ── */
+  .print-only   { display: block !important; }
+  .print-hidden { display: none !important; }
+
+  /* ── Body / typography ── */
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 10pt;
+    line-height: 1.5;
+  }
+
+  /* ── Tables ── */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    font-size: 9pt !important;
+  }
+  thead { display: table-header-group; }
+  tr    { break-inside: avoid; }
+
+  th {
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+    font-weight: 600 !important;
+    border: 1px solid #d1d5db !important;
+    padding: 5px 10px !important;
+    text-align: left !important;
+  }
+
+  td {
+    color: #374151 !important;
+    border: 1px solid #e5e7eb !important;
+    padding: 5px 10px !important;
+  }
+
+  /* ── Section cards: avoid mid-card page breaks ── */
+  .rounded-xl { break-inside: avoid; }
+
+  /* ── Colour overrides: keep semantic meaning in B&W-safe hues ── */
+  .text-blue-400   { color: #1d4ed8 !important; }
+  .text-emerald-400 { color: #047857 !important; }
+  .text-red-400    { color: #b91c1c !important; }
+  .text-purple-400 { color: #6d28d9 !important; }
+  .text-orange-400 { color: #b45309 !important; }
+  .text-yellow-400 { color: #92400e !important; }
+
+  /* ── Progress bars: keep filled ── */
+  .bg-blue-500  { background-color: #3b82f6 !important; }
+  .bg-red-500   { background-color: #ef4444 !important; }
+  .bg-orange-500 { background-color: #f97316 !important; }
+
+  /* ── Print-only report header ── */
+  .print-header {
+    display: flex !important;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid #1d4ed8;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .print-header-title {
+    font-size: 15pt;
+    font-weight: 700;
+    color: #111827 !important;
+    letter-spacing: -0.01em;
+  }
+
+  .print-header-meta {
+    font-size: 9pt;
+    color: #6b7280 !important;
+    text-align: right;
+  }
+}

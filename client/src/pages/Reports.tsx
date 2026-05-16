@@ -16,6 +16,20 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'builder', label: 'Custom Reports' },
 ];
 
+function usePrint() {
+  return () => {
+    const html = document.documentElement;
+    const wasDark = html.classList.contains('dark');
+    if (wasDark) html.classList.remove('dark');
+    window.print();
+    const restore = () => {
+      if (wasDark) html.classList.add('dark');
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+  };
+}
+
 export default function Reports() {
   const [report, setReport] = useState<ExecutiveReport | null>(null);
   const [snapshots, setSnapshots] = useState<CoverageSnapshot[]>([]);
@@ -30,6 +44,7 @@ export default function Reports() {
   const [deleteSnapshotId, setDeleteSnapshotId] = useState<number | null>(null);
   const [deletingSnapshot, setDeletingSnapshot] = useState(false);
   const [fetchedTabs, setFetchedTabs] = useState<Set<TabId>>(new Set(['executive']));
+  const handlePrint = usePrint();
 
   // Load executive on mount
   useEffect(() => {
@@ -126,8 +141,25 @@ export default function Reports() {
   }));
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+    <div className="flex flex-col h-full print:block print:h-auto">
+      {/* Print-only report header */}
+      <div className="print-header print-only hidden">
+        <div>
+          <div className="print-header-title">MitreMap — Detection Coverage Report</div>
+          <div className="print-header-meta" style={{ fontSize: '9pt', color: '#6b7280', marginTop: 2 }}>
+            {activeTab === 'executive' ? 'Executive Summary' :
+             activeTab === 'trends' ? 'Coverage Trends' :
+             activeTab === 'threats' ? 'Threat Landscape' : 'Prioritized Gaps'}
+          </div>
+        </div>
+        <div className="print-header-meta">
+          {report ? new Date(report.generated_at).toLocaleString() : new Date().toLocaleString()}
+          <div style={{ marginTop: 2, opacity: 0.6 }}>mitremap.internal</div>
+        </div>
+      </div>
+
+      {/* Screen-only page header */}
+      <div className="print-hidden flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between">
           <div>
@@ -140,6 +172,10 @@ export default function Reports() {
             <button onClick={takeSnapshot} disabled={snapping}
               className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-400 dark:border-slate-600 rounded-lg hover:bg-slate-600 transition-colors disabled:opacity-50">
               {snapping ? 'Taking snapshot...' : 'Take Snapshot'}
+            </button>
+            <button onClick={handlePrint}
+              className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-400 dark:border-slate-600 rounded-lg hover:bg-slate-600 transition-colors">
+              Print / PDF
             </button>
             <div className="relative group">
               <button className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors">
@@ -159,7 +195,7 @@ export default function Reports() {
         {tabBar}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 print:overflow-visible print:h-auto">
         {/* Executive Summary */}
         {activeTab === 'executive' && (
           loadingExec ? (
