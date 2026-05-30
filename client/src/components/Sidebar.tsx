@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import NotificationCenter from './NotificationCenter';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useEffect, useState } from 'react';
@@ -195,13 +196,16 @@ export default function Sidebar() {
         )}
         <div className="flex items-center justify-between">
           <div className="text-xs text-gray-400 dark:text-slate-500">{version} · D3FEND v1</div>
-          <button
-            onClick={toggle}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors p-1 rounded"
-          >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationCenter />
+            <button
+              onClick={toggle}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors p-1 rounded"
+            >
+              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
+          </div>
         </div>
       </div>
     </aside>

@@ -4,6 +4,8 @@ import { onAuthError } from './api';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
+import CommandPalette from './components/CommandPalette';
 import ToastContainer from './components/ToastContainer';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -111,10 +113,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ToastProvider>
-          <AppShell />
-          <ToastContainer />
-        </ToastProvider>
+        <NotificationProvider>
+          <ToastProvider>
+            <AppShell />
+            <CommandPalette />
+            <ToastContainer />
+          </ToastProvider>
+        </NotificationProvider>
       </AuthProvider>
     </ThemeProvider>
   );
