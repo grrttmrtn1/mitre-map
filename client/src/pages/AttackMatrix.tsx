@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
-import type { MatrixColumn, MatrixCell, SubtechniqueCell, ThreatGroup, ThreatGroupDetail } from '../types';
+import type { MatrixColumn, MatrixCell, SubtechniqueCell, ThreatGroup, ThreatGroupDetail, Exercise } from '../types';
 import StatusBadge from '../components/StatusBadge';
+import { useToast } from '../context/ToastContext';
 
 const TACTIC_COLORS: Record<string, string> = {
   'TA0043': '#a78bfa', // Reconnaissance
@@ -244,6 +245,7 @@ function InlineLegend({
 
 export default function AttackMatrix() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToast();
 
   const [matrix, setMatrix] = useState<MatrixColumn[]>([]);
   const [loading, setLoading] = useState(true);
@@ -262,9 +264,19 @@ export default function AttackMatrix() {
   const [scrollVersion, setScrollVersion] = useState(0);
   const scrollRef = useCallback((el: HTMLDivElement | null) => setScrollEl(el), []);
 
+  const [exercises, setExercises] = useState<Array<{ id: number; name: string }>>([]);
+  const [addToExerciseCell, setAddToExerciseCell] = useState<string | null>(null);
+  const [addingToExercise, setAddingToExercise] = useState(false);
+
   useEffect(() => {
     api.getCoverageMatrix().then(setMatrix).finally(() => setLoading(false));
     api.getThreatGroups().then(setGroups).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    api.getExercises()
+      .then((all: Exercise[]) => setExercises(all.filter(e => e.status === 'active')))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -300,6 +312,19 @@ export default function AttackMatrix() {
       setOverlayCoverage({ name: detail.name, covered: detail.coverage.covered, total: detail.coverage.total });
     }).catch(() => {});
   }, [overlayGroupId, setSearchParams]);
+
+  async function addTechniqueToExercise(exerciseId: number, techniqueId: string) {
+    setAddingToExercise(true);
+    try {
+      await api.addExerciseTechniques(exerciseId, [techniqueId]);
+      toast.success('Technique added to exercise');
+      setAddToExerciseCell(null);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setAddingToExercise(false);
+    }
+  }
 
   const toggleExpand = (cellId: string) => {
     setExpandedCells(prev => {
@@ -592,6 +617,31 @@ export default function AttackMatrix() {
                   No active detections or tool mitigations for this {selected.parentId ? 'subtechnique' : 'technique'}.
                   Visit the Gap Analysis page for recommendations.
                 </p>
+              </div>
+            )}
+
+            {selected.status === 'gap' && exercises.length > 0 && (
+              <div className="mt-3">
+                <button
+                  onClick={() => setAddToExerciseCell(v => v === selected.id ? null : selected.id)}
+                  className="text-xs px-2.5 py-1.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-colors"
+                >
+                  + Add to Exercise
+                </button>
+                {addToExerciseCell === selected.id && (
+                  <div className="mt-2 space-y-1">
+                    {exercises.map(ex => (
+                      <button
+                        key={ex.id}
+                        onClick={() => addTechniqueToExercise(ex.id, selected.id)}
+                        disabled={addingToExercise}
+                        className="w-full text-left text-xs px-2.5 py-1.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 disabled:opacity-50 transition-colors"
+                      >
+                        {ex.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
