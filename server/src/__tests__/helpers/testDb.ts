@@ -324,6 +324,7 @@ export function createTestApp(...routers: Array<[string, express.Router]>): expr
   app.use((req: Request, _res: Response, next: NextFunction) => {
     (req as any).actor = 'test-user';
     (req as any).sourceIp = '127.0.0.1';
+    (req as any).user = { id: 1, email: 'test@test.com', name: 'Test User', role: 'admin', is_active: 1 };
     next();
   });
   for (const [path, router] of routers) {
