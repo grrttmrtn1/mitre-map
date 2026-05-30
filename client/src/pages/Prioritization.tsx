@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { PrioritizationItem, PrioritizationQueue, DataReadinessStatus } from '../types';
 import { SkeletonRow } from '../components/Skeleton';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const SECTORS = [
   'Financial', 'Healthcare', 'Energy', 'Government', 'Defense', 'Technology',
@@ -74,8 +76,31 @@ function QueueCard({ item, expanded, onToggle }: {
   onToggle: () => void;
 }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [assigningSelf, setAssigningSelf] = useState(false);
   const sectorGroups = item.groups.filter(g => g.in_sector);
   const otherGroups = item.groups.filter(g => !g.in_sector);
+
+  async function assignToSelf(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!user) return;
+    setAssigningSelf(true);
+    try {
+      await api.createAssignment({
+        entity_type: 'technique',
+        entity_id: item.technique_id,
+        assignee: user.name ?? user.email,
+        priority: 'medium',
+        due_date: null,
+      });
+      toast.success('Assigned to you');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setAssigningSelf(false);
+    }
+  }
 
   return (
     <div className={`bg-gray-50 dark:bg-slate-900 border rounded-xl overflow-hidden transition-colors ${expanded ? 'border-blue-500/40' : 'border-gray-200 dark:border-slate-800 hover:border-gray-300 dark:border-slate-700'}`}>
@@ -133,6 +158,13 @@ function QueueCard({ item, expanded, onToggle }: {
           <div className="w-24 hidden lg:block">
             <ScoreBar score={item.priority_score} />
           </div>
+          <button
+            onClick={assignToSelf}
+            disabled={assigningSelf}
+            className="text-[10px] px-2 py-0.5 rounded bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300 border border-gray-300 dark:border-slate-600 hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            {assigningSelf ? '…' : 'Assign to me'}
+          </button>
           <span className="text-gray-400 dark:text-slate-600 text-sm">{expanded ? '▲' : '▼'}</span>
         </div>
       </button>
