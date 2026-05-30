@@ -303,6 +303,17 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.text('notes');
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
+    })
+    .createTableIfNotExists('notifications', t => {
+      t.increments('id').primary();
+      t.integer('user_id').nullable();
+      t.string('type').notNullable();
+      t.string('title').notNullable();
+      t.text('message').nullable();
+      t.string('entity_type').nullable();
+      t.string('entity_id').nullable();
+      t.integer('read').notNullable().defaultTo(0);
+      t.timestamp('created_at').defaultTo(db.fn.now());
     });
 }
 
