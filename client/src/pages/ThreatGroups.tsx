@@ -3,6 +3,7 @@ import { api } from '../api';
 import type { Country, Motivation, Procedure, ProcedureType, ThreatGroup, Technique } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 import { SkeletonRow } from '../components/Skeleton';
+import Breadcrumb from '../components/Breadcrumb';
 
 const BLANK_FORM = {
   id: '', name: '', country: '', motivation: '', description: '', url: '', aliases: '', targeted_sectors: [] as string[],
@@ -787,6 +788,10 @@ function GroupDetailPane({ group, detail, onClose, onEdit }: {
 
   return (
     <div className="p-5 space-y-5">
+      <Breadcrumb items={[
+        { label: 'Threat Groups', href: '/threats' },
+        { label: group.name },
+      ]} />
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100">{group.name}</h2>
