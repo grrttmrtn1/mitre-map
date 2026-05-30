@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { CoveredTechnique, GapTechnique } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import { D3FEND_CATEGORY_COLORS } from '../lib/constants';
 import { SkeletonRow } from '../components/Skeleton';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const SECTORS = [
   'Financial', 'Healthcare', 'Energy', 'Government', 'Defense', 'Technology',
@@ -38,6 +41,9 @@ function PriorityBar({ score, components }: { score: number; components: GapTech
 }
 
 export default function GapAnalysis() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [view, setView] = useState<View>('gaps');
   const [gaps, setGaps] = useState<GapTechnique[]>([]);
   const [covered, setCovered] = useState<CoveredTechnique[]>([]);
@@ -48,6 +54,9 @@ export default function GapAnalysis() {
   const [sortBy, setSortBy] = useState<'priority' | 'tactic' | 'd3fend' | 'mitigations' | 'detections' | 'tools'>('priority');
   const [orgSector, setOrgSector] = useState('');
   const [savingSector, setSavingSector] = useState(false);
+  const [assigningGap, setAssigningGap] = useState<string | null>(null);
+  const [assignForm, setAssignForm] = useState({ assignee: '', priority: 'medium', due_date: '' });
+  const [savingAssign, setSavingAssign] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getCoverageGaps(), api.getCoveredTechniques(), api.getSetting('org_sector')])
@@ -61,6 +70,31 @@ export default function GapAnalysis() {
     // Reload gaps so priority scores reflect new sector
     api.getCoverageGaps().then(setGaps);
   };
+
+  function createDetectionFromGap(techniqueId: string, techniqueName: string) {
+    navigate(`/detections?prefill_technique=${techniqueId}&prefill_name=${encodeURIComponent('Detect ' + techniqueName)}`);
+  }
+
+  async function saveAssignment(techniqueId: string) {
+    if (!assignForm.assignee.trim()) return;
+    setSavingAssign(true);
+    try {
+      await api.createAssignment({
+        entity_type: 'technique',
+        entity_id: techniqueId,
+        assignee: assignForm.assignee,
+        priority: assignForm.priority as 'critical' | 'high' | 'medium' | 'low',
+        due_date: assignForm.due_date || null,
+      });
+      toast.success('Assignment created');
+      setAssigningGap(null);
+      setAssignForm({ assignee: '', priority: 'medium', due_date: '' });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSavingAssign(false);
+    }
+  }
 
   const allTactics = [...new Set([
     ...gaps.flatMap(g => g.tactic_names),
@@ -267,6 +301,52 @@ export default function GapAnalysis() {
                     <span className="text-gray-400 dark:text-slate-600 text-sm">{expanded === g.id ? '▲' : '▼'}</span>
                   </div>
                 </button>
+
+                {/* Quick actions */}
+                <div className="px-4 pb-2 flex items-center gap-1.5">
+                  <button
+                    onClick={() => createDetectionFromGap(g.id, g.name)}
+                    className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+                  >
+                    + Create Detection
+                  </button>
+                  <button
+                    onClick={() => { setAssigningGap(g.id); setAssignForm({ assignee: user?.name ?? '', priority: 'medium', due_date: '' }); }}
+                    className="text-[10px] px-2 py-0.5 rounded bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 border border-gray-300 dark:border-slate-600 hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+                  >
+                    Assign
+                  </button>
+                </div>
+
+                {assigningGap === g.id && (
+                  <div className="mx-4 mb-2 flex items-center gap-2 p-2 bg-gray-100 dark:bg-slate-800 rounded-lg">
+                    <input
+                      type="text" value={assignForm.assignee}
+                      onChange={e => setAssignForm(f => ({ ...f, assignee: e.target.value }))}
+                      placeholder="Assignee"
+                      className="flex-1 min-w-0 text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1 text-gray-800 dark:text-slate-200 focus:outline-none focus:border-blue-500/50"
+                    />
+                    <select
+                      value={assignForm.priority}
+                      onChange={e => setAssignForm(f => ({ ...f, priority: e.target.value }))}
+                      className="text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1 text-gray-800 dark:text-slate-200 focus:outline-none"
+                    >
+                      {['critical','high','medium','low'].map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <input
+                      type="date" value={assignForm.due_date}
+                      onChange={e => setAssignForm(f => ({ ...f, due_date: e.target.value }))}
+                      className="text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1 text-gray-800 dark:text-slate-200 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => saveAssignment(g.id)} disabled={savingAssign}
+                      className="text-xs px-2 py-1 bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/40 disabled:opacity-50 transition-colors"
+                    >
+                      {savingAssign ? '…' : 'Save'}
+                    </button>
+                    <button onClick={() => setAssigningGap(null)} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 px-1">✕</button>
+                  </div>
+                )}
 
                 {expanded === g.id && (
                   <div className="border-t border-gray-200 dark:border-slate-800 px-4 py-4 grid grid-cols-2 gap-4">

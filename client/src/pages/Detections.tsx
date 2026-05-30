@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Detection, DetectionHistory, DetectionQualityScore, Technique } from '../types';
 import StatusBadge from '../components/StatusBadge';
@@ -31,6 +32,7 @@ const EMPTY_FORM = {
 export default function Detections() {
   const { canWrite } = useAuth();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [detections, setDetections] = useState<Detection[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +78,20 @@ export default function Detections() {
   useEffect(() => { load(); }, [filterStatus, filterSeverity, filterSource]);
   useEffect(() => { api.getTechniques(undefined, true).then(setTechniques); }, []);
   useEffect(() => { loadQuality(); }, []);
+
+  useEffect(() => {
+    const prefillTechnique = searchParams.get('prefill_technique');
+    const prefillName = searchParams.get('prefill_name');
+    if (prefillTechnique) {
+      setForm(f => ({
+        ...f,
+        technique_ids: [prefillTechnique],
+        name: prefillName ?? f.name,
+        status: 'planned',
+      }));
+      setModalOpen(true);
+    }
+  }, [searchParams]);
 
   const openCreate = () => { setEditDetection(null); setForm({ ...EMPTY_FORM }); setModalOpen(true); };
   const openEdit = (d: Detection, e?: React.MouseEvent) => {
