@@ -745,3 +745,15 @@ export interface AlertRule {
   created_at: string;
   updated_at: string;
 }
+
+export interface Notification {
+  id: number;
+  user_id: number | null;
+  type: 'taxii_batch_ready' | 'deprecated_technique' | 'assignment_due' | 'coverage_alert';
+  title: string;
+  message: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  read: number;
+  created_at: string;
+}

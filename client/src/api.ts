@@ -7,7 +7,7 @@ import type {
   RiskByTactic, RiskScore, SigmaLibrarySearch, SigmaParseResult, SigmaRuleDetail, SigmaTemplate,
   Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
   TaxiiBatch, TaxiiJob, TaxiiPendingItem, TaxiiServer, TaxiiCollection,
-  Tool, ToolDetail, User, WebhookConfig, AlertRule,
+  Tool, ToolDetail, User, WebhookConfig, AlertRule, Notification,
 } from './types';
 
 const BASE = '/api';
@@ -441,4 +441,9 @@ export const api = {
 
   // Prioritization
   getPrioritizationQueue: () => get<PrioritizationQueue>('/prioritization/queue'),
+
+  // Notifications
+  getNotifications: () => get<Notification[]>('/notifications'),
+  markNotificationRead: (id: number) => patch<void>(`/notifications/${id}/read`, {}),
+  markAllNotificationsRead: () => patch<void>('/notifications/read-all', {}),
 };
