@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import cron from 'node-cron';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, createNotificationsForAllAnalysts } from '../db/database';
 import { TaxiiClient } from '../taxii/client';
 import { runFetch, applyPendingItem, rejectPendingItem } from '../taxii/ingest';
 import { scheduleJob, stopJob, runJob } from '../taxii/scheduler';
@@ -85,7 +85,7 @@ router.post('/servers/:id/test', async (req, res) => {
 // Trigger manual fetch — runs in background, returns immediately
 router.post('/servers/:id/fetch', async (req, res) => {
   const db = getKnex();
-  const server = await rawGet(db, 'SELECT id FROM taxii_servers WHERE id=?', [req.params.id]);
+  const server = await rawGet<any>(db, 'SELECT id, name FROM taxii_servers WHERE id=?', [req.params.id]);
   if (!server) return res.status(404).json({ error: 'Not found' });
 
   const actor = (req as any).actor ?? 'user';
@@ -104,7 +104,15 @@ router.post('/servers/:id/fetch', async (req, res) => {
         `UPDATE taxii_servers SET last_fetch_status='success', last_fetch_items=?, last_fetch_skipped=?, last_fetch_error=NULL WHERE id=?`,
         [result.items_created, result.skipped, serverId],
       );
-      return logAudit(db, 'taxii_server', req.params.id, 'fetch', actor, result as unknown as Record<string, unknown>, sourceIp);
+      await logAudit(db, 'taxii_server', req.params.id, 'fetch', actor, result as unknown as Record<string, unknown>, sourceIp);
+      const pendingCount = result.items_created;
+      await createNotificationsForAllAnalysts(db, {
+        type: 'taxii_batch_ready',
+        title: 'TAXII batch ready for review',
+        message: `${pendingCount} item(s) staged from ${server.name}`,
+        entity_type: 'taxii_batch',
+        entity_id: String(serverId),
+      }).catch(() => {}); // non-blocking
     })
     .catch(async err => {
       console.error('[taxii] Ad-hoc fetch failed (server', serverId, '):', err.message);

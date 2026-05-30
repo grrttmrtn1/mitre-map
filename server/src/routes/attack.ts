@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import cron from 'node-cron';
-import { getKnex, rawAll, rawGet, logAudit } from '../db/database';
+import { getKnex, rawAll, rawGet, logAudit, createNotificationsForAllAnalysts } from '../db/database';
 import { fetchAndParseStix, GITHUB_RELEASES_API, GH_HEADERS } from '../data/stix-fetch';
 import {
   getSettings, updateSettings, stageUpdate, approveBatch, rejectBatch, approveItem, rejectItem,
@@ -247,6 +247,15 @@ router.get('/migration-scan', async (_req, res) => {
       can_auto_migrate: canAutoMigrate,
     }];
   });
+
+  if (affected.length > 0) {
+    await createNotificationsForAllAnalysts(db, {
+      type: 'deprecated_technique',
+      title: `${affected.length} detection(s) reference deprecated techniques`,
+      message: 'Run Migration Scan in Settings to review affected detections.',
+      entity_type: 'detection',
+    }).catch(() => {});
+  }
 
   res.json({ detections_affected: affected, total: affected.length });
 });
