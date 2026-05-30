@@ -122,3 +122,33 @@ export function resolveToParent(
   const parent = subtechToParent.get(id);
   return (parent && parentTechIds.has(parent)) ? parent : null;
 }
+
+export async function createNotification(
+  db: DB,
+  opts: {
+    user_id?: number | null;
+    type: string;
+    title: string;
+    message?: string;
+    entity_type?: string;
+    entity_id?: string;
+  }
+): Promise<void> {
+  await db.raw(
+    'INSERT INTO notifications (user_id, type, title, message, entity_type, entity_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [opts.user_id ?? null, opts.type, opts.title, opts.message ?? null, opts.entity_type ?? null, opts.entity_id ?? null]
+  );
+}
+
+export async function createNotificationsForAllAnalysts(
+  db: DB,
+  opts: { type: string; title: string; message?: string; entity_type?: string; entity_id?: string }
+): Promise<void> {
+  const users = await rawAll<{ id: number }>(
+    db,
+    "SELECT id FROM users WHERE role IN ('admin', 'analyst') AND is_active = 1"
+  );
+  for (const user of users) {
+    await createNotification(db, { ...opts, user_id: user.id });
+  }
+}
