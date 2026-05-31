@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { CoveredTechnique, GapTechnique } from '../types';
+import type { CoveredTechnique, CveGapSummary, GapTechnique } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import { D3FEND_CATEGORY_COLORS } from '../lib/constants';
 import { SkeletonRow } from '../components/Skeleton';
@@ -57,11 +57,17 @@ export default function GapAnalysis() {
   const [assigningGap, setAssigningGap] = useState<string | null>(null);
   const [assignForm, setAssignForm] = useState({ assignee: '', priority: 'medium', due_date: '' });
   const [savingAssign, setSavingAssign] = useState(false);
+  const [cveSummary, setCveSummary] = useState<Map<string, CveGapSummary>>(new Map());
 
   useEffect(() => {
     Promise.all([api.getCoverageGaps(), api.getCoveredTechniques(), api.getSetting('org_sector')])
       .then(([g, c, s]) => { setGaps(g); setCovered(c); setOrgSector(s.value ?? ''); })
       .finally(() => setLoading(false));
+    api.getCveGapSummary().then(rows => {
+      const m = new Map<string, CveGapSummary>();
+      for (const r of rows) m.set(r.technique_id, r);
+      setCveSummary(m);
+    }).catch(() => {});
   }, []);
 
   const saveSector = async (val: string) => {
@@ -298,6 +304,20 @@ export default function GapAnalysis() {
                       )}
                     </div>
                     {g.priority_components && <PriorityBar score={g.priority_score} components={g.priority_components} />}
+                    {(() => {
+                      const cve = cveSummary.get(g.id);
+                      if (!cve || cve.cve_count === 0) return null;
+                      const max = Number(cve.max_cvss) || 0;
+                      const cls = max >= 9 ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                        : max >= 7 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs ${cls}`}
+                          title={`${cve.cve_count} CVE(s) — Max CVSS: ${max}`}>
+                          CVE·{cve.cve_count}
+                        </span>
+                      );
+                    })()}
                     <span className="text-gray-400 dark:text-slate-600 text-sm">{expanded === g.id ? '▲' : '▼'}</span>
                   </div>
                 </button>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import type { Country, Motivation, Procedure, ProcedureType, ThreatGroup, Technique } from '../types';
+import type { Campaign, Country, Indicator, Motivation, Procedure, ProcedureType, ThreatGroup, Technique } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 import { SkeletonRow } from '../components/Skeleton';
 import Breadcrumb from '../components/Breadcrumb';
@@ -47,6 +47,12 @@ export default function ThreatGroups() {
 
   const [motivationOptions, setMotivationOptions] = useState<Motivation[]>([]);
   const [countryOptions, setCountryOptions] = useState<Country[]>([]);
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
+  const [catalogue, setCatalogue] = useState<Array<{ id: string; name: string; aliases: string[]; description: string | null; url: string | null }>>([]);
+  const [catalogueLoading, setCatalogueLoading] = useState(false);
+  const [catalogueSearch, setCatalogueSearch] = useState('');
+  const [selectedImport, setSelectedImport] = useState<Set<string>>(new Set());
+  const [importing, setImporting] = useState(false);
   const [existingProcedures, setExistingProcedures] = useState<Procedure[]>([]);
   const [pendingProcedures, setPendingProcedures] = useState<Array<{technique_id: string; type: ProcedureType; content: string; source: string}>>([]);
   const [deletedProcedureIds, setDeletedProcedureIds] = useState<number[]>([]);
@@ -781,13 +787,29 @@ function GroupDetailPane({ group, detail, onClose, onEdit }: {
   const { coverage } = detail;
   const exposed = coverage.details.filter(t => !t.detected);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
+  const [detailTab, setDetailTab] = useState<'coverage' | 'techniques' | 'campaigns' | 'iocs'>('coverage');
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [indicators, setIndicators] = useState<Indicator[]>([]);
+  const [addCampaignOpen, setAddCampaignOpen] = useState(false);
+  const [campaignForm, setCampaignForm] = useState({ name: '', description: '', start_date: '', end_date: '', source_url: '' });
+  const [addIocOpen, setAddIocOpen] = useState(false);
+  const [iocForm, setIocForm] = useState({ type: 'ip', value: '', confidence: 'medium', notes: '' });
 
   useEffect(() => {
     api.getGroupProcedures(group.id).then(setProcedures).catch(() => {});
+    api.getCampaigns(group.id).then(setCampaigns).catch(() => {});
+    api.getIndicators(group.id).then(setIndicators).catch(() => {});
   }, [group.id]);
 
+  const TABS = [
+    { id: 'coverage' as const, label: 'Coverage' },
+    { id: 'techniques' as const, label: `Techniques (${coverage.details.length})` },
+    { id: 'campaigns' as const, label: `Campaigns${campaigns.length ? ` (${campaigns.length})` : ''}` },
+    { id: 'iocs' as const, label: `IOCs${indicators.length ? ` (${indicators.length})` : ''}` },
+  ];
+
   return (
-    <div className="p-5 space-y-5">
+    <div className="p-5 space-y-4">
       <Breadcrumb items={[
         { label: 'Threat Groups', href: '/threats' },
         { label: group.name },
@@ -812,40 +834,180 @@ function GroupDetailPane({ group, detail, onClose, onEdit }: {
         ))}
       </div>
 
-      <div className="bg-gray-100/50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-300 dark:border-slate-700/50">
-        <div className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">Detection Coverage</div>
-        <div className="flex items-baseline gap-2 mb-2">
-          <span className={`text-2xl font-bold ${coverage.pct >= 60 ? 'text-emerald-400' : coverage.pct >= 30 ? 'text-yellow-400' : 'text-red-400'}`}>
-            {coverage.pct}%
-          </span>
-          <span className="text-xs text-gray-400 dark:text-slate-500">{coverage.covered}/{coverage.total} techniques detected</span>
-        </div>
-        <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-          <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${coverage.pct}%` }} />
-        </div>
-        {exposed.length > 0 && (
-          <div className="mt-2 text-xs text-red-400">{exposed.length} techniques not detected</div>
-        )}
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-gray-200 dark:border-slate-700">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setDetailTab(t.id)}
+            className={`text-xs px-3 py-1.5 border-b-2 transition-colors ${detailTab === t.id ? 'border-blue-500 text-blue-500 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'}`}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div>
-        <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">
-          Techniques &amp; Procedures
-          {procedures.length > 0 && <span className="ml-2 text-gray-400 dark:text-slate-600 font-normal">{procedures.length} total procedures</span>}
+      {/* ── Coverage tab ── */}
+      {detailTab === 'coverage' && (
+        <div className="space-y-4">
+          <div className="bg-gray-100/50 dark:bg-slate-800/50 rounded-xl p-4 border border-gray-300 dark:border-slate-700/50">
+            <div className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">Detection Coverage</div>
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className={`text-2xl font-bold ${coverage.pct >= 60 ? 'text-emerald-400' : coverage.pct >= 30 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {coverage.pct}%
+              </span>
+              <span className="text-xs text-gray-400 dark:text-slate-500">{coverage.covered}/{coverage.total} techniques detected</span>
+            </div>
+            <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${coverage.pct}%` }} />
+            </div>
+            {exposed.length > 0 && (
+              <div className="mt-2 text-xs text-red-400">{exposed.length} techniques not detected</div>
+            )}
+          </div>
+          {group.url && (
+            <a href={group.url} target="_blank" rel="noreferrer"
+              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+              View on MITRE ATT&CK ↗
+            </a>
+          )}
         </div>
-        <div className="space-y-1 max-h-[32rem] overflow-y-auto">
-          {coverage.details.map(t => (
-            <TechniqueWithProcedures key={t.technique_id} t={t} groupId={group.id}
-              procedures={procedures} onProcsChange={setProcedures} />
+      )}
+
+      {/* ── Techniques tab ── */}
+      {detailTab === 'techniques' && (
+        <div>
+          <div className="text-xs text-gray-500 dark:text-slate-400 mb-2">
+            {procedures.length > 0 && <span>{procedures.length} procedures recorded</span>}
+          </div>
+          <div className="space-y-1 max-h-[36rem] overflow-y-auto">
+            {coverage.details.map(t => (
+              <TechniqueWithProcedures key={t.technique_id} t={t} groupId={group.id}
+                procedures={procedures} onProcsChange={setProcedures} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Campaigns tab ── */}
+      {detailTab === 'campaigns' && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button onClick={() => setAddCampaignOpen(true)}
+              className="text-xs px-2.5 py-1.5 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/30 transition-colors">
+              + Add Campaign
+            </button>
+          </div>
+          {campaigns.length === 0 && !addCampaignOpen && (
+            <div className="text-xs text-gray-400 dark:text-slate-600 py-6 text-center">No campaigns recorded.</div>
+          )}
+          {campaigns.map(c => (
+            <div key={c.id} className="bg-gray-100/50 dark:bg-slate-800/50 rounded-lg p-3 border border-gray-200 dark:border-slate-700">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-800 dark:text-slate-200">{c.name}</div>
+                  {(c.start_date || c.end_date) && (
+                    <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">
+                      {c.start_date ?? '?'} → {c.end_date ?? 'ongoing'}
+                    </div>
+                  )}
+                  {c.description && <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">{c.description}</div>}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {c.technique_ids.map(tid => (
+                      <span key={tid} className="text-[9px] px-1.5 py-0.5 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded font-mono">{tid}</span>
+                    ))}
+                  </div>
+                  {c.source_url && (
+                    <a href={c.source_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:text-blue-300 mt-1 block">Source →</a>
+                  )}
+                </div>
+                <button onClick={async () => { await api.deleteCampaign(c.id); setCampaigns(prev => prev.filter(x => x.id !== c.id)); }}
+                  className="text-xs text-red-400 hover:text-red-300 transition-colors ml-2 flex-shrink-0">Delete</button>
+              </div>
+            </div>
           ))}
+          {addCampaignOpen && (
+            <div className="bg-gray-100/50 dark:bg-slate-800/50 rounded-lg p-3 border border-gray-200 dark:border-slate-700 space-y-2">
+              <input type="text" value={campaignForm.name} onChange={e => setCampaignForm(f => ({ ...f, name: e.target.value }))} placeholder="Campaign name *"
+                className="w-full text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none" />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" value={campaignForm.start_date} onChange={e => setCampaignForm(f => ({ ...f, start_date: e.target.value }))}
+                  className="text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none" />
+                <input type="date" value={campaignForm.end_date} onChange={e => setCampaignForm(f => ({ ...f, end_date: e.target.value }))}
+                  className="text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none" />
+              </div>
+              <input type="text" value={campaignForm.source_url} onChange={e => setCampaignForm(f => ({ ...f, source_url: e.target.value }))} placeholder="Source URL"
+                className="w-full text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none" />
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setAddCampaignOpen(false)} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300">Cancel</button>
+                <button onClick={async () => {
+                  if (!campaignForm.name.trim()) return;
+                  const c = await api.createCampaign({ group_id: group.id, ...campaignForm });
+                  setCampaigns(prev => [...prev, c]);
+                  setAddCampaignOpen(false);
+                  setCampaignForm({ name: '', description: '', start_date: '', end_date: '', source_url: '' });
+                }} className="text-xs px-2.5 py-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/30 transition-colors">Save</button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {group.url && (
-        <a href={group.url} target="_blank" rel="noreferrer"
-          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
-          View on MITRE ATT&CK ↗
-        </a>
+      {/* ── IOCs tab ── */}
+      {detailTab === 'iocs' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <button onClick={() => setAddIocOpen(true)}
+              className="text-xs px-2.5 py-1.5 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/30 transition-colors">
+              + Add IOC
+            </button>
+            {indicators.length > 0 && (
+              <button onClick={() => api.exportIndicatorsStix(group.id)}
+                className="text-xs px-2.5 py-1.5 bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 border border-gray-300 dark:border-slate-600 rounded hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors">
+                Export STIX
+              </button>
+            )}
+          </div>
+          {indicators.length === 0 && !addIocOpen && (
+            <div className="text-xs text-gray-400 dark:text-slate-600 py-6 text-center">No indicators recorded.</div>
+          )}
+          <div className="space-y-1">
+            {indicators.map(ioc => (
+              <div key={ioc.id} className="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-slate-800/50">
+                <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 rounded w-12 text-center flex-shrink-0">{ioc.type}</span>
+                <span className="text-xs font-mono text-gray-700 dark:text-slate-300 flex-1 truncate">{ioc.value}</span>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded border flex-shrink-0 ${ioc.confidence === 'high' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : ioc.confidence === 'low' ? 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border-gray-300 dark:border-slate-600' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}`}>
+                  {ioc.confidence}
+                </span>
+                <button onClick={async () => { await api.deleteIndicator(ioc.id); setIndicators(prev => prev.filter(i => i.id !== ioc.id)); }}
+                  className="text-[10px] text-red-400 hover:text-red-300 transition-colors flex-shrink-0">✕</button>
+              </div>
+            ))}
+          </div>
+          {addIocOpen && (
+            <div className="bg-gray-100/50 dark:bg-slate-800/50 rounded-lg p-3 border border-gray-200 dark:border-slate-700 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <select value={iocForm.type} onChange={e => setIocForm(f => ({ ...f, type: e.target.value }))}
+                  className="text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none">
+                  {['ip', 'domain', 'hash', 'url', 'email'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select value={iocForm.confidence} onChange={e => setIocForm(f => ({ ...f, confidence: e.target.value }))}
+                  className="text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none">
+                  {['high', 'medium', 'low'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <input type="text" value={iocForm.value} onChange={e => setIocForm(f => ({ ...f, value: e.target.value }))} placeholder="Value (IP, domain, hash...)"
+                className="w-full text-xs font-mono bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none" />
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setAddIocOpen(false)} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300">Cancel</button>
+                <button onClick={async () => {
+                  if (!iocForm.value.trim()) return;
+                  const ind = await api.createIndicator({ ...iocForm, group_id: group.id });
+                  setIndicators(prev => [...prev, ind]);
+                  setAddIocOpen(false);
+                  setIocForm({ type: 'ip', value: '', confidence: 'medium', notes: '' });
+                }} className="text-xs px-2.5 py-1 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/30 transition-colors">Save</button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

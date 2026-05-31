@@ -9,6 +9,7 @@ import type {
   TaxiiBatch, TaxiiJob, TaxiiPendingItem, TaxiiServer, TaxiiCollection,
   Tool, ToolDetail, User, WebhookConfig, AlertRule, Notification,
   SiemIntegration, SiemSyncLog, GithubSyncConfig, TicketingConfig,
+  Campaign, Indicator, CveGapSummary,
 } from './types';
 
 const BASE = '/api';
@@ -457,6 +458,27 @@ export const api = {
   getNotifications: () => get<Notification[]>('/notifications'),
   markNotificationRead: (id: number) => patch<void>(`/notifications/${id}/read`, {}),
   markAllNotificationsRead: () => patch<void>('/notifications/read-all', {}),
+
+  // Campaigns
+  getCampaigns: (groupId: string) => get<Campaign[]>(`/campaigns?group_id=${encodeURIComponent(groupId)}`),
+  createCampaign: (data: { group_id: string; name: string; description?: string; start_date?: string; end_date?: string; source_url?: string; technique_ids?: string[] }) =>
+    post<Campaign>('/campaigns', data),
+  updateCampaign: (id: number, data: Partial<Campaign & { technique_ids: string[] }>) => put<Campaign>(`/campaigns/${id}`, data),
+  deleteCampaign: (id: number) => del(`/campaigns/${id}`),
+
+  // Indicators
+  getIndicators: (groupId: string) => get<Indicator[]>(`/indicators?group_id=${encodeURIComponent(groupId)}`),
+  createIndicator: (data: { type: string; value: string; group_id?: string; technique_id?: string; confidence?: string; notes?: string }) =>
+    post<Indicator>('/indicators', data),
+  deleteIndicator: (id: number) => del(`/indicators/${id}`),
+  exportIndicatorsStix: (groupId?: string) => {
+    const url = groupId ? `/api/indicators/export/stix?group_id=${encodeURIComponent(groupId)}` : '/api/indicators/export/stix';
+    const a = document.createElement('a'); a.href = url; a.download = 'indicators.stix.json'; a.click();
+  },
+
+  // CVEs
+  getCveGapSummary: () => get<CveGapSummary[]>('/cves/gap-summary'),
+  getMitreCatalogue: () => get<Array<{ id: string; name: string; aliases: string[]; description: string | null; url: string | null }>>('/threat-groups/mitre-catalogue'),
 
   // SIEM Integrations
   getSiemIntegrations: () => get<SiemIntegration[]>('/integrations/siem'),

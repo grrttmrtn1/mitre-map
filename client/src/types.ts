@@ -767,6 +767,38 @@ export interface Notification {
   created_at: string;
 }
 
+export interface Campaign {
+  id: number;
+  group_id: string;
+  name: string;
+  description: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  source_url: string | null;
+  technique_ids: string[];
+  created_at: string;
+}
+
+export interface Indicator {
+  id: number;
+  type: 'ip' | 'domain' | 'hash' | 'url' | 'email';
+  value: string;
+  group_id: string | null;
+  technique_id: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  notes: string | null;
+  first_seen: string | null;
+  last_seen: string | null;
+  created_at: string;
+}
+
+export interface CveGapSummary {
+  technique_id: string;
+  cve_count: number;
+  max_cvss: number | null;
+  cve_ids: string;
+}
+
 export type SiemType = 'sentinel' | 'splunk' | 'elastic' | 'crowdstrike' | 'qradar' | 'chronicle';
 
 export interface SiemIntegration {
