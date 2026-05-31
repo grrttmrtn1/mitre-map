@@ -314,6 +314,14 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.string('entity_id').nullable();
       t.integer('read').notNullable().defaultTo(0);
       t.timestamp('created_at').defaultTo(db.fn.now());
+    })
+    .createTableIfNotExists('compliance_snapshots', t => {
+      t.increments('id').primary();
+      t.string('framework_id').notNullable();
+      t.integer('total_controls').notNullable();
+      t.integer('covered_controls').notNullable();
+      t.integer('coverage_pct').notNullable();
+      t.timestamp('taken_at').defaultTo(db.fn.now());
     });
 }
 

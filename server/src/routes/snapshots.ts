@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, buildTechniqueGraph, resolveToParent, logAudit } from '../db/database';
+import { snapshotComplianceCoverage } from './compliance';
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.post('/', async (req, res) => {
   const { notes } = req.body;
   const snapshot = await takeSnapshot(notes, (req as any).actor ?? 'user', (req as any).sourceIp);
   res.status(201).json(snapshot);
+  snapshotComplianceCoverage(getKnex()).catch(() => {});
 });
 
 router.patch('/:id', async (req, res) => {
