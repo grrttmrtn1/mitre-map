@@ -34,19 +34,23 @@ RUN npm run build --workspace=server
 FROM node:20-bookworm-slim AS production
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 python3-pip make g++ ca-certificates gosu \
+      python3 python3-pip python3-venv make g++ ca-certificates gosu \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1001 mitremap \
     && useradd  --uid 1001 --gid mitremap --shell /bin/bash --no-create-home mitremap
 
-RUN pip3 install --no-cache-dir --break-system-packages \
-      sigma-cli \
-      pySigma-backend-splunk \
-      pySigma-backend-elasticsearch \
-      pySigma-backend-microsoft365defender \
-      pySigma-backend-crowdstrike \
-      pySigma-backend-qradar \
-      pySigma-backend-chronicle
+RUN python3 -m venv /opt/sigma-venv && \
+    /opt/sigma-venv/bin/pip install --no-cache-dir \
+      sigma-cli==3.0.2 \
+      pySigma-backend-splunk==2.1.0 \
+      pySigma-backend-elasticsearch==2.0.3 \
+      pySigma-backend-microsoft365defender==0.3.2 \
+      pySigma-backend-crowdstrike==3.0.0 \
+      pySigma-backend-secops==1.0.0
+# pySigma-backend-qradar is omitted: 0.3.3 requires pysigma<0.10 which conflicts
+# with pysigma>=1 required by all other backends.
+
+ENV PATH="/opt/sigma-venv/bin:$PATH"
 
 WORKDIR /app
 

@@ -25,6 +25,7 @@ import {
   Sun,
   Moon,
   ClipboardCheck,
+  Plug,
 } from 'lucide-react';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
@@ -59,10 +60,11 @@ const NAV: NavGroup[] = [
   {
     section: 'Detection Eng.',
     items: [
-      { to: '/sigma',    label: 'SIGMA Library',       icon: FileCode2 },
-      { to: '/atomic',   label: 'Atomic Tests',        icon: FlaskConical },
-      { to: '/exercises', label: 'Exercises',          icon: Target },
-      { to: '/tools',    label: 'Tools & Capabilities', icon: Wrench },
+      { to: '/sigma',        label: 'SIGMA Library',       icon: FileCode2 },
+      { to: '/atomic',       label: 'Atomic Tests',        icon: FlaskConical },
+      { to: '/exercises',    label: 'Exercises',           icon: Target },
+      { to: '/tools',        label: 'Tools & Capabilities', icon: Wrench },
+      { to: '/integrations', label: 'Integrations',        icon: Plug },
     ],
   },
   {

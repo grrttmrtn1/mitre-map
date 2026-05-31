@@ -42,6 +42,7 @@ import webhooksRouter from './routes/webhooks';
 import settingsRouter from './routes/settings';
 import prioritizationRouter from './routes/prioritization';
 import notificationsRouter from './routes/notifications';
+import integrationsRouter from './routes/integrations';
 import { initScheduler } from './taxii/scheduler';
 import { initAttackScheduler } from './attack/scheduler';
 import { requireApiKey } from './middleware/auth';
@@ -110,6 +111,7 @@ app.use('/api/webhooks', webhooksRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/prioritization', prioritizationRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/integrations', integrationsRouter);
 
 // OpenAPI spec — machine-readable, no auth required
 app.get('/api/openapi.json', (_req, res) => {

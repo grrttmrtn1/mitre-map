@@ -766,3 +766,53 @@ export interface Notification {
   read: number;
   created_at: string;
 }
+
+export type SiemType = 'sentinel' | 'splunk' | 'elastic' | 'crowdstrike' | 'qradar' | 'chronicle';
+
+export interface SiemIntegration {
+  id: number;
+  name: string;
+  type: SiemType;
+  config: string;
+  enabled: number;
+  last_push_status: string | null;
+  last_push_error: string | null;
+  last_pushed_at: string | null;
+  last_pull_status: string | null;
+  last_pull_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SiemSyncLog {
+  id: number;
+  integration_id: number;
+  direction: 'push' | 'pull';
+  status: string;
+  items_affected: number;
+  detail: string | null;
+  created_at: string;
+}
+
+export interface GithubSyncConfig {
+  id: number;
+  name: string;
+  repo_url: string;
+  branch: string;
+  path_glob: string;
+  enabled: number;
+  last_sha: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+}
+
+export interface TicketingConfig {
+  id: number;
+  name: string;
+  type: 'jira' | 'servicenow';
+  base_url: string;
+  default_project: string | null;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
+}

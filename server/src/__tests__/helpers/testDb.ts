@@ -322,6 +322,54 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.integer('covered_controls').notNullable();
       t.integer('coverage_pct').notNullable();
       t.timestamp('taken_at').defaultTo(db.fn.now());
+    })
+    // Migration 018
+    .createTableIfNotExists('siem_integrations', t => {
+      t.increments('id').primary();
+      t.string('name').notNullable();
+      t.string('type').notNullable();
+      t.text('config').notNullable().defaultTo('{}');
+      t.text('credentials_enc').nullable();
+      t.integer('enabled').notNullable().defaultTo(1);
+      t.string('last_push_status').nullable();
+      t.string('last_push_error').nullable();
+      t.timestamp('last_pushed_at').nullable();
+      t.string('last_pull_status').nullable();
+      t.string('last_pull_error').nullable();
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
+    })
+    .createTableIfNotExists('siem_sync_log', t => {
+      t.increments('id').primary();
+      t.integer('integration_id').notNullable();
+      t.string('direction').notNullable();
+      t.string('status').notNullable();
+      t.integer('items_affected').notNullable().defaultTo(0);
+      t.text('detail').nullable();
+      t.timestamp('created_at').defaultTo(db.fn.now());
+    })
+    .createTableIfNotExists('github_sync_configs', t => {
+      t.increments('id').primary();
+      t.string('name').notNullable();
+      t.string('repo_url').notNullable();
+      t.string('branch').notNullable().defaultTo('main');
+      t.string('path_glob').notNullable().defaultTo('**/*.yml');
+      t.text('token_enc').nullable();
+      t.integer('enabled').notNullable().defaultTo(1);
+      t.string('last_sha').nullable();
+      t.timestamp('last_synced_at').nullable();
+      t.timestamp('created_at').defaultTo(db.fn.now());
+    })
+    .createTableIfNotExists('ticketing_configs', t => {
+      t.increments('id').primary();
+      t.string('name').notNullable();
+      t.string('type').notNullable();
+      t.string('base_url').notNullable();
+      t.text('credentials_enc').nullable();
+      t.string('default_project').nullable();
+      t.integer('enabled').notNullable().defaultTo(1);
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
     });
 }
 

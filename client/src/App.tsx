@@ -26,6 +26,7 @@ import TaxiiIngest from './pages/TaxiiIngest';
 import SigmaLibrary from './pages/SigmaLibrary';
 import Prioritization from './pages/Prioritization';
 import Compliance from './pages/Compliance';
+import Integrations from './pages/Integrations';
 
 function AuthBanner({ onDismiss }: { onDismiss: () => void }) {
   const navigate = useNavigate();
@@ -65,6 +66,7 @@ function AnimatedRoutes() {
         <Route path="/exercises" element={<Exercises />} />
         <Route path="/taxii" element={<TaxiiIngest />} />
         <Route path="/sigma" element={<SigmaLibrary />} />
+        <Route path="/integrations" element={<Integrations />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/api" element={<ApiPlayground />} />

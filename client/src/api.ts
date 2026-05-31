@@ -8,6 +8,7 @@ import type {
   Tactic, Tag, Technique, ThreatGroup, ThreatGroupDetail,
   TaxiiBatch, TaxiiJob, TaxiiPendingItem, TaxiiServer, TaxiiCollection,
   Tool, ToolDetail, User, WebhookConfig, AlertRule, Notification,
+  SiemIntegration, SiemSyncLog, GithubSyncConfig, TicketingConfig,
 } from './types';
 
 const BASE = '/api';
@@ -456,4 +457,31 @@ export const api = {
   getNotifications: () => get<Notification[]>('/notifications'),
   markNotificationRead: (id: number) => patch<void>(`/notifications/${id}/read`, {}),
   markAllNotificationsRead: () => patch<void>('/notifications/read-all', {}),
+
+  // SIEM Integrations
+  getSiemIntegrations: () => get<SiemIntegration[]>('/integrations/siem'),
+  createSiemIntegration: (data: { name: string; type: string; config?: Record<string, any>; credentials?: Record<string, string>; enabled?: boolean }) =>
+    post<SiemIntegration>('/integrations/siem', data),
+  updateSiemIntegration: (id: number, data: Partial<{ name: string; config: Record<string, any>; credentials: Record<string, string>; enabled: boolean }>) =>
+    put<SiemIntegration>(`/integrations/siem/${id}`, data),
+  deleteSiemIntegration: (id: number) => del(`/integrations/siem/${id}`),
+  testSiemIntegration: (id: number) => post<{ ok: boolean; message: string }>(`/integrations/siem/${id}/test`, {}),
+  getSiemLog: (id: number) => get<SiemSyncLog[]>(`/integrations/siem/${id}/log`),
+
+  // GitHub Sync
+  getGithubSyncConfigs: () => get<GithubSyncConfig[]>('/integrations/github-sync'),
+  createGithubSyncConfig: (data: { name: string; repo_url: string; branch?: string; path_glob?: string; token?: string; enabled?: boolean }) =>
+    post<GithubSyncConfig>('/integrations/github-sync', data),
+  updateGithubSyncConfig: (id: number, data: Partial<{ name: string; repo_url: string; branch: string; path_glob: string; token: string; enabled: boolean }>) =>
+    put<GithubSyncConfig>(`/integrations/github-sync/${id}`, data),
+  deleteGithubSyncConfig: (id: number) => del(`/integrations/github-sync/${id}`),
+  runGithubSync: (id: number) => post<{ staged: number; sha: string }>(`/integrations/github-sync/${id}/run`, {}),
+
+  // Ticketing
+  getTicketingConfigs: () => get<TicketingConfig[]>('/integrations/ticketing'),
+  createTicketingConfig: (data: { name: string; type: string; base_url: string; credentials?: Record<string, string>; default_project?: string; enabled?: boolean }) =>
+    post<TicketingConfig>('/integrations/ticketing', data),
+  updateTicketingConfig: (id: number, data: Partial<{ name: string; base_url: string; credentials: Record<string, string>; default_project: string; enabled: boolean }>) =>
+    put<TicketingConfig>(`/integrations/ticketing/${id}`, data),
+  deleteTicketingConfig: (id: number) => del(`/integrations/ticketing/${id}`),
 };
