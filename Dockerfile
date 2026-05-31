@@ -34,10 +34,19 @@ RUN npm run build --workspace=server
 FROM node:20-bookworm-slim AS production
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 make g++ ca-certificates gosu \
+      python3 python3-pip make g++ ca-certificates gosu \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1001 mitremap \
     && useradd  --uid 1001 --gid mitremap --shell /bin/bash --no-create-home mitremap
+
+RUN pip3 install --no-cache-dir --break-system-packages \
+      sigma-cli \
+      pySigma-backend-splunk \
+      pySigma-backend-elasticsearch \
+      pySigma-backend-microsoft365defender \
+      pySigma-backend-crowdstrike \
+      pySigma-backend-qradar \
+      pySigma-backend-chronicle
 
 WORKDIR /app
 
