@@ -6,6 +6,9 @@ import { fetchAndParseStix } from '../data/stix-fetch';
 import { DEMO_TOOLS, DEMO_DETECTIONS } from '../data/demo';
 import { THREAT_GROUPS } from '../data/threat-groups';
 import { COMPLIANCE_FRAMEWORKS, COMPLIANCE_CONTROLS, TECHNIQUE_COMPLIANCE, DEMO_TAGS } from '../data/compliance';
+import { ISO_FRAMEWORK, ISO_CONTROLS, ISO_TECHNIQUE_MAPPINGS } from '../data/compliance-iso27001';
+import { PCI_FRAMEWORK, PCI_CONTROLS, PCI_TECHNIQUE_MAPPINGS } from '../data/compliance-pci';
+import { SOC2_FRAMEWORK, SOC2_CONTROLS, SOC2_TECHNIQUE_MAPPINGS } from '../data/compliance-soc2';
 import { DATA_SOURCES, TECHNIQUE_DATA_SOURCES } from '../data/data-sources';
 import { ART_TESTS, fetchArtFromGithub } from '../data/atomic-tests';
 
@@ -201,6 +204,66 @@ async function seedNewTables(db: Knex, isFirstRun: boolean): Promise<void> {
         const exists = await trx('attack_techniques').where('id', m.technique_id).first();
         if (exists) {
           await trx.raw('INSERT INTO technique_compliance (technique_id, control_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [m.technique_id, m.control_id]);
+        }
+      }
+    });
+  }
+
+  // Seed ISO 27001:2022 (idempotent — skip if already present)
+  const isoExists = await db('compliance_frameworks').where('id', ISO_FRAMEWORK.id).first();
+  if (!isoExists) {
+    await db.transaction(async trx => {
+      await trx.raw('INSERT INTO compliance_frameworks (id, name, version, description) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+        [ISO_FRAMEWORK.id, ISO_FRAMEWORK.name, ISO_FRAMEWORK.version, ISO_FRAMEWORK.description]);
+      for (const c of ISO_CONTROLS) {
+        await trx.raw('INSERT INTO compliance_controls (id, framework_id, name, description, category) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+          [c.id, c.framework_id, c.name, null, c.category]);
+      }
+      for (const m of ISO_TECHNIQUE_MAPPINGS) {
+        const exists = await trx('attack_techniques').where('id', m.technique_id).first();
+        if (exists) {
+          await trx.raw('INSERT INTO technique_compliance (technique_id, control_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+            [m.technique_id, m.control_id]);
+        }
+      }
+    });
+  }
+
+  // Seed PCI DSS v4.0 (idempotent — skip if already present)
+  const pciExists = await db('compliance_frameworks').where('id', PCI_FRAMEWORK.id).first();
+  if (!pciExists) {
+    await db.transaction(async trx => {
+      await trx.raw('INSERT INTO compliance_frameworks (id, name, version, description) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+        [PCI_FRAMEWORK.id, PCI_FRAMEWORK.name, PCI_FRAMEWORK.version, PCI_FRAMEWORK.description]);
+      for (const c of PCI_CONTROLS) {
+        await trx.raw('INSERT INTO compliance_controls (id, framework_id, name, description, category) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+          [c.id, c.framework_id, c.name, null, c.category]);
+      }
+      for (const m of PCI_TECHNIQUE_MAPPINGS) {
+        const exists = await trx('attack_techniques').where('id', m.technique_id).first();
+        if (exists) {
+          await trx.raw('INSERT INTO technique_compliance (technique_id, control_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+            [m.technique_id, m.control_id]);
+        }
+      }
+    });
+  }
+
+  // Seed SOC 2 TSC (idempotent — skip if already present)
+  const soc2Exists = await db('compliance_frameworks').where('id', SOC2_FRAMEWORK.id).first();
+  if (!soc2Exists) {
+    await db.transaction(async trx => {
+      await trx.raw('INSERT INTO compliance_frameworks (id, name, version, description) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+        [SOC2_FRAMEWORK.id, SOC2_FRAMEWORK.name, SOC2_FRAMEWORK.version, SOC2_FRAMEWORK.description]);
+      for (const c of SOC2_CONTROLS) {
+        await trx.raw('INSERT INTO compliance_controls (id, framework_id, name, description, category) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+          [c.id, c.framework_id, c.name, null, c.category]);
+      }
+      for (const m of SOC2_TECHNIQUE_MAPPINGS) {
+        const exists = await trx('attack_techniques').where('id', m.technique_id).first();
+        if (exists) {
+          await trx.raw('INSERT INTO technique_compliance (technique_id, control_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
+            [m.technique_id, m.control_id]);
         }
       }
     });
