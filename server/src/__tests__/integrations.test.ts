@@ -136,6 +136,11 @@ describe('POST /api/integrations/siem/:id/test', () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.message).toBe('Connected');
   });
+
+  it('returns 404 for non-existent integration', async () => {
+    const res = await request(app).post('/api/integrations/siem/9999/test').send().expect(404);
+    expect(res.body.error).toMatch(/not found/i);
+  });
 });
 
 // ── GitHub Sync Configs ───────────────────────────────────────────────────────
@@ -144,6 +149,16 @@ describe('GET /api/integrations/github-sync', () => {
   it('returns empty array when none', async () => {
     const res = await request(app).get('/api/integrations/github-sync').expect(200);
     expect(res.body).toEqual([]);
+  });
+
+  it('returns list after creating a config', async () => {
+    await request(app)
+      .post('/api/integrations/github-sync')
+      .send({ name: 'Sigma Rules', repo_url: 'https://github.com/SigmaHQ/sigma' })
+      .expect(201);
+    const res = await request(app).get('/api/integrations/github-sync').expect(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].name).toBe('Sigma Rules');
   });
 });
 
@@ -159,8 +174,24 @@ describe('POST /api/integrations/github-sync', () => {
     expect(row[0].token_enc).toBeTruthy();
   });
 
+  it('returns 400 when name is missing', async () => {
+    const res = await request(app)
+      .post('/api/integrations/github-sync')
+      .send({ repo_url: 'https://github.com/example/repo' })
+      .expect(400);
+    expect(res.body.error).toMatch(/name/i);
+  });
+
   it('returns 400 when repo_url is missing', async () => {
     await request(app).post('/api/integrations/github-sync').send({ name: 'X' }).expect(400);
+  });
+
+  it('returns 400 when repo_url uses http instead of https', async () => {
+    const res = await request(app)
+      .post('/api/integrations/github-sync')
+      .send({ name: 'Insecure', repo_url: 'http://github.com/example/repo' })
+      .expect(400);
+    expect(res.body.error).toMatch(/https/i);
   });
 });
 
@@ -189,6 +220,16 @@ describe('GET /api/integrations/ticketing', () => {
     const res = await request(app).get('/api/integrations/ticketing').expect(200);
     expect(res.body).toEqual([]);
   });
+
+  it('returns list without credentials_enc', async () => {
+    await request(app)
+      .post('/api/integrations/ticketing')
+      .send({ name: 'Jira Cloud', type: 'jira', base_url: 'https://acme.atlassian.net', credentials: { token: 'secret' } })
+      .expect(201);
+    const res = await request(app).get('/api/integrations/ticketing').expect(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).not.toHaveProperty('credentials_enc');
+  });
 });
 
 describe('POST /api/integrations/ticketing', () => {
@@ -204,15 +245,41 @@ describe('POST /api/integrations/ticketing', () => {
     expect(row[0].credentials_enc).toBeTruthy();
   });
 
+  it('returns 400 when name is missing', async () => {
+    const res = await request(app)
+      .post('/api/integrations/ticketing')
+      .send({ type: 'jira', base_url: 'https://acme.atlassian.net' })
+      .expect(400);
+    expect(res.body.error).toMatch(/name/i);
+  });
+
+  it('returns 400 when type is missing', async () => {
+    const res = await request(app)
+      .post('/api/integrations/ticketing')
+      .send({ name: 'My Jira', base_url: 'https://acme.atlassian.net' })
+      .expect(400);
+    expect(res.body.error).toMatch(/type/i);
+  });
+
   it('returns 400 for unknown type', async () => {
-    await request(app)
+    const res = await request(app)
       .post('/api/integrations/ticketing')
       .send({ name: 'X', type: 'zendesk', base_url: 'https://x.com' })
       .expect(400);
+    expect(res.body.error).toMatch(/type/i);
   });
 
   it('returns 400 when base_url is missing', async () => {
     await request(app).post('/api/integrations/ticketing').send({ name: 'X', type: 'jira' }).expect(400);
+  });
+
+  it('accepts http base_url (ticketing route does not enforce https)', async () => {
+    // The ticketing POST does NOT call validateBaseUrl, so http:// is accepted
+    const res = await request(app)
+      .post('/api/integrations/ticketing')
+      .send({ name: 'Internal Jira', type: 'jira', base_url: 'http://internal.jira.corp' })
+      .expect(201);
+    expect(res.body.base_url).toBe('http://internal.jira.corp');
   });
 });
 

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { SiemIntegration, GithubSyncConfig, TicketingConfig } from '../types';
 import { useToast } from '../context/ToastContext';
+import ConfirmModal from '../components/ConfirmModal';
+import { SkeletonRow } from '../components/Skeleton';
 import { Plus, Trash2, Play, RefreshCw, CheckCircle, XCircle, Loader } from 'lucide-react';
 
 type Tab = 'siem' | 'github' | 'ticketing';
@@ -30,6 +32,8 @@ function SiemTab() {
   const [integrations, setIntegrations] = useState<SiemIntegration[]>([]);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', type: 'splunk', config: '{}', credentials: '{}' });
 
@@ -52,13 +56,16 @@ function SiemTab() {
     } catch { toast.error('Failed to create integration'); }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Delete this integration?')) return;
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await api.deleteSiemIntegration(id);
-      setIntegrations(prev => prev.filter(i => i.id !== id));
+      await api.deleteSiemIntegration(deleteTarget);
+      setIntegrations(prev => prev.filter(i => i.id !== deleteTarget));
       toast.success('Deleted');
     } catch { toast.error('Failed to delete'); }
+    setDeleting(false);
+    setDeleteTarget(null);
   }
 
   async function handleTest(id: number) {
@@ -79,10 +86,20 @@ function SiemTab() {
     } catch { toast.error('Failed to update'); }
   }
 
-  if (loading) return <div className="text-sm text-gray-400 dark:text-slate-500 py-8 text-center">Loading…</div>;
+  if (loading) return <div className="space-y-2 pt-2">{[0,1,2].map(i => <SkeletonRow key={i} className="bg-gray-100/40 dark:bg-slate-800/40 rounded-xl" />)}</div>;
 
   return (
     <div className="space-y-4">
+      <ConfirmModal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete integration"
+        message="This will permanently remove the SIEM integration and its credentials."
+        confirmLabel="Delete"
+        destructive
+        confirming={deleting}
+      />
       <div className="flex justify-between items-center">
         <p className="text-sm text-gray-500 dark:text-slate-400">Push SIGMA rules to your SIEM and sync rule status.</p>
         <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">
@@ -149,7 +166,7 @@ function SiemTab() {
                   className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 disabled:opacity-50">
                   {testing === integ.id ? <Loader size={12} className="animate-spin" /> : <Play size={12} />} Test
                 </button>
-                <button onClick={() => handleDelete(integ.id)}
+                <button onClick={() => setDeleteTarget(integ.id)}
                   className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
                   <Trash2 size={14} />
                 </button>
@@ -169,6 +186,8 @@ function GithubSyncTab() {
   const [configs, setConfigs] = useState<GithubSyncConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', repo_url: '', branch: 'main', path_glob: '**/*.yml', token: '' });
 
@@ -197,19 +216,32 @@ function GithubSyncTab() {
     setRunning(null);
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Delete this sync config?')) return;
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await api.deleteGithubSyncConfig(id);
-      setConfigs(prev => prev.filter(c => c.id !== id));
+      await api.deleteGithubSyncConfig(deleteTarget);
+      setConfigs(prev => prev.filter(c => c.id !== deleteTarget));
       toast.success('Deleted');
     } catch { toast.error('Failed to delete'); }
+    setDeleting(false);
+    setDeleteTarget(null);
   }
 
-  if (loading) return <div className="text-sm text-gray-400 dark:text-slate-500 py-8 text-center">Loading…</div>;
+  if (loading) return <div className="space-y-2 pt-2">{[0,1,2].map(i => <SkeletonRow key={i} className="bg-gray-100/40 dark:bg-slate-800/40 rounded-xl" />)}</div>;
 
   return (
     <div className="space-y-4">
+      <ConfirmModal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete sync config"
+        message="This will permanently remove the GitHub sync configuration."
+        confirmLabel="Delete"
+        destructive
+        confirming={deleting}
+      />
       <div className="flex justify-between items-center">
         <p className="text-sm text-gray-500 dark:text-slate-400">Pull SIGMA rules from GitHub repositories into the library.</p>
         <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">
@@ -278,7 +310,7 @@ function GithubSyncTab() {
                   className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 disabled:opacity-50">
                   {running === cfg.id ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />} Sync Now
                 </button>
-                <button onClick={() => handleDelete(cfg.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
+                <button onClick={() => setDeleteTarget(cfg.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -296,6 +328,8 @@ function TicketingTab() {
   const { toast } = useToast();
   const [configs, setConfigs] = useState<TicketingConfig[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', type: 'jira', base_url: '', default_project: '', credentials: '{}' });
 
@@ -316,19 +350,32 @@ function TicketingTab() {
     } catch { toast.error('Failed to create config'); }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('Delete this ticketing config?')) return;
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await api.deleteTicketingConfig(id);
-      setConfigs(prev => prev.filter(c => c.id !== id));
+      await api.deleteTicketingConfig(deleteTarget);
+      setConfigs(prev => prev.filter(c => c.id !== deleteTarget));
       toast.success('Deleted');
     } catch { toast.error('Failed to delete'); }
+    setDeleting(false);
+    setDeleteTarget(null);
   }
 
-  if (loading) return <div className="text-sm text-gray-400 dark:text-slate-500 py-8 text-center">Loading…</div>;
+  if (loading) return <div className="space-y-2 pt-2">{[0,1,2].map(i => <SkeletonRow key={i} className="bg-gray-100/40 dark:bg-slate-800/40 rounded-xl" />)}</div>;
 
   return (
     <div className="space-y-4">
+      <ConfirmModal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete ticketing config"
+        message="This will permanently remove the ticketing configuration and its credentials."
+        confirmLabel="Delete"
+        destructive
+        confirming={deleting}
+      />
       <div className="flex justify-between items-center">
         <p className="text-sm text-gray-500 dark:text-slate-400">Create tickets in Jira or ServiceNow from detection gaps.</p>
         <button onClick={() => setShowForm(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">
@@ -392,7 +439,7 @@ function TicketingTab() {
                 </div>
                 <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{cfg.base_url}</p>
               </div>
-              <button onClick={() => handleDelete(cfg.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
+              <button onClick={() => setDeleteTarget(cfg.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
                 <Trash2 size={14} />
               </button>
             </div>
