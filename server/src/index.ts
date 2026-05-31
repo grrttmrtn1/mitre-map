@@ -43,6 +43,9 @@ import settingsRouter from './routes/settings';
 import prioritizationRouter from './routes/prioritization';
 import notificationsRouter from './routes/notifications';
 import integrationsRouter from './routes/integrations';
+import campaignsRouter from './routes/campaigns';
+import cvesRouter from './routes/cves';
+import indicatorsRouter from './routes/indicators';
 import { initScheduler } from './taxii/scheduler';
 import { initAttackScheduler } from './attack/scheduler';
 import { requireApiKey } from './middleware/auth';
@@ -112,6 +115,9 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/prioritization', prioritizationRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/integrations', integrationsRouter);
+app.use('/api/campaigns', campaignsRouter);
+app.use('/api/cves', cvesRouter);
+app.use('/api/indicators', indicatorsRouter);
 
 // OpenAPI spec — machine-readable, no auth required
 app.get('/api/openapi.json', (_req, res) => {
