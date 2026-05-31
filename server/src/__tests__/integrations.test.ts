@@ -13,6 +13,14 @@ vi.mock('../db/database', async (importOriginal) => {
   };
 });
 
+// Mock URL validator so tests don't make real DNS lookups
+vi.mock('../integrations/url-validator', () => ({
+  validateBaseUrl: vi.fn().mockResolvedValue(undefined),
+  validateGitRepoUrl: vi.fn().mockImplementation(async (url: string) => {
+    if (!url.startsWith('https://')) throw new Error('Repository URL must use HTTPS');
+  }),
+}));
+
 // Mock the GitHub sync and SIEM connectors so tests don't make real HTTP calls
 vi.mock('../integrations/github-sync', () => ({
   runGithubSync: vi.fn().mockResolvedValue({ staged: 3, sha: 'abc123' }),

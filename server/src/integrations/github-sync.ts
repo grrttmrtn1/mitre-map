@@ -11,6 +11,14 @@ interface GithubSyncConfig {
   last_sha: string | null;
 }
 
+const SAFE_BRANCH_RE = /^[A-Za-z0-9._\-/]+$/;
+
+function validateBranch(branch: string): void {
+  if (!SAFE_BRANCH_RE.test(branch) || branch.includes('..') || branch.startsWith('/') || branch.endsWith('/')) {
+    throw new Error(`Unsafe branch name: ${branch}`);
+  }
+}
+
 function toApiBase(repoUrl: string): string {
   const match = repoUrl.match(/github\.com\/([^/]+\/[^/]+)/);
   if (!match) throw new Error(`Cannot parse GitHub repo URL: ${repoUrl}`);
@@ -20,7 +28,7 @@ function toApiBase(repoUrl: string): string {
 async function getLatestSha(apiBase: string, branch: string, token: string | null): Promise<string> {
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${apiBase}/commits/${branch}`, { headers });
+  const res = await fetch(`${apiBase}/commits/${encodeURIComponent(branch)}`, { headers });
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
   return ((await res.json()) as any).sha;
 }
@@ -35,7 +43,7 @@ async function getChangedYmlFiles(
   if (token) headers.Authorization = `Bearer ${token}`;
 
   if (!lastSha) {
-    const treeRes = await fetch(`${apiBase}/git/trees/${branch}?recursive=1`, { headers });
+    const treeRes = await fetch(`${apiBase}/git/trees/${encodeURIComponent(branch)}?recursive=1`, { headers });
     if (!treeRes.ok) throw new Error(`GitHub tree error: ${treeRes.status}`);
     const tree = (await treeRes.json()) as any;
     const ymlPaths = ((tree.tree ?? []) as any[])
@@ -43,7 +51,8 @@ async function getChangedYmlFiles(
       .slice(0, 200);
     const files: Array<{ path: string; content: string }> = [];
     for (const f of ymlPaths) {
-      const blobRes = await fetch(`${apiBase}/contents/${f.path}?ref=${branch}`, { headers });
+      const params = new URLSearchParams({ ref: branch });
+      const blobRes = await fetch(`${apiBase}/contents/${encodeURIComponent(f.path)}?${params}`, { headers });
       if (!blobRes.ok) continue;
       const blob = (await blobRes.json()) as any;
       files.push({ path: f.path, content: Buffer.from(blob.content, 'base64').toString('utf8') });
@@ -51,12 +60,13 @@ async function getChangedYmlFiles(
     return files;
   }
 
-  const compareRes = await fetch(`${apiBase}/compare/${lastSha}...${branch}`, { headers });
+  const compareRes = await fetch(`${apiBase}/compare/${encodeURIComponent(lastSha)}...${encodeURIComponent(branch)}`, { headers });
   if (!compareRes.ok) throw new Error(`GitHub compare error: ${compareRes.status}`);
   const compare = (await compareRes.json()) as any;
   const files: Array<{ path: string; content: string }> = [];
   for (const f of ((compare.files ?? []) as any[]).filter((f: any) => f.filename.endsWith('.yml'))) {
-    const contentRes = await fetch(`${apiBase}/contents/${f.filename}?ref=${branch}`, { headers });
+    const params = new URLSearchParams({ ref: branch });
+    const contentRes = await fetch(`${apiBase}/contents/${encodeURIComponent(f.filename)}?${params}`, { headers });
     if (!contentRes.ok) continue;
     const blob = (await contentRes.json()) as any;
     files.push({ path: f.filename, content: Buffer.from(blob.content, 'base64').toString('utf8') });
@@ -92,6 +102,7 @@ export async function runGithubSync(configId: number): Promise<{ staged: number;
     [configId],
   );
   if (!cfg) throw new Error('Config not found');
+  validateBranch(cfg.branch);
 
   const token = cfg.token_enc ? (decryptJson(cfg.token_enc).token ?? null) : null;
   const apiBase = toApiBase(cfg.repo_url);

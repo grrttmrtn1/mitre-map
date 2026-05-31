@@ -21,8 +21,8 @@ function safe<T>(row: T & { credentials_enc?: string | null; token_enc?: string 
   return rest;
 }
 
-function validateSiemConfig(config: Record<string, any>): void {
-  if (config.base_url) validateBaseUrl(config.base_url);
+async function validateSiemConfig(config: Record<string, any>): Promise<void> {
+  if (config.base_url) await validateBaseUrl(config.base_url);
 }
 
 function buildSiemConnector(type: string, config: Record<string, any>, creds: Record<string, any>): SiemConnector {
@@ -57,7 +57,7 @@ router.post('/siem', async (req, res) => {
     if (!name || !type) return res.status(400).json({ error: 'name and type required' });
     const validTypes = ['sentinel', 'splunk', 'elastic', 'crowdstrike', 'qradar', 'chronicle'];
     if (!validTypes.includes(type)) return res.status(400).json({ error: `type must be one of: ${validTypes.join(', ')}` });
-    try { validateSiemConfig(config); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+    try { await validateSiemConfig(config); } catch (e: any) { return res.status(400).json({ error: e.message }); }
     const credentials_enc = Object.keys(credentials).length ? encryptJson(credentials) : null;
     const id = await rawInsert(db, `INSERT INTO siem_integrations (name, type, config, credentials_enc, enabled) VALUES (?, ?, ?, ?, ?) RETURNING id`,
       [name, type, JSON.stringify(config), credentials_enc, enabled ? 1 : 0]);
@@ -90,7 +90,7 @@ router.put('/siem/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' });
     const { name, config, credentials, enabled } = req.body;
     if (config !== undefined) {
-      try { validateSiemConfig(config); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+      try { await validateSiemConfig(config); } catch (e: any) { return res.status(400).json({ error: e.message }); }
     }
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
@@ -126,7 +126,7 @@ router.post('/siem/:id/test', async (req, res) => {
     const row = await rawGet<any>(db, 'SELECT * FROM siem_integrations WHERE id = ?', [id]);
     if (!row) return res.status(404).json({ error: 'Not found' });
     const config = JSON.parse(row.config ?? '{}');
-    try { validateSiemConfig(config); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+    try { await validateSiemConfig(config); } catch (e: any) { return res.status(400).json({ error: e.message }); }
     const creds = row.credentials_enc ? decryptJson(row.credentials_enc) : {};
     const connector = buildSiemConnector(row.type, config, creds);
     const result = await connector.testConnection();
@@ -223,7 +223,11 @@ router.post('/github-sync', async (req, res) => {
     const db = getKnex();
     const { name, repo_url, branch = 'main', path_glob = '**/*.yml', token, enabled = 1 } = req.body;
     if (!name || !repo_url) return res.status(400).json({ error: 'name and repo_url required' });
-    try { validateGitRepoUrl(repo_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+    try { await validateGitRepoUrl(repo_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+    const SAFE_BRANCH = /^[A-Za-z0-9._\-/]+$/;
+    if (branch && (!SAFE_BRANCH.test(branch) || branch.includes('..') || branch.startsWith('/') || branch.endsWith('/'))) {
+      return res.status(400).json({ error: 'Invalid branch name' });
+    }
     const token_enc = token ? encryptJson({ token }) : null;
     const id = await rawInsert(db, `INSERT INTO github_sync_configs (name, repo_url, branch, path_glob, token_enc, enabled) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [name, repo_url, branch, path_glob, token_enc, enabled ? 1 : 0]);
@@ -256,7 +260,13 @@ router.put('/github-sync/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' });
     const { name, repo_url, branch, path_glob, token, enabled } = req.body;
     if (repo_url !== undefined) {
-      try { validateGitRepoUrl(repo_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+      try { await validateGitRepoUrl(repo_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+    }
+    if (branch !== undefined) {
+      const SAFE_BRANCH = /^[A-Za-z0-9._\-/]+$/;
+      if (!SAFE_BRANCH.test(branch) || branch.includes('..') || branch.startsWith('/') || branch.endsWith('/')) {
+        return res.status(400).json({ error: 'Invalid branch name' });
+      }
     }
     const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name;
@@ -294,7 +304,7 @@ router.post('/github-sync/:id/run', async (req, res) => {
     const db = getKnex();
     const cfg = await rawGet<any>(db, 'SELECT repo_url FROM github_sync_configs WHERE id = ?', [id]);
     if (!cfg) return res.status(404).json({ error: 'Not found' });
-    try { validateGitRepoUrl(cfg.repo_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+    try { await validateGitRepoUrl(cfg.repo_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
     const result = await runGithubSync(id);
     res.json(result);
   } catch (e: any) {

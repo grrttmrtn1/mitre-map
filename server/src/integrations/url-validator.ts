@@ -1,43 +1,88 @@
-const PRIVATE_HOST = [
-  /^localhost$/i,
-  /^127\./,
-  /^10\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^0\.0\.0\.0$/,
-  /^::1$/,
-  /^fc[0-9a-f]{2}:/i,
-  /^fd[0-9a-f]{2}:/i,
-  /^fe80:/i,
+import { promises as dnsPromises } from 'dns';
+import net from 'net';
+
+// RFC1918/loopback/link-local/reserved IPv4 ranges as [network, mask] pairs
+const PRIVATE_V4: Array<[number, number]> = [
+  [0x00000000, 0xFF000000], // 0.0.0.0/8
+  [0x0A000000, 0xFF000000], // 10.0.0.0/8
+  [0x64400000, 0xFFC00000], // 100.64.0.0/10 shared address space
+  [0x7F000000, 0xFF000000], // 127.0.0.0/8 loopback
+  [0xA9FE0000, 0xFFFF0000], // 169.254.0.0/16 link-local / metadata
+  [0xAC100000, 0xFFF00000], // 172.16.0.0/12
+  [0xC0000000, 0xFFFFFF00], // 192.0.0.0/24 IANA special
+  [0xC0A80000, 0xFFFF0000], // 192.168.0.0/16
+  [0xC6120000, 0xFFFE0000], // 198.18.0.0/15 benchmarking
+  [0xE0000000, 0xF0000000], // 224.0.0.0/4 multicast
+  [0xF0000000, 0xF0000000], // 240.0.0.0/4 reserved
+  [0xFFFFFFFF, 0xFFFFFFFF], // 255.255.255.255 broadcast
 ];
 
-export function validateBaseUrl(rawUrl: string): void {
+function ipv4ToInt(ip: string): number {
+  return ip.split('.').reduce((acc, octet) => (acc << 8) | parseInt(octet, 10), 0) >>> 0;
+}
+
+function isPrivateIPv4(ip: string): boolean {
+  const n = ipv4ToInt(ip);
+  return PRIVATE_V4.some(([network, mask]) => (n & mask) === network);
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const h = ip.toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === '::1') return true;
+  // IPv4-mapped ::ffff:w.x.y.z — check the embedded v4 address
+  const v4mapped = h.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (v4mapped) return isPrivateIPv4(v4mapped[1]);
+  // fc00::/7 unique-local (fc00:: and fd00::)
+  if (/^f[cd][0-9a-f]{2}:/i.test(h)) return true;
+  // fe80::/10 link-local
+  if (/^fe[89ab][0-9a-f]:/i.test(h)) return true;
+  return false;
+}
+
+async function resolveAndCheck(hostname: string): Promise<boolean> {
+  // Normalize: lowercase, strip trailing dot
+  const norm = hostname.toLowerCase().replace(/\.$/, '');
+
+  // Reject well-known special-case names before DNS
+  if (['localhost', 'ip6-localhost', 'ip6-loopback'].includes(norm)) return true;
+
+  // If already a numeric IP, check directly (no DNS)
+  if (net.isIPv4(norm)) return isPrivateIPv4(norm);
+  if (net.isIPv6(norm)) return isPrivateIPv6(norm);
+
+  // Resolve the hostname; ALL returned addresses must be public
+  let addresses: Array<{ address: string; family: number }>;
+  try {
+    addresses = await dnsPromises.lookup(norm, { all: true });
+  } catch {
+    throw new Error('Hostname could not be resolved');
+  }
+  if (addresses.length === 0) throw new Error('Hostname resolved to no addresses');
+
+  return addresses.some(a =>
+    a.family === 4 ? isPrivateIPv4(a.address) : isPrivateIPv6(a.address),
+  );
+}
+
+async function check(rawUrl: string, kind: 'Integration' | 'Repository'): Promise<void> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
   } catch {
-    throw new Error('Invalid URL');
+    throw new Error(`Invalid ${kind.toLowerCase()} URL`);
   }
   if (parsed.protocol !== 'https:') {
-    throw new Error('Integration URL must use HTTPS');
+    throw new Error(`${kind} URL must use HTTPS`);
   }
-  if (PRIVATE_HOST.some(p => p.test(parsed.hostname))) {
-    throw new Error('Integration URL must not point to a private or loopback address');
+  if (await resolveAndCheck(parsed.hostname)) {
+    throw new Error(`${kind} URL must not point to a private or loopback address`);
   }
 }
 
-export function validateGitRepoUrl(rawUrl: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(rawUrl);
-  } catch {
-    throw new Error('Invalid repository URL');
-  }
-  if (parsed.protocol !== 'https:') {
-    throw new Error('Repository URL must use HTTPS');
-  }
-  if (PRIVATE_HOST.some(p => p.test(parsed.hostname))) {
-    throw new Error('Repository URL must not point to a private or loopback address');
-  }
+export async function validateBaseUrl(rawUrl: string): Promise<void> {
+  return check(rawUrl, 'Integration');
+}
+
+export async function validateGitRepoUrl(rawUrl: string): Promise<void> {
+  return check(rawUrl, 'Repository');
 }

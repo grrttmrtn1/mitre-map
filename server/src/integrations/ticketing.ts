@@ -21,7 +21,7 @@ export async function createJiraTicket(config: {
   token: string;
   project_key: string;
 }, input: TicketInput): Promise<TicketResult> {
-  validateBaseUrl(config.base_url);
+  await validateBaseUrl(config.base_url);
   const auth = Buffer.from(`${config.username}:${config.token}`).toString('base64');
   const body = {
     fields: {
@@ -52,7 +52,7 @@ export async function createServiceNowTicket(config: {
   password: string;
   assignment_group?: string;
 }, input: TicketInput): Promise<TicketResult> {
-  validateBaseUrl(config.base_url);
+  await validateBaseUrl(config.base_url);
   const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
   const urgency = input.priority === 'highest' || input.priority === 'high' ? '1'
     : input.priority === 'low' || input.priority === 'lowest' ? '3' : '2';
