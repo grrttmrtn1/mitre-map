@@ -271,6 +271,15 @@ export interface ComplianceFramework {
   coverage_pct?: number;
 }
 
+export interface ComplianceSnapshot {
+  id: number;
+  framework_id: string;
+  total_controls: number;
+  covered_controls: number;
+  coverage_pct: number;
+  taken_at: string;
+}
+
 export interface ComplianceControl {
   id: string;
   framework_id: string;

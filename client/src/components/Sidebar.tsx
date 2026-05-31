@@ -24,6 +24,7 @@ import {
   Zap,
   Sun,
   Moon,
+  ClipboardCheck,
 } from 'lucide-react';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
@@ -44,6 +45,7 @@ const NAV: NavGroup[] = [
       { to: '/defense',        label: 'Defense Mapping', icon: Shield },
       { to: '/gaps',           label: 'Gap Analysis',    icon: AlertTriangle },
       { to: '/prioritization', label: 'Priority Queue',  icon: ListOrdered },
+      { to: '/compliance',     label: 'Compliance',      icon: ClipboardCheck },
     ],
   },
   {

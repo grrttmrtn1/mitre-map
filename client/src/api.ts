@@ -1,5 +1,5 @@
 import type {
-  ApiKey, ArtResult, ArtTest, Assignment, AttackVersion, AuditLogEntry, Comment, ComplianceFramework,
+  ApiKey, ArtResult, ArtTest, Assignment, AttackVersion, AuditLogEntry, Comment, ComplianceFramework, ComplianceSnapshot,
   CoverageAttributionEntry, CoverageSnapshot, CoverageStats, Country, CoveredTechnique, DataSource, Detection, DetectionHistory, DetectionQualityScore, D3FendTechnique,
   Exercise, ExerciseDetail, ExerciseFinding, ExerciseReport, ExerciseTestRun,
   ExecutiveReport, GapTechnique, MatrixColumn, Mitigation, Motivation, OidcProvider, Procedure, ProcedureType,
@@ -235,6 +235,16 @@ export const api = {
   getComplianceGap: (framework_id?: string) => {
     const q = framework_id ? `?framework_id=${framework_id}` : '';
     return get<any[]>(`/compliance/gap${q}`);
+  },
+  getComplianceSnapshots: (frameworkId: string) =>
+    get<ComplianceSnapshot[]>(`/compliance/snapshots?framework_id=${encodeURIComponent(frameworkId)}`),
+  downloadComplianceExport: (frameworkId: string): void => {
+    const a = document.createElement('a');
+    a.href = `/api/compliance/export/${encodeURIComponent(frameworkId)}`;
+    a.download = `${frameworkId}-gaps.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   },
 
   // SIGMA
