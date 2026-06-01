@@ -13,7 +13,7 @@ export function getTransporter(): Transporter {
   _transporter = nodemailer.createTransport({
     host, port, secure: port === 465,
     auth: user ? { user, pass } : undefined,
-    tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
+    tls: { rejectUnauthorized: process.env.SMTP_INSECURE !== 'true' },
   });
   return _transporter;
 }
