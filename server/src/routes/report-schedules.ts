@@ -41,6 +41,7 @@ router.put('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Not found' });
     const { name, report_type, schedule, recipients, format, framework_id, enabled } = req.body;
     if (schedule && !cron.validate(schedule)) return res.status(400).json({ error: 'Invalid cron expression' });
+    if (report_type !== undefined && !VALID_TYPES.includes(report_type)) return res.status(400).json({ error: `report_type must be one of: ${VALID_TYPES.join(', ')}` });
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
     if (report_type !== undefined) updates.report_type = report_type;

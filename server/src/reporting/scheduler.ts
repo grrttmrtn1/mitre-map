@@ -4,17 +4,30 @@ import { sendReportEmail, buildReportHtml } from './mailer';
 
 const _jobs = new Map<number, ScheduledTask>();
 
+const VALID_TYPES = ['executive', 'trends', 'threats', 'gaps', 'compliance'] as const;
+type ValidType = typeof VALID_TYPES[number];
+
+const TYPE_TO_PATH: Record<ValidType, string> = {
+  executive: '/api/reports/executive',
+  trends:    '/api/reports/trends',
+  threats:   '/api/reports/threats',
+  gaps:      '/api/reports/gaps',
+  compliance: '/api/reports/compliance',
+};
+
 async function runSchedule(scheduleId: number): Promise<void> {
   const db = getKnex();
   const rows = await rawAll<any>(db, 'SELECT * FROM report_schedules WHERE id = ?', [scheduleId]);
   const s = rows[0];
   if (!s || !s.enabled) return;
+  if (!VALID_TYPES.includes(s.report_type)) return; // reject unknown types stored in DB
   const recipients: string[] = JSON.parse(s.recipients ?? '[]');
   if (recipients.length === 0) return;
   try {
     const port = process.env.PORT ?? '4000';
     const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const res = await fetch(`${proto}://localhost:${port}/api/reports/${s.report_type}`, {
+    const path = TYPE_TO_PATH[s.report_type as ValidType];
+    const res = await fetch(`${proto}://localhost:${port}${path}`, {
       headers: { 'x-internal-report': 'true' },
     }).catch(() => null);
     const data = res?.ok ? await res.json().catch(() => null) : null;
