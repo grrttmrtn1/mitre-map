@@ -68,6 +68,11 @@
   .cell-glow-planned:hover   { box-shadow: 0 0 8px rgba(59, 130, 246, 0.3); }
 }
 
+/* ── Table density ──────────────────────────────────────────────────── */
+[data-density="compact"] .table-row td { padding-top: 0.25rem; padding-bottom: 0.25rem; font-size: 0.75rem; }
+[data-density="comfortable"] .table-row td { padding-top: 0.5rem; padding-bottom: 0.5rem; font-size: 0.75rem; }
+[data-density="spacious"] .table-row td { padding-top: 0.75rem; padding-bottom: 0.75rem; font-size: 0.875rem; }
+
 /* ── Print / PDF stylesheet ─────────────────────────────────────────── */
 @media print {
   @page {

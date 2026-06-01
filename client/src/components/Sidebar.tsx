@@ -116,7 +116,7 @@ function ShieldLogo() {
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
-  const { theme, toggle } = useTheme();
+  const { theme, toggle, density, setDensity } = useTheme();
   const navigate = useNavigate();
   const [version, setVersion] = useState('ATT&CK v14');
 
@@ -209,6 +209,21 @@ export default function Sidebar() {
             >
               {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             </button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-400 dark:text-slate-500">Row density</div>
+          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-800 rounded border border-gray-300 dark:border-slate-700 overflow-hidden">
+            {(['compact', 'comfortable', 'spacious'] as const).map((d, i) => (
+              <button
+                key={d}
+                onClick={() => setDensity(d)}
+                title={d.charAt(0).toUpperCase() + d.slice(1)}
+                className={`px-1.5 py-0.5 text-[10px] font-medium transition-colors ${density === d ? 'bg-blue-600/30 text-blue-400' : 'text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300'} ${i > 0 ? 'border-l border-gray-300 dark:border-slate-700' : ''}`}
+              >
+                {d === 'compact' ? 'S' : d === 'comfortable' ? 'M' : 'L'}
+              </button>
+            ))}
           </div>
         </div>
       </div>

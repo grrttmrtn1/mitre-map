@@ -245,7 +245,7 @@ export default function ThreatGroups() {
                 {filtered.map(g => (
                   <tr key={g.id}
                     onClick={() => loadDetail(g.id)}
-                    className={`border-b border-gray-200 dark:border-slate-800/60 hover:bg-gray-100/30 dark:bg-slate-800/30 transition-colors cursor-pointer ${selected === g.id ? 'bg-blue-600/10' : ''}`}>
+                    className={`table-row border-b border-gray-200 dark:border-slate-800/60 hover:bg-gray-100/30 dark:bg-slate-800/30 transition-colors cursor-pointer ${selected === g.id ? 'bg-blue-600/10' : ''}`}>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-800 dark:text-slate-200">{g.name}</div>
                       <div className="text-xs text-gray-400 dark:text-slate-500 font-mono">{g.id}</div>

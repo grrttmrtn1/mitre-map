@@ -1,11 +1,30 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, LineChart, Line, CartesianGrid } from 'recharts';
 import { api } from '../api';
-import type { CoverageAttributionEntry, CoverageStats, CoverageSnapshot } from '../types';
+import type { CoverageAttributionEntry, CoverageStats, CoverageSnapshot, RiskScore } from '../types';
 import CoverageBar from '../components/CoverageBar';
 import { SkeletonDashboard } from '../components/Skeleton';
 import { useTheme } from '../context/ThemeContext';
+
+type WidgetId = 'kpis' | 'tactic_bars' | 'detection_status' | 'radar' | 'tactic_chart' | 'trend' | 'risk' | 'lowest_tactics' | 'attribution';
+const DEFAULT_WIDGET_ORDER: WidgetId[] = ['kpis', 'tactic_bars', 'detection_status', 'radar', 'tactic_chart', 'trend', 'risk', 'lowest_tactics', 'attribution'];
+
+function loadWidgetOrder(): WidgetId[] {
+  try {
+    const stored = localStorage.getItem('dashboard_widget_order');
+    if (stored) return JSON.parse(stored) as WidgetId[];
+  } catch { /* fallthrough */ }
+  return DEFAULT_WIDGET_ORDER;
+}
+
+function loadHiddenWidgets(): Set<WidgetId> {
+  try {
+    const stored = localStorage.getItem('dashboard_hidden_widgets');
+    if (stored) return new Set(JSON.parse(stored) as WidgetId[]);
+  } catch { /* fallthrough */ }
+  return new Set();
+}
 
 function TrendBadge({ delta, invert = false, unit = '' }: { delta: number | null; invert?: boolean; unit?: string }) {
   if (delta === null || delta === 0) return null;
@@ -40,12 +59,18 @@ export default function Dashboard() {
   const [stats, setStats] = useState<CoverageStats | null>(null);
   const [snapshots, setSnapshots] = useState<CoverageSnapshot[]>([]);
   const [attribution, setAttribution] = useState<CoverageAttributionEntry[]>([]);
+  const [riskScore, setRiskScore] = useState<RiskScore | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [trendRange, setTrendRange] = useState<'7D' | '30D' | '90D' | 'All'>('90D');
   const [selectedSnapId, setSelectedSnapId] = useState<number | null>(null);
   const [annotationText, setAnnotationText] = useState('');
   const [savingAnnotation, setSavingAnnotation] = useState(false);
+
+  // Task 9: widget order and hidden state
+  const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(loadWidgetOrder);
+  const [hiddenWidgets] = useState<Set<WidgetId>>(loadHiddenWidgets);
+  const [draggedWidget, setDraggedWidget] = useState<WidgetId | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -54,16 +79,40 @@ export default function Dashboard() {
       api.getCoverageStats(),
       api.getSnapshots().catch(() => []),
       api.getCoverageAttribution({ limit: 20 }).catch(() => ({ rows: [], total: 0 })),
+      api.getRiskScore().catch(() => null),
     ])
-      .then(([data, snaps, attr]) => {
+      .then(([data, snaps, attr, risk]) => {
         setStats(data);
         setSnapshots(snaps);
         setAttribution(attr.rows);
+        setRiskScore(risk);
         setError(false);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   };
+
+  const resetWidgetLayout = () => {
+    setWidgetOrder(DEFAULT_WIDGET_ORDER);
+    localStorage.setItem('dashboard_widget_order', JSON.stringify(DEFAULT_WIDGET_ORDER));
+  };
+
+  const handleDragStart = (id: WidgetId) => setDraggedWidget(id);
+  const handleDragOver = (e: React.DragEvent, id: WidgetId) => {
+    e.preventDefault();
+    if (!draggedWidget || draggedWidget === id) return;
+    setWidgetOrder(prev => {
+      const next = [...prev];
+      const fromIdx = next.indexOf(draggedWidget);
+      const toIdx = next.indexOf(id);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, draggedWidget);
+      localStorage.setItem('dashboard_widget_order', JSON.stringify(next));
+      return next;
+    });
+  };
+  const handleDragEnd = () => setDraggedWidget(null);
 
   useEffect(() => { load(); }, []);
 
@@ -191,6 +240,13 @@ export default function Dashboard() {
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">MITRE ATT&CK Enterprise detection and defense coverage</p>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={resetWidgetLayout}
+              className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-400 dark:border-slate-600 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+              title="Reset widget order to default"
+            >
+              Reset layout
+            </button>
             <Link to="/gaps" className="px-3 py-1.5 text-sm bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-colors">
               View Gaps →
             </Link>
