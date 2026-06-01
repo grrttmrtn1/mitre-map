@@ -415,6 +415,21 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.string('first_seen').nullable();
       t.string('last_seen').nullable();
       t.timestamp('created_at').defaultTo(db.fn.now());
+    })
+    .createTableIfNotExists('report_schedules', t => {
+      t.increments('id').primary();
+      t.string('name').notNullable();
+      t.string('report_type').notNullable();
+      t.string('schedule').notNullable();
+      t.text('recipients').notNullable();
+      t.string('format').notNullable().defaultTo('pdf');
+      t.string('framework_id').nullable();
+      t.integer('enabled').notNullable().defaultTo(1);
+      t.timestamp('last_run_at').nullable();
+      t.string('last_run_status').nullable();
+      t.string('last_run_error').nullable();
+      t.timestamp('created_at').defaultTo(db.fn.now());
+      t.timestamp('updated_at').defaultTo(db.fn.now());
     });
 }
 

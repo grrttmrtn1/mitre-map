@@ -42,7 +42,9 @@ import webhooksRouter from './routes/webhooks';
 import settingsRouter from './routes/settings';
 import prioritizationRouter from './routes/prioritization';
 import notificationsRouter from './routes/notifications';
+import reportSchedulesRouter from './routes/report-schedules';
 import integrationsRouter from './routes/integrations';
+import { initReportScheduler } from './reporting/scheduler';
 import campaignsRouter from './routes/campaigns';
 import cvesRouter from './routes/cves';
 import indicatorsRouter from './routes/indicators';
@@ -114,6 +116,7 @@ app.use('/api/webhooks', webhooksRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/prioritization', prioritizationRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/report-schedules', reportSchedulesRouter);
 app.use('/api/integrations', integrationsRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/cves', cvesRouter);
@@ -188,6 +191,7 @@ async function start() {
   await seedDatabase(db);
   await initScheduler();
   await initAttackScheduler();
+  await initReportScheduler();
 
   if (process.env.NODE_ENV === 'production') {
     const tlsOptions = await loadTlsOptions();

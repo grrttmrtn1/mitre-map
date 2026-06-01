@@ -376,4 +376,43 @@ router.get('/:id/report', async (req, res) => {
   });
 });
 
+// ── Executive Summary ───────────────────────────────────────────────────────
+router.get('/:id/executive-summary', async (req, res) => {
+  try {
+    const db = getKnex();
+    const exercise = await rawGet<any>(db, 'SELECT * FROM exercises WHERE id = ?', [req.params.id]);
+    if (!exercise) return res.status(404).json({ error: 'Not found' });
+    const techniques = await rawAll<any>(db, 'SELECT * FROM exercise_techniques WHERE exercise_id = ?', [exercise.id]);
+    const testRuns = await rawAll<any>(db, 'SELECT * FROM exercise_test_runs WHERE exercise_id = ?', [exercise.id]);
+    const findings = await rawAll<any>(db, 'SELECT * FROM exercise_findings WHERE exercise_id = ?', [exercise.id]);
+    const detectedCount = testRuns.filter((r: any) => r.outcome === 'detected').length;
+    const partialCount = testRuns.filter((r: any) => r.outcome === 'partial').length;
+    const notDetectedCount = testRuns.filter((r: any) => r.outcome === 'not_detected').length;
+    const detectionRate = testRuns.length === 0 ? 0 : Math.round(((detectedCount + partialCount * 0.5) / testRuns.length) * 100);
+    const findingsBySeverity = {
+      critical: findings.filter((f: any) => f.severity === 'critical').length,
+      high: findings.filter((f: any) => f.severity === 'high').length,
+      medium: findings.filter((f: any) => f.severity === 'medium').length,
+      low: findings.filter((f: any) => f.severity === 'low').length,
+    };
+    const severityOrder = ['critical', 'high', 'medium', 'low', 'informational'];
+    const topFindings = [...findings]
+      .sort((a: any, b: any) => severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity))
+      .slice(0, 5)
+      .map((f: any) => ({ title: f.title, severity: f.severity, finding_type: f.finding_type, recommendation: f.recommendation }));
+    const detectionGaps = testRuns
+      .filter((r: any) => r.outcome === 'not_detected')
+      .map((r: any) => ({ technique_id: r.technique_id ?? null, notes: r.notes }))
+      .slice(0, 10);
+    res.json({
+      exercise: { id: exercise.id, name: exercise.name, type: exercise.type, status: exercise.status, lead: exercise.lead, start_date: exercise.start_date, end_date: exercise.end_date },
+      kpis: { detection_rate: detectionRate, techniques_scoped: techniques.length, tests_executed: testRuns.length, findings_total: findings.length, detected: detectedCount, partial: partialCount, not_detected: notDetectedCount },
+      findings_by_severity: findingsBySeverity,
+      top_findings: topFindings,
+      detection_gaps: detectionGaps,
+      generated_at: new Date().toISOString(),
+    });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+});
+
 export default router;
