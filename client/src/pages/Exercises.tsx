@@ -907,9 +907,44 @@ function ReportTab({ exerciseId }: { exerciseId: number }) {
     <div className="p-6 space-y-8 max-w-4xl">
       {/* Header */}
       <div>
-        <div className="flex items-center gap-3 mb-1">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">{exercise.name}</h2>
-          <Badge text={TYPE_LABELS[exercise.type] ?? exercise.type} className={TYPE_COLORS[exercise.type] ?? ''} />
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">{exercise.name}</h2>
+            <Badge text={TYPE_LABELS[exercise.type] ?? exercise.type} className={TYPE_COLORS[exercise.type] ?? ''} />
+          </div>
+          <button onClick={async () => {
+            const esc = (s: string) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            try {
+              const s = await api.getExerciseExecutiveSummary(exerciseId);
+              const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+                body{font-family:sans-serif;padding:32px;max-width:700px;margin:0 auto}
+                h1{font-size:22px;border-bottom:2px solid #3b82f6;padding-bottom:8px}
+                .kpi{display:inline-block;background:#f1f5f9;border-radius:8px;padding:10px 14px;margin:4px;text-align:center}
+                .kpi .v{font-size:26px;font-weight:700;color:#3b82f6}.kpi .l{font-size:10px;color:#64748b;text-transform:uppercase}
+                table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}
+                th{text-align:left;padding:6px;background:#f8fafc;font-size:11px;color:#64748b;text-transform:uppercase}
+                td{padding:6px;border-bottom:1px solid #e2e8f0}
+              </style></head><body>
+                <h1>${esc(s.exercise.name)} — Executive Summary</h1>
+                <div>
+                  <div class="kpi"><div class="v">${Number(s.kpis.detection_rate)}%</div><div class="l">Detection Rate</div></div>
+                  <div class="kpi"><div class="v">${Number(s.kpis.techniques_scoped)}</div><div class="l">Techniques</div></div>
+                  <div class="kpi"><div class="v">${Number(s.kpis.tests_executed)}</div><div class="l">Tests Run</div></div>
+                  <div class="kpi"><div class="v">${Number(s.kpis.findings_total)}</div><div class="l">Findings</div></div>
+                </div>
+                <h2 style="margin-top:24px;font-size:16px">Top Findings</h2>
+                <table><thead><tr><th>Finding</th><th>Severity</th><th>Recommendation</th></tr></thead><tbody>
+                  ${(s.top_findings ?? []).map((f: any) => `<tr><td>${esc(f.title)}</td><td>${esc(f.severity)}</td><td>${esc(f.recommendation ?? '—')}</td></tr>`).join('')}
+                </tbody></table>
+                <p style="font-size:11px;color:#94a3b8;margin-top:24px">Generated ${esc(new Date().toLocaleString())} · MitreMap</p>
+              </body></html>`;
+              const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+              const win = window.open(url, '_blank');
+              if (win) win.addEventListener('load', () => { win.print(); setTimeout(() => URL.revokeObjectURL(url), 60000); });
+            } catch { /* silently fail */ }
+          }} className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">
+            Export Executive Summary
+          </button>
         </div>
         <div className="flex gap-4 text-sm text-gray-400 dark:text-slate-500 flex-wrap">
           {exercise.threat_group_name && <span>Target: <span className="text-gray-700 dark:text-slate-300">{exercise.threat_group_name}</span></span>}

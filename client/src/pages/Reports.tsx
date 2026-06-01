@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api';
-import type { ExecutiveReport, CoverageSnapshot } from '../types';
+import type { ExecutiveReport, CoverageSnapshot, ReportSchedule } from '../types';
 import ConfirmModal from '../components/ConfirmModal';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import CoverageBar from '../components/CoverageBar';
 import ReportBuilder from '../components/ReportBuilder';
 
-type TabId = 'executive' | 'trends' | 'threats' | 'gaps' | 'builder';
+type TabId = 'executive' | 'trends' | 'threats' | 'gaps' | 'builder' | 'scheduled';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'executive', label: 'Executive Summary' },
@@ -14,6 +14,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'threats', label: 'Threat Landscape' },
   { id: 'gaps', label: 'Prioritized Gaps' },
   { id: 'builder', label: 'Custom Reports' },
+  { id: 'scheduled', label: 'Scheduled Delivery' },
 ];
 
 function usePrint() {
@@ -44,6 +45,9 @@ export default function Reports() {
   const [deleteSnapshotId, setDeleteSnapshotId] = useState<number | null>(null);
   const [deletingSnapshot, setDeletingSnapshot] = useState(false);
   const [fetchedTabs, setFetchedTabs] = useState<Set<TabId>>(new Set(['executive']));
+  const [schedules, setSchedules] = useState<ReportSchedule[]>([]);
+  const [addScheduleOpen, setAddScheduleOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({ name: '', report_type: 'executive', schedule: '0 8 * * 1', recipients: '' });
   const handlePrint = usePrint();
 
   // Load executive on mount
@@ -68,6 +72,9 @@ export default function Reports() {
     if (tab === 'gaps') {
       setLoadingGaps(true);
       api.getGapReport().then(setGapReport).finally(() => setLoadingGaps(false));
+    }
+    if (tab === 'scheduled') {
+      api.getReportSchedules().then(setSchedules).catch(() => {});
     }
   }, [fetchedTabs]);
 
@@ -107,6 +114,106 @@ export default function Reports() {
       ))}
     </div>
   );
+
+  if (activeTab === 'scheduled') {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Reports &amp; Exports</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Automated email delivery on a schedule</p>
+          {tabBar}
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div className="flex justify-end">
+            <button onClick={() => setAddScheduleOpen(v => !v)}
+              className="px-3 py-1.5 text-sm bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600/30 transition-colors">
+              + Schedule Report
+            </button>
+          </div>
+
+          {addScheduleOpen && (
+            <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300">New Scheduled Report</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-slate-400">Name</label>
+                  <input type="text" value={scheduleForm.name} onChange={e => setScheduleForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full mt-1 text-xs bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-slate-400">Report Type</label>
+                  <select value={scheduleForm.report_type} onChange={e => setScheduleForm(f => ({ ...f, report_type: e.target.value }))}
+                    className="w-full mt-1 text-xs bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none">
+                    <option value="executive">Executive Summary</option>
+                    <option value="gaps">Prioritized Gaps</option>
+                    <option value="threats">Threat Landscape</option>
+                    <option value="trends">Coverage Trends</option>
+                    <option value="compliance">Compliance</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-slate-400">Schedule (cron expression)</label>
+                  <input type="text" value={scheduleForm.schedule} onChange={e => setScheduleForm(f => ({ ...f, schedule: e.target.value }))}
+                    placeholder="0 8 * * 1  (Mon 8am UTC)" className="w-full mt-1 text-xs font-mono bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-slate-400">Recipients (comma-separated)</label>
+                  <input type="text" value={scheduleForm.recipients} onChange={e => setScheduleForm(f => ({ ...f, recipients: e.target.value }))}
+                    placeholder="ciso@company.com, team@company.com"
+                    className="w-full mt-1 text-xs bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded px-2 py-1.5 text-gray-800 dark:text-slate-200 focus:outline-none" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setAddScheduleOpen(false)} className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200">Cancel</button>
+                <button onClick={async () => {
+                  try {
+                    const created = await api.createReportSchedule({
+                      ...scheduleForm,
+                      recipients: scheduleForm.recipients.split(',').map(r => r.trim()).filter(Boolean),
+                    });
+                    setSchedules(prev => [...prev, created]);
+                    setAddScheduleOpen(false);
+                    setScheduleForm({ name: '', report_type: 'executive', schedule: '0 8 * * 1', recipients: '' });
+                  } catch { /* errors shown server-side */ }
+                }} className="text-xs px-3 py-1.5 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/30 transition-colors">Save</button>
+              </div>
+            </div>
+          )}
+
+          {schedules.length === 0 && !addScheduleOpen && (
+            <div className="text-center py-12">
+              <p className="text-sm text-gray-400 dark:text-slate-600 mb-1">No scheduled reports configured.</p>
+              <p className="text-xs text-gray-300 dark:text-slate-700">Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables to enable email delivery.</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {schedules.map(s => (
+              <div key={s.id} className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-800 dark:text-slate-200">{s.name}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 rounded font-medium uppercase">{s.report_type}</span>
+                    {s.last_run_status && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium uppercase ${s.last_run_status === 'ok' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                        {s.last_run_status}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 font-mono">{s.schedule} · {s.recipients?.join(', ')}</div>
+                  {s.last_run_at && <div className="text-[10px] text-gray-300 dark:text-slate-600 mt-0.5">Last run: {new Date(s.last_run_at).toLocaleString()}</div>}
+                </div>
+                <button onClick={async () => {
+                  await api.deleteReportSchedule(s.id);
+                  setSchedules(prev => prev.filter(x => x.id !== s.id));
+                }} className="text-xs text-red-400 hover:text-red-300 transition-colors">Delete</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (activeTab === 'builder') {
     return (

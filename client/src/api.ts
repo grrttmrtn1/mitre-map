@@ -9,7 +9,7 @@ import type {
   TaxiiBatch, TaxiiJob, TaxiiPendingItem, TaxiiServer, TaxiiCollection,
   Tool, ToolDetail, User, WebhookConfig, AlertRule, Notification,
   SiemIntegration, SiemSyncLog, GithubSyncConfig, TicketingConfig,
-  Campaign, Indicator, CveGapSummary,
+  Campaign, Indicator, CveGapSummary, ReportSchedule,
 } from './types';
 
 const BASE = '/api';
@@ -506,4 +506,12 @@ export const api = {
   updateTicketingConfig: (id: number, data: Partial<{ name: string; base_url: string; credentials: Record<string, string>; default_project: string; enabled: boolean }>) =>
     put<TicketingConfig>(`/integrations/ticketing/${id}`, data),
   deleteTicketingConfig: (id: number) => del(`/integrations/ticketing/${id}`),
+
+  // Report schedules
+  getReportSchedules: () => get<ReportSchedule[]>('/report-schedules'),
+  createReportSchedule: (data: { name: string; report_type: string; schedule: string; recipients: string[]; format?: string; framework_id?: string }) =>
+    post<ReportSchedule>('/report-schedules', data),
+  updateReportSchedule: (id: number, data: Partial<ReportSchedule>) => put<ReportSchedule>(`/report-schedules/${id}`, data),
+  deleteReportSchedule: (id: number) => del(`/report-schedules/${id}`),
+  getExerciseExecutiveSummary: (id: number) => get<any>(`/exercises/${id}/executive-summary`),
 };

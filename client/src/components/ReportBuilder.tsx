@@ -164,6 +164,52 @@ const DATA_SOURCES: Record<string, DataSourceDef> = {
       { key: 'notes', label: 'Notes', type: 'string' },
     ],
   },
+  compliance_summary: {
+    label: 'Compliance Framework Summary',
+    fetch: async () => {
+      const frameworks = await api.getComplianceFrameworks();
+      return frameworks.map((fw: any) => ({
+        id: fw.id,
+        name: fw.name,
+        version: fw.version ?? '',
+        total_controls: fw.total_controls ?? 0,
+        covered_controls: fw.covered_controls ?? 0,
+        coverage_pct: fw.total_controls ? Math.round(((fw.covered_controls ?? 0) / fw.total_controls) * 100) : 0,
+      }));
+    },
+    fields: [
+      { key: 'name', label: 'Framework', type: 'string' },
+      { key: 'version', label: 'Version', type: 'string' },
+      { key: 'total_controls', label: 'Total Controls', type: 'number' },
+      { key: 'covered_controls', label: 'Covered Controls', type: 'number' },
+      { key: 'coverage_pct', label: 'Coverage %', type: 'number' },
+    ],
+  },
+  integration_sync_status: {
+    label: 'Integration Sync Status',
+    fetch: async () => {
+      const integrations = await api.getSiemIntegrations();
+      return integrations.map((i: any) => ({
+        name: i.name,
+        type: i.type,
+        enabled: i.enabled ? 'Yes' : 'No',
+        last_push_status: i.last_push_status ?? '—',
+        last_push_error: i.last_push_error ?? '',
+        last_pushed_at: i.last_pushed_at ?? '',
+        last_pull_status: i.last_pull_status ?? '—',
+        last_pulled_at: i.last_pulled_at ?? '',
+      }));
+    },
+    fields: [
+      { key: 'name', label: 'Name', type: 'string' },
+      { key: 'type', label: 'Type', type: 'string' },
+      { key: 'enabled', label: 'Enabled', type: 'string' },
+      { key: 'last_push_status', label: 'Push Status', type: 'string' },
+      { key: 'last_pushed_at', label: 'Last Push', type: 'date' },
+      { key: 'last_pull_status', label: 'Pull Status', type: 'string' },
+      { key: 'last_pulled_at', label: 'Last Pull', type: 'date' },
+    ],
+  },
 };
 
 // ─── Persistence ──────────────────────────────────────────────────────────────

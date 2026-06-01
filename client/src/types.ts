@@ -848,3 +848,19 @@ export interface TicketingConfig {
   created_at: string;
   updated_at: string;
 }
+
+export interface ReportSchedule {
+  id: number;
+  name: string;
+  report_type: 'executive' | 'trends' | 'threats' | 'gaps' | 'compliance';
+  schedule: string;
+  recipients: string[];
+  format: 'pdf' | 'markdown';
+  framework_id: string | null;
+  enabled: number;
+  last_run_at: string | null;
+  last_run_status: string | null;
+  last_run_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
