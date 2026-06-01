@@ -211,3 +211,6 @@ node_modules/
 
 # Enterprise CA certificates — keep dir tracked, ignore actual cert files
 certs/*.crt
+
+# Claude Code local settings
+.claude/
