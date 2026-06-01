@@ -38,9 +38,20 @@ export async function sendReportEmail(opts: {
   });
 }
 
+const SAFE_TITLES: Record<string, string> = {
+  executive: 'Executive Summary', trends: 'Coverage Trends',
+  threats: 'Threat Landscape', gaps: 'Prioritized Gaps', compliance: 'Compliance Report',
+};
+
+function esc(s: any): string {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function n(v: any): number { return Number(v) || 0; }
+
 export function buildReportHtml(reportType: string, data: any): string {
-  const timestamp = new Date().toLocaleString();
-  const title = ({ executive: 'Executive Summary', trends: 'Coverage Trends', threats: 'Threat Landscape', gaps: 'Prioritized Gaps', compliance: 'Compliance Report' } as Record<string,string>)[reportType] ?? reportType;
+  const timestamp = esc(new Date().toLocaleString());
+  const title = SAFE_TITLES[reportType] ?? esc(reportType);
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
     body{font-family:-apple-system,sans-serif;color:#1e293b;padding:32px;max-width:800px;margin:0 auto}
@@ -58,17 +69,17 @@ export function buildReportHtml(reportType: string, data: any): string {
   <p style="color:#64748b;font-size:13px;">Generated: ${timestamp}</p>
   ${reportType === 'executive' && data ? `
     <div>
-      <div class="kpi"><div class="value">${data.coverage_pct ?? 0}%</div><div class="label">Coverage</div></div>
-      <div class="kpi"><div class="value">${data.active_detections ?? 0}</div><div class="label">Detections</div></div>
-      <div class="kpi"><div class="value">${data.gap_techniques ?? 0}</div><div class="label">Gaps</div></div>
-      <div class="kpi"><div class="value">${data.risk_score ?? 0}</div><div class="label">Risk Score</div></div>
+      <div class="kpi"><div class="value">${n(data.coverage_pct)}%</div><div class="label">Coverage</div></div>
+      <div class="kpi"><div class="value">${n(data.active_detections)}</div><div class="label">Detections</div></div>
+      <div class="kpi"><div class="value">${n(data.gap_techniques)}</div><div class="label">Gaps</div></div>
+      <div class="kpi"><div class="value">${n(data.risk_score)}</div><div class="label">Risk Score</div></div>
     </div>
     ${data.tactic_breakdown ? `<h2>Coverage by Tactic</h2><table><thead><tr><th>Tactic</th><th>Covered</th><th>Total</th><th>%</th></tr></thead><tbody>
-      ${(data.tactic_breakdown ?? []).map((t: any) => `<tr><td>${t.tactic_name}</td><td>${t.covered}</td><td>${t.total}</td><td>${t.pct}%</td></tr>`).join('')}
+      ${(data.tactic_breakdown ?? []).map((t: any) => `<tr><td>${esc(t.tactic_name)}</td><td>${n(t.covered)}</td><td>${n(t.total)}</td><td>${n(t.pct)}%</td></tr>`).join('')}
     </tbody></table>` : ''}
   ` : ''}
   ${reportType === 'gaps' && data?.gaps ? `<h2>Top Priority Gaps</h2><table><thead><tr><th>Technique</th><th>ID</th><th>Priority</th><th>Tactics</th></tr></thead><tbody>
-    ${(data.gaps ?? []).slice(0,20).map((g: any) => `<tr><td>${g.name}</td><td style="font-family:monospace">${g.id}</td><td>${g.priority_score}</td><td>${(g.tactic_names??[]).join(', ')}</td></tr>`).join('')}
+    ${(data.gaps ?? []).slice(0,20).map((g: any) => `<tr><td>${esc(g.name)}</td><td style="font-family:monospace">${esc(g.id)}</td><td>${n(g.priority_score)}</td><td>${esc((g.tactic_names??[]).join(', '))}</td></tr>`).join('')}
   </tbody></table>` : ''}
   <div class="footer">MitreMap · Detection Coverage Platform · Report generated automatically by scheduled delivery</div>
   </body></html>`;
