@@ -14,6 +14,99 @@ const SIEM_LABELS: Record<string, string> = {
   crowdstrike: 'CrowdStrike Falcon', qradar: 'IBM QRadar', chronicle: 'Google Chronicle',
 };
 
+interface SiemSchema {
+  doc: string;
+  docLabel: string;
+  configTemplate: Record<string, string>;
+  credentialsTemplate: Record<string, string>;
+  configHints: Record<string, string>;
+  credentialsHints: Record<string, string>;
+}
+
+const SIEM_SCHEMA: Record<string, SiemSchema> = {
+  sentinel: {
+    doc: 'https://learn.microsoft.com/en-us/azure/sentinel/connect-rest-api-template',
+    docLabel: 'Azure Sentinel REST API docs',
+    configTemplate: { tenant_id: '', subscription_id: '', resource_group: '', workspace_name: '', client_id: '' },
+    credentialsTemplate: { client_secret: '' },
+    configHints: {
+      tenant_id: 'Azure AD tenant (Directory) ID — found in Azure Portal → Azure Active Directory → Overview',
+      subscription_id: 'Azure subscription ID — found in Subscriptions blade',
+      resource_group: 'Resource group containing the Log Analytics workspace',
+      workspace_name: 'Log Analytics workspace name (not the workspace ID)',
+      client_id: 'App registration Application (client) ID — needs SecurityInsights Contributor role',
+    },
+    credentialsHints: {
+      client_secret: 'App registration client secret value (not the secret ID)',
+    },
+  },
+  splunk: {
+    doc: 'https://docs.splunk.com/Documentation/Splunk/latest/RESTREF/RESTprolog',
+    docLabel: 'Splunk REST API reference',
+    configTemplate: { base_url: 'https://splunk.example.com:8089', app: 'search' },
+    credentialsTemplate: { token: '' },
+    configHints: {
+      base_url: 'Splunk management port URL — typically port 8089 (must be HTTPS)',
+      app: 'Splunk app namespace for saved searches — use "search" for default',
+    },
+    credentialsHints: {
+      token: 'Splunk HEC or REST API token — create in Settings → Tokens',
+    },
+  },
+  elastic: {
+    doc: 'https://www.elastic.co/guide/en/security/current/detection-engine-overview.html',
+    docLabel: 'Elastic Detection Engine API docs',
+    configTemplate: { base_url: 'https://kibana.example.com:5601', space_id: '' },
+    credentialsTemplate: { api_key: '' },
+    configHints: {
+      base_url: 'Kibana base URL (must be HTTPS for production)',
+      space_id: 'Kibana space ID — leave empty for the default space',
+    },
+    credentialsHints: {
+      api_key: 'Elastic API key (Base64-encoded id:key) — create in Stack Management → API Keys with "detection_engine" privileges',
+    },
+  },
+  crowdstrike: {
+    doc: 'https://falcon.crowdstrike.com/documentation/46/falcon-api-specification',
+    docLabel: 'CrowdStrike Falcon API docs',
+    configTemplate: { base_url: 'https://api.crowdstrike.com' },
+    credentialsTemplate: { client_id: '', client_secret: '' },
+    configHints: {
+      base_url: 'Falcon API base URL — use https://api.eu-1.crowdstrike.com for EU tenants',
+    },
+    credentialsHints: {
+      client_id: 'OAuth2 client ID — create in Support & Resources → API Clients & Keys with Custom IOA Write scope',
+      client_secret: 'OAuth2 client secret (shown once at creation time)',
+    },
+  },
+  qradar: {
+    doc: 'https://www.ibm.com/docs/en/qsip/7.5?topic=api-restful-overview',
+    docLabel: 'IBM QRadar REST API docs',
+    configTemplate: { base_url: 'https://qradar.example.com' },
+    credentialsTemplate: { token: '' },
+    configHints: {
+      base_url: 'QRadar console base URL (must be HTTPS)',
+    },
+    credentialsHints: {
+      token: 'QRadar authorized service token — create in Admin → Authorized Services with Security permissions',
+    },
+  },
+  chronicle: {
+    doc: 'https://cloud.google.com/chronicle/docs/reference/rest',
+    docLabel: 'Google SecOps Chronicle API docs',
+    configTemplate: { project_id: '', instance_id: '', region: 'us' },
+    credentialsTemplate: { service_account_json: '{"type":"service_account","project_id":"..."}' },
+    configHints: {
+      project_id: 'Google Cloud project ID hosting the Chronicle instance',
+      instance_id: 'Chronicle instance ID — found in Settings → SIEM Settings',
+      region: 'Chronicle deployment region: us, europe, asia-southeast1, etc.',
+    },
+    credentialsHints: {
+      service_account_json: 'Full service account JSON key (paste the entire downloaded JSON) — needs Chronicle API Editor role',
+    },
+  },
+};
+
 function StatusBadge({ status }: { status: string | null }) {
   if (!status) return <span className="text-gray-400 dark:text-slate-600 text-xs">—</span>;
   const ok = status === 'ok';
@@ -35,7 +128,7 @@ function SiemTab() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', type: 'splunk', config: '{}', credentials: '{}' });
+  const [form, setForm] = useState({ name: '', type: 'splunk', config: JSON.stringify(SIEM_SCHEMA.splunk.configTemplate, null, 2), credentials: JSON.stringify(SIEM_SCHEMA.splunk.credentialsTemplate, null, 2) });
 
   useEffect(() => {
     api.getSiemIntegrations().then(setIntegrations).finally(() => setLoading(false));
@@ -51,7 +144,7 @@ function SiemTab() {
       const created = await api.createSiemIntegration({ name: form.name, type: form.type, config, credentials });
       setIntegrations(prev => [created, ...prev]);
       setShowForm(false);
-      setForm({ name: '', type: 'splunk', config: '{}', credentials: '{}' });
+      setForm({ name: '', type: 'splunk', config: JSON.stringify(SIEM_SCHEMA.splunk.configTemplate, null, 2), credentials: JSON.stringify(SIEM_SCHEMA.splunk.credentialsTemplate, null, 2) });
       toast.success('Integration created');
     } catch { toast.error('Failed to create integration'); }
   }
@@ -107,38 +200,76 @@ function SiemTab() {
         </button>
       </div>
 
-      {showForm && (
-        <form onSubmit={handleCreate} className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Name</label>
-              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+      {showForm && (() => {
+        const schema = SIEM_SCHEMA[form.type];
+        return (
+          <form onSubmit={handleCreate} className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl p-4 space-y-4">
+            {/* Name + Type */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Name</label>
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required
+                  placeholder={`My ${SIEM_LABELS[form.type]} integration`}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Type</label>
+                <select value={form.type} onChange={e => {
+                  const s = SIEM_SCHEMA[e.target.value];
+                  setForm(f => ({ ...f, type: e.target.value, config: JSON.stringify(s.configTemplate, null, 2), credentials: JSON.stringify(s.credentialsTemplate, null, 2) }));
+                }} className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100">
+                  {SIEM_TYPES.map(t => <option key={t} value={t}>{SIEM_LABELS[t]}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Type</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100">
-                {SIEM_TYPES.map(t => <option key={t} value={t}>{SIEM_LABELS[t]}</option>)}
-              </select>
+
+            {/* Doc link */}
+            <div className="flex items-center gap-1.5 text-xs text-indigo-500 dark:text-indigo-400">
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+              <a href={schema.doc} target="_blank" rel="noopener noreferrer" className="hover:underline">{schema.docLabel}</a>
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Config (JSON — non-sensitive fields like base_url, app, workspace_name)</label>
-            <textarea value={form.config} onChange={e => setForm(f => ({ ...f, config: e.target.value }))} rows={3}
-              className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Credentials (JSON — tokens, secrets — stored encrypted)</label>
-            <textarea value={form.credentials} onChange={e => setForm(f => ({ ...f, credentials: e.target.value }))} rows={3}
-              className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
-          </div>
-          <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-sm text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg">Cancel</button>
-            <button type="submit" className="px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">Save</button>
-          </div>
-        </form>
-      )}
+
+            {/* Config */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">
+                Config <span className="font-normal text-gray-400 dark:text-slate-500">(non-sensitive — not encrypted)</span>
+              </label>
+              <div className="mb-2 space-y-1">
+                {Object.entries(schema.configHints).map(([key, hint]) => (
+                  <div key={key} className="flex gap-2 text-xs">
+                    <code className="flex-shrink-0 font-mono text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-1 rounded">{key}</code>
+                    <span className="text-gray-500 dark:text-slate-400">{hint}</span>
+                  </div>
+                ))}
+              </div>
+              <textarea value={form.config} onChange={e => setForm(f => ({ ...f, config: e.target.value }))} rows={Object.keys(schema.configTemplate).length + 2}
+                className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+            </div>
+
+            {/* Credentials */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">
+                Credentials <span className="font-normal text-gray-400 dark:text-slate-500">(stored AES-256-GCM encrypted)</span>
+              </label>
+              <div className="mb-2 space-y-1">
+                {Object.entries(schema.credentialsHints).map(([key, hint]) => (
+                  <div key={key} className="flex gap-2 text-xs">
+                    <code className="flex-shrink-0 font-mono text-amber-500 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1 rounded">{key}</code>
+                    <span className="text-gray-500 dark:text-slate-400">{hint}</span>
+                  </div>
+                ))}
+              </div>
+              <textarea value={form.credentials} onChange={e => setForm(f => ({ ...f, credentials: e.target.value }))} rows={Object.keys(schema.credentialsTemplate).length + 2}
+                className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-sm text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg">Cancel</button>
+              <button type="submit" className="px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">Save</button>
+            </div>
+          </form>
+        );
+      })()}
 
       {integrations.length === 0 ? (
         <div className="text-center py-12 text-gray-400 dark:text-slate-600 text-sm">No SIEM integrations configured yet.</div>
