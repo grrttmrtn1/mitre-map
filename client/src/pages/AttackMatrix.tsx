@@ -200,10 +200,16 @@ function InlineLegend({
   heatmapMode,
   hasOverlay,
   groupName,
+  overlayMode,
+  groupAName,
+  groupBName,
 }: {
   heatmapMode: boolean;
   hasOverlay: boolean;
   groupName: string | null;
+  overlayMode?: boolean;
+  groupAName?: string;
+  groupBName?: string;
 }) {
   return (
     <div className="bg-white dark:bg-slate-950/90 backdrop-blur border border-gray-300 dark:border-slate-700/60 rounded-lg p-2.5 shadow-xl">
@@ -235,6 +241,22 @@ function InlineLegend({
               <span className="text-[10px] text-amber-400 leading-tight">{groupName ?? 'Threat group'}</span>
             </div>
           )}
+          {overlayMode && (
+            <div className="pt-1 border-t border-gray-200 dark:border-slate-800 mt-0.5 space-y-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: 'rgba(239,68,68,0.75)' }} />
+                <span className="text-[10px] text-red-400 leading-tight">Both groups</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: 'rgba(249,115,22,0.75)' }} />
+                <span className="text-[10px] text-orange-400 leading-tight">{groupAName || 'Group A'} only</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: 'rgba(234,179,8,0.75)' }} />
+                <span className="text-[10px] text-yellow-400 leading-tight">{groupBName || 'Group B'} only</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -250,15 +272,24 @@ export default function AttackMatrix() {
   const [matrix, setMatrix] = useState<MatrixColumn[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<SelectedCell | null>(null);
-  const [filter, setFilter] = useState<string>(searchParams.get('filter') ?? 'all');
+  // Task 5: filter persistence — read from sessionStorage on init
+  const [filter, setFilter] = useState<string>(() => sessionStorage.getItem('matrix_filter_status') ?? searchParams.get('filter') ?? 'all');
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set());
   const [zoom, setZoom] = useState(1.0);
   const [heatmapMode, setHeatmapMode] = useState(false);
 
   const [groups, setGroups] = useState<ThreatGroup[]>([]);
-  const [overlayGroupId, setOverlayGroupId] = useState<string>(searchParams.get('group') ?? '');
+  // single-group overlay (existing)
+  const [overlayGroupId, setOverlayGroupId] = useState<string>(() => sessionStorage.getItem('matrix_filter_group') ?? searchParams.get('group') ?? '');
   const [overlayTechIds, setOverlayTechIds] = useState<Set<string>>(new Set());
   const [overlayCoverage, setOverlayCoverage] = useState<{ name: string; covered: number; total: number } | null>(null);
+
+  // Task 4: two-group overlay mode
+  const [overlayMode, setOverlayMode] = useState(false);
+  const [overlayGroupA, setOverlayGroupA] = useState('');
+  const [overlayGroupB, setOverlayGroupB] = useState('');
+  const [overlayTechsA, setOverlayTechsA] = useState<Set<string>>(new Set());
+  const [overlayTechsB, setOverlayTechsB] = useState<Set<string>>(new Set());
 
   const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
   const [scrollVersion, setScrollVersion] = useState(0);
@@ -286,7 +317,9 @@ export default function AttackMatrix() {
     return () => scrollEl.removeEventListener('scroll', onScroll);
   }, [scrollEl]);
 
+  // Task 5: persist filter to sessionStorage
   useEffect(() => {
+    sessionStorage.setItem('matrix_filter_status', filter);
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
       if (filter === 'all') next.delete('filter'); else next.set('filter', filter);
@@ -294,7 +327,9 @@ export default function AttackMatrix() {
     }, { replace: true });
   }, [filter, setSearchParams]);
 
+  // Task 5: persist overlay group to sessionStorage
   useEffect(() => {
+    sessionStorage.setItem('matrix_filter_group', overlayGroupId);
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
       if (!overlayGroupId) next.delete('group'); else next.set('group', overlayGroupId);
@@ -312,6 +347,21 @@ export default function AttackMatrix() {
       setOverlayCoverage({ name: detail.name, covered: detail.coverage.covered, total: detail.coverage.total });
     }).catch(() => {});
   }, [overlayGroupId, setSearchParams]);
+
+  // Task 4: load techniques for two-group overlay
+  useEffect(() => {
+    if (!overlayGroupA) { setOverlayTechsA(new Set()); return; }
+    api.getThreatGroup(overlayGroupA).then(g => {
+      setOverlayTechsA(new Set(g.techniques?.map((t: any) => t.id) ?? []));
+    }).catch(() => {});
+  }, [overlayGroupA]);
+
+  useEffect(() => {
+    if (!overlayGroupB) { setOverlayTechsB(new Set()); return; }
+    api.getThreatGroup(overlayGroupB).then(g => {
+      setOverlayTechsB(new Set(g.techniques?.map((t: any) => t.id) ?? []));
+    }).catch(() => {});
+  }, [overlayGroupB]);
 
   async function addTechniqueToExercise(exerciseId: number, techniqueId: string) {
     setAddingToExercise(true);
@@ -346,6 +396,17 @@ export default function AttackMatrix() {
   const coveredCount = totalTechs - gapCount;
   const totalSubs    = matrix.reduce((s, c) => s + c.cells.reduce((cs, cell) => cs + cell.subtechnique_count, 0), 0);
   const hasOverlay   = overlayTechIds.size > 0;
+  // Task 4: two-group overlay helpers
+  const hasTwoOverlay = overlayMode && (overlayTechsA.size > 0 || overlayTechsB.size > 0);
+  function getTwoOverlayCellStyle(techId: string): React.CSSProperties | undefined {
+    if (!hasTwoOverlay) return undefined;
+    const inA = overlayTechsA.has(techId);
+    const inB = overlayTechsB.has(techId);
+    if (inA && inB) return { backgroundColor: 'rgba(239,68,68,0.75)', color: 'white' };
+    if (inA) return { backgroundColor: 'rgba(249,115,22,0.75)', color: 'white' };
+    if (inB) return { backgroundColor: 'rgba(234,179,8,0.75)', color: '#1a1a1a' };
+    return undefined;
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -370,14 +431,50 @@ export default function AttackMatrix() {
 
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0">
             {/* Threat group overlay */}
-            <select
-              value={overlayGroupId}
-              onChange={e => setOverlayGroupId(e.target.value)}
-              className={`px-3 py-1.5 text-xs bg-gray-100 dark:bg-slate-800 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none transition-colors ${overlayGroupId ? 'border border-amber-500/60 focus:border-amber-400' : 'border border-gray-300 dark:border-slate-700 focus:border-amber-500'}`}
+            {!overlayMode && (
+              <select
+                value={overlayGroupId}
+                onChange={e => setOverlayGroupId(e.target.value)}
+                className={`px-3 py-1.5 text-xs bg-gray-100 dark:bg-slate-800 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none transition-colors ${overlayGroupId ? 'border border-amber-500/60 focus:border-amber-400' : 'border border-gray-300 dark:border-slate-700 focus:border-amber-500'}`}
+              >
+                <option value="">Compare to threat group…</option>
+                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            )}
+
+            {/* Task 4: Two-group overlay toggle */}
+            <button
+              onClick={() => setOverlayMode(m => !m)}
+              className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                overlayMode
+                  ? 'bg-red-500/20 border-red-500/60 text-red-300 hover:bg-red-500/30'
+                  : 'bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-200 dark:bg-slate-700'
+              }`}
+              title="Compare two threat groups side-by-side"
             >
-              <option value="">Compare to threat group…</option>
-              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+              {overlayMode ? '◉ Overlay' : '○ Overlay'}
+            </button>
+
+            {overlayMode && (
+              <>
+                <select
+                  value={overlayGroupA}
+                  onChange={e => setOverlayGroupA(e.target.value)}
+                  className={`px-3 py-1.5 text-xs bg-gray-100 dark:bg-slate-800 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none transition-colors ${overlayGroupA ? 'border border-orange-500/60' : 'border border-gray-300 dark:border-slate-700'}`}
+                >
+                  <option value="">Group A…</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+                <select
+                  value={overlayGroupB}
+                  onChange={e => setOverlayGroupB(e.target.value)}
+                  className={`px-3 py-1.5 text-xs bg-gray-100 dark:bg-slate-800 rounded-lg text-gray-700 dark:text-slate-300 focus:outline-none transition-colors ${overlayGroupB ? 'border border-yellow-500/60' : 'border border-gray-300 dark:border-slate-700'}`}
+                >
+                  <option value="">Group B…</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </>
+            )}
 
             {/* Status filter */}
             <select
@@ -474,6 +571,7 @@ export default function AttackMatrix() {
                         ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-slate-900'
                         : '';
                     const dimClass = hasOverlay && !inOverlay ? 'opacity-40' : '';
+                    const twoOverlayStyle = getTwoOverlayCellStyle(cell.id);
 
                     return (
                       <div key={cell.id} className="flex flex-col gap-0.5">
@@ -484,8 +582,8 @@ export default function AttackMatrix() {
                             tacticName: col.tactic.name,
                           })}
                           title={`${cell.id} · ${cell.name}`}
-                          className={`w-24 text-left px-1.5 py-1 rounded text-xs transition-colors cursor-pointer ${heatmapMode ? '' : CELL_COLORS[cell.status]} ${ringClass} ${dimClass}`}
-                          style={heatmapMode ? densityStyle(cellDensityRatio(cell)) : undefined}
+                          className={`w-24 text-left px-1.5 py-1 rounded text-xs transition-colors cursor-pointer ${hasTwoOverlay ? '' : (heatmapMode ? '' : CELL_COLORS[cell.status])} ${ringClass} ${dimClass}`}
+                          style={twoOverlayStyle ?? (heatmapMode ? densityStyle(cellDensityRatio(cell)) : undefined)}
                         >
                           <div className="font-mono text-xs opacity-75">{cell.id}</div>
                           <div className="truncate leading-tight">{cell.name}</div>
@@ -552,6 +650,9 @@ export default function AttackMatrix() {
             heatmapMode={heatmapMode}
             hasOverlay={hasOverlay}
             groupName={overlayCoverage?.name ?? null}
+            overlayMode={hasTwoOverlay}
+            groupAName={groups.find(g => g.id === overlayGroupA)?.name}
+            groupBName={groups.find(g => g.id === overlayGroupB)?.name}
           />
         </div>
 

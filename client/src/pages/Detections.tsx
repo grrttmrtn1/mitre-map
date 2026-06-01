@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
-import type { Detection, DetectionHistory, DetectionQualityScore, Technique } from '../types';
+import type { Detection, DetectionHistory, DetectionQualityScore, Tag, Technique } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import Modal from '../components/Modal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -28,6 +28,18 @@ const EMPTY_FORM = {
   status: 'active' as Detection['status'], severity: 'medium' as Detection['severity'],
   confidence: 'medium' as Detection['confidence'], false_positive_rate: 'medium', notes: '',
 };
+
+function getQualitySuggestions(detection: Detection, score: DetectionQualityScore | undefined): string[] {
+  if (!score || score.grade === 'A') return [];
+  const suggestions: string[] = [];
+  if (score.components.tests < 10) suggestions.push('No test results recorded — run an Atomic Red Team test and log the outcome.');
+  if (score.components.fp_rate === 0) suggestions.push('False positive rate is "high" — investigate tuning opportunities to reduce noise.');
+  if (score.components.severity < 15) suggestions.push('Severity is low — review whether this detection warrants a higher severity level.');
+  if (score.components.confidence < 15) suggestions.push('Confidence is low — add rule logic to improve precision.');
+  if (score.components.uniqueness === 0) suggestions.push('This technique is covered by many detections — check for redundancy or consolidate.');
+  if (!detection.last_reviewed_at) suggestions.push('Detection has never been reviewed — stamp a review date to keep quality scores current.');
+  return suggestions;
+}
 
 export default function Detections() {
   const { canWrite } = useAuth();
@@ -69,6 +81,16 @@ export default function Detections() {
   const [deleting, setDeleting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Task 1: Inline cell editing
+  const [editingCell, setEditingCell] = useState<{ id: number; field: string } | null>(null);
+  const [cellUpdating, setCellUpdating] = useState<{ id: number; field: string } | null>(null);
+
+  // Task 3: Bulk tag assignment
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [bulkTagOpen, setBulkTagOpen] = useState(false);
+  const [bulkTagSearch, setBulkTagSearch] = useState('');
+  const [bulkTagging, setBulkTagging] = useState(false);
+
   const load = () => api.getDetections({ status: filterStatus || undefined, severity: filterSeverity || undefined, source: filterSource || undefined })
     .then(setDetections).finally(() => setLoading(false));
 
@@ -78,6 +100,7 @@ export default function Detections() {
   useEffect(() => { load(); }, [filterStatus, filterSeverity, filterSource]);
   useEffect(() => { api.getTechniques(undefined, true).then(setTechniques); }, []);
   useEffect(() => { loadQuality(); }, []);
+  useEffect(() => { api.getTags().then(setTags).catch(() => {}); }, []);
 
   useEffect(() => {
     const prefillTechnique = searchParams.get('prefill_technique');
@@ -92,6 +115,38 @@ export default function Detections() {
       setModalOpen(true);
     }
   }, [searchParams]);
+
+  // Task 1: inline cell update handler
+  const updateCell = async (id: number, field: string, value: string) => {
+    setEditingCell(null);
+    setCellUpdating({ id, field });
+    try {
+      const updated = await api.updateDetection(id, { [field]: value } as Partial<Detection>);
+      setDetections(prev => prev.map(d => d.id === id ? updated : d));
+      if (selectedDetection?.id === id) setSelectedDetection(updated);
+      loadQuality();
+      toast.success('Updated');
+    } catch (e: any) {
+      toast.error(e.message ?? 'Update failed');
+    } finally {
+      setCellUpdating(null);
+    }
+  };
+
+  // Task 3: bulk tag assignment
+  const bulkAssignTag = async (tagId: number) => {
+    setBulkTagging(true);
+    try {
+      await Promise.all([...selectedIds].map(id => api.addEntityTag('detection', String(id), tagId)));
+      toast.success(`Tag assigned to ${selectedIds.size} detection${selectedIds.size !== 1 ? 's' : ''}`);
+      setBulkTagOpen(false);
+      setBulkTagSearch('');
+    } catch (e: any) {
+      toast.error(e.message ?? 'Tag assignment failed');
+    } finally {
+      setBulkTagging(false);
+    }
+  };
 
   const openCreate = () => { setEditDetection(null); setForm({ ...EMPTY_FORM }); setModalOpen(true); };
   const openEdit = (d: Detection, e?: React.MouseEvent) => {
@@ -406,6 +461,41 @@ export default function Detections() {
             <button onClick={bulkDelete} className="px-3 py-1 text-xs bg-red-600/80 text-white rounded hover:bg-red-600 transition-colors">
               Delete Selected
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setBulkTagOpen(v => !v)}
+                className="px-3 py-1 text-xs bg-purple-600/30 text-purple-400 border border-purple-500/30 rounded hover:bg-purple-600/40 transition-colors"
+              >
+                Tag ({selectedIds.size})
+              </button>
+              {bulkTagOpen && (
+                <div className="absolute left-0 top-7 z-30 w-52 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg shadow-xl p-2">
+                  <input
+                    autoFocus
+                    value={bulkTagSearch}
+                    onChange={e => setBulkTagSearch(e.target.value)}
+                    placeholder="Search tags..."
+                    className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded mb-1.5 text-gray-800 dark:text-slate-200 focus:outline-none"
+                  />
+                  <div className="max-h-40 overflow-y-auto space-y-0.5">
+                    {tags.filter(t => !bulkTagSearch || t.name.toLowerCase().includes(bulkTagSearch.toLowerCase())).map(tag => (
+                      <button
+                        key={tag.id}
+                        onClick={() => bulkAssignTag(tag.id)}
+                        disabled={bulkTagging}
+                        className="w-full text-left px-2 py-1 text-xs rounded hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                        <span className="text-gray-700 dark:text-slate-300 truncate">{tag.name}</span>
+                      </button>
+                    ))}
+                    {tags.filter(t => !bulkTagSearch || t.name.toLowerCase().includes(bulkTagSearch.toLowerCase())).length === 0 && (
+                      <div className="text-xs text-gray-400 dark:text-slate-500 px-2 py-1">No tags found</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 ml-1">Clear</button>
           </div>
         )}
@@ -453,8 +543,46 @@ export default function Detections() {
                         </div>}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap mt-2">
-                        <StatusBadge value={d.status} variant="detection_status" />
-                        <StatusBadge value={d.severity} variant="severity" />
+                        {canWrite && editingCell?.id === d.id && editingCell.field === 'status' ? (
+                          <select
+                            autoFocus
+                            defaultValue={d.status}
+                            onBlur={e => updateCell(d.id, 'status', e.target.value)}
+                            onChange={e => updateCell(d.id, 'status', e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-slate-800 border border-blue-500 rounded focus:outline-none text-gray-700 dark:text-slate-300"
+                          >
+                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        ) : (
+                          <span
+                            onClick={e => { if (canWrite) { e.stopPropagation(); setEditingCell({ id: d.id, field: 'status' }); } }}
+                            className={canWrite ? 'cursor-pointer hover:opacity-80' : ''}
+                            title={canWrite ? 'Click to edit status' : undefined}
+                          >
+                            <StatusBadge value={cellUpdating?.id === d.id && cellUpdating.field === 'status' ? d.status : d.status} variant="detection_status" />
+                          </span>
+                        )}
+                        {canWrite && editingCell?.id === d.id && editingCell.field === 'severity' ? (
+                          <select
+                            autoFocus
+                            defaultValue={d.severity}
+                            onBlur={e => updateCell(d.id, 'severity', e.target.value)}
+                            onChange={e => updateCell(d.id, 'severity', e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-slate-800 border border-blue-500 rounded focus:outline-none text-gray-700 dark:text-slate-300"
+                          >
+                            {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        ) : (
+                          <span
+                            onClick={e => { if (canWrite) { e.stopPropagation(); setEditingCell({ id: d.id, field: 'severity' }); } }}
+                            className={canWrite ? 'cursor-pointer hover:opacity-80' : ''}
+                            title={canWrite ? 'Click to edit severity' : undefined}
+                          >
+                            <StatusBadge value={d.severity} variant="severity" />
+                          </span>
+                        )}
                         {qualityScores.get(d.id) && (() => {
                           const qs = qualityScores.get(d.id)!;
                           return (
@@ -567,6 +695,23 @@ export default function Detections() {
                       </div>
                     ))}
                   </div>
+                  {(() => {
+                    const suggestions = getQualitySuggestions(selectedDetection, qs);
+                    if (suggestions.length === 0) return null;
+                    return (
+                      <div className="mt-2 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                        <div className="text-xs font-semibold text-amber-400 mb-1.5">Improvement suggestions</div>
+                        <ul className="space-y-1">
+                          {suggestions.map((s, i) => (
+                            <li key={i} className="text-xs text-amber-300/80 flex items-start gap-1.5">
+                              <span className="text-amber-500 mt-0.5 flex-shrink-0">•</span>
+                              <span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}

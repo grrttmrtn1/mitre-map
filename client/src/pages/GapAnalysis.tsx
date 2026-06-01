@@ -21,6 +21,18 @@ const STATUS_BADGE: Record<string, string> = {
 
 type View = 'gaps' | 'covered';
 
+interface FilterPreset { name: string; search: string; filterTactic: string; sortBy: string; }
+
+const COLUMN_IDS = ['tactics', 'd3fend', 'mitigations', 'threat_groups', 'data_sources'] as const;
+type ColumnId = typeof COLUMN_IDS[number];
+const COLUMN_LABELS: Record<ColumnId, string> = {
+  tactics: 'Tactics',
+  d3fend: 'D3FEND Countermeasures',
+  mitigations: 'ATT&CK Mitigations',
+  threat_groups: 'Threat Groups',
+  data_sources: 'Data Sources',
+};
+
 function PriorityBar({ score, components }: { score: number; components: GapTechnique['priority_components'] }) {
   const level = score >= 70 ? 'critical' : score >= 45 ? 'high' : score >= 20 ? 'medium' : 'low';
   const colors = { critical: 'text-red-400 bg-red-500/15 border-red-500/30', high: 'text-orange-400 bg-orange-500/15 border-orange-500/30', medium: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30', low: 'text-gray-500 dark:text-slate-400 bg-gray-200 dark:bg-slate-700 border-gray-400 dark:border-slate-600' };
@@ -59,6 +71,26 @@ export default function GapAnalysis() {
   const [savingAssign, setSavingAssign] = useState(false);
   const [cveSummary, setCveSummary] = useState<Map<string, CveGapSummary>>(new Map());
 
+  // Task 6: saved filter presets
+  const [presets, setPresets] = useState<FilterPreset[]>(
+    () => JSON.parse(localStorage.getItem('gap_filter_presets') ?? '[]')
+  );
+  const [presetName, setPresetName] = useState('');
+  const [presetSaveOpen, setPresetSaveOpen] = useState(false);
+
+  // Task 7: column visibility
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnId>>(
+    () => {
+      const stored = localStorage.getItem('gap_visible_columns');
+      if (stored) {
+        try { return new Set(JSON.parse(stored) as ColumnId[]); }
+        catch { /* fallthrough */ }
+      }
+      return new Set(COLUMN_IDS);
+    }
+  );
+  const [colPickerOpen, setColPickerOpen] = useState(false);
+
   useEffect(() => {
     Promise.all([api.getCoverageGaps(), api.getCoveredTechniques(), api.getSetting('org_sector')])
       .then(([g, c, s]) => { setGaps(g); setCovered(c); setOrgSector(s.value ?? ''); })
@@ -75,6 +107,39 @@ export default function GapAnalysis() {
     await api.setSetting('org_sector', val || null).finally(() => setSavingSector(false));
     // Reload gaps so priority scores reflect new sector
     api.getCoverageGaps().then(setGaps);
+  };
+
+  // Task 6: preset helpers
+  const savePreset = () => {
+    if (!presetName.trim()) return;
+    const next = [...presets, { name: presetName.trim(), search, filterTactic, sortBy }];
+    setPresets(next);
+    localStorage.setItem('gap_filter_presets', JSON.stringify(next));
+    setPresetName('');
+    setPresetSaveOpen(false);
+    toast.success('Filter preset saved');
+  };
+
+  const deletePreset = (idx: number) => {
+    const next = presets.filter((_, i) => i !== idx);
+    setPresets(next);
+    localStorage.setItem('gap_filter_presets', JSON.stringify(next));
+  };
+
+  const applyPreset = (p: FilterPreset) => {
+    setSearch(p.search);
+    setFilterTactic(p.filterTactic);
+    setSortBy(p.sortBy as typeof sortBy);
+  };
+
+  // Task 7: column visibility helpers
+  const toggleColumn = (col: ColumnId) => {
+    setVisibleColumns(prev => {
+      const next = new Set(prev);
+      next.has(col) ? next.delete(col) : next.add(col);
+      localStorage.setItem('gap_visible_columns', JSON.stringify([...next]));
+      return next;
+    });
   };
 
   function createDetectionFromGap(techniqueId: string, techniqueName: string) {
@@ -215,6 +280,19 @@ export default function GapAnalysis() {
           </button>
         </div>
 
+        {/* Task 6: preset chips */}
+        {presets.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            <span className="text-xs text-gray-400 dark:text-slate-500">Presets:</span>
+            {presets.map((p, i) => (
+              <span key={i} className="flex items-center gap-0.5 px-2 py-0.5 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded text-xs text-gray-600 dark:text-slate-300">
+                <button onClick={() => applyPreset(p)} className="hover:text-blue-400 transition-colors">{p.name}</button>
+                <button onClick={() => deletePreset(i)} className="ml-1 text-gray-400 dark:text-slate-500 hover:text-red-400 transition-colors">×</button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-3 mt-3">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search techniques..."
             className="flex-1 px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500" />
@@ -239,6 +317,54 @@ export default function GapAnalysis() {
               <option value="tools">Sort: Tools</option>
             </select>
           )}
+          {/* Task 6: save preset button */}
+          <div className="relative">
+            <button
+              onClick={() => setPresetSaveOpen(v => !v)}
+              className="px-2.5 py-1.5 text-xs bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 transition-colors"
+              title="Save current filters as preset"
+            >
+              + Save preset
+            </button>
+            {presetSaveOpen && (
+              <div className="absolute right-0 top-9 z-30 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg p-2 shadow-xl flex gap-2 w-52">
+                <input
+                  autoFocus
+                  value={presetName}
+                  onChange={e => setPresetName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') savePreset(); if (e.key === 'Escape') setPresetSaveOpen(false); }}
+                  placeholder="Preset name..."
+                  className="flex-1 px-2 py-1 text-xs bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded text-gray-800 dark:text-slate-200 focus:outline-none"
+                />
+                <button onClick={savePreset} className="px-2 py-1 text-xs bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-600/40">Save</button>
+              </div>
+            )}
+          </div>
+          {/* Task 7: column visibility */}
+          <div className="relative">
+            <button
+              onClick={() => setColPickerOpen(v => !v)}
+              className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${colPickerOpen ? 'bg-blue-600/20 border-blue-500/40 text-blue-400' : 'bg-gray-100 dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200'}`}
+              title="Toggle column visibility"
+            >
+              &#9881; Columns
+            </button>
+            {colPickerOpen && (
+              <div className="absolute right-0 top-9 z-30 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg p-2 shadow-xl w-52">
+                {COLUMN_IDS.map(col => (
+                  <label key={col} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-gray-200 dark:hover:bg-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns.has(col)}
+                      onChange={() => toggleColumn(col)}
+                      className="accent-blue-500"
+                    />
+                    <span className="text-xs text-gray-700 dark:text-slate-300">{COLUMN_LABELS[col]}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         {view === 'gaps' && (
           <div className="flex items-center gap-2 mt-2">
@@ -370,57 +496,65 @@ export default function GapAnalysis() {
 
                 {expanded === g.id && (
                   <div className="border-t border-gray-200 dark:border-slate-800 px-4 py-4 grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Recommended D3FEND Countermeasures</div>
-                      {g.recommended_d3fend.length === 0 ? (
-                        <div className="text-xs text-gray-400 dark:text-slate-500 italic">No D3FEND mappings available.</div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {g.recommended_d3fend.map(d => (
-                            <div key={d.id} className="flex items-center gap-2">
-                              <span className={`px-1.5 py-0.5 rounded border text-xs font-medium ${D3FEND_CATEGORY_COLORS[d.category] ?? 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border-gray-400 dark:border-slate-600'}`}>
-                                {d.category}
-                              </span>
-                              <span className="font-mono text-xs text-gray-400 dark:text-slate-500">{d.id}</span>
-                              <span className="text-xs text-gray-700 dark:text-slate-300">{d.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    {visibleColumns.has('d3fend') && (
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Recommended D3FEND Countermeasures</div>
+                        {g.recommended_d3fend.length === 0 ? (
+                          <div className="text-xs text-gray-400 dark:text-slate-500 italic">No D3FEND mappings available.</div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {g.recommended_d3fend.map(d => (
+                              <div key={d.id} className="flex items-center gap-2">
+                                <span className={`px-1.5 py-0.5 rounded border text-xs font-medium ${D3FEND_CATEGORY_COLORS[d.category] ?? 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400 border-gray-400 dark:border-slate-600'}`}>
+                                  {d.category}
+                                </span>
+                                <span className="font-mono text-xs text-gray-400 dark:text-slate-500">{d.id}</span>
+                                <span className="text-xs text-gray-700 dark:text-slate-300">{d.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                    <div>
-                      <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Recommended ATT&CK Mitigations</div>
-                      {g.recommended_mitigations.length === 0 ? (
-                        <div className="text-xs text-gray-400 dark:text-slate-500 italic">No mitigations available.</div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {g.recommended_mitigations.map(m => (
-                            <div key={m.id} className="flex items-start gap-2">
-                              <span className="font-mono text-xs text-purple-400 w-12 flex-shrink-0">{m.id}</span>
-                              <span className="text-xs text-gray-700 dark:text-slate-300">{m.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    {visibleColumns.has('mitigations') && (
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Recommended ATT&CK Mitigations</div>
+                        {g.recommended_mitigations.length === 0 ? (
+                          <div className="text-xs text-gray-400 dark:text-slate-500 italic">No mitigations available.</div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {g.recommended_mitigations.map(m => (
+                              <div key={m.id} className="flex items-start gap-2">
+                                <span className="font-mono text-xs text-purple-400 w-12 flex-shrink-0">{m.id}</span>
+                                <span className="text-xs text-gray-700 dark:text-slate-300">{m.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {g.priority_components && (
                       <div className="col-span-2 bg-gray-100/50 dark:bg-slate-800/50 rounded-lg p-3">
                         <div className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">Priority Score: <span className="text-gray-800 dark:text-slate-200">{g.priority_score}/100</span></div>
                         <div className="grid grid-cols-4 gap-2 text-xs">
-                          <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
-                            <div className="text-amber-400 font-bold text-base">{g.priority_components.group}</div>
-                            <div className="text-gray-400 dark:text-slate-500 mt-0.5">Threat groups<br/><span className="text-gray-400 dark:text-slate-600">/40</span></div>
-                          </div>
+                          {visibleColumns.has('threat_groups') && (
+                            <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
+                              <div className="text-amber-400 font-bold text-base">{g.priority_components.group}</div>
+                              <div className="text-gray-400 dark:text-slate-500 mt-0.5">Threat groups<br/><span className="text-gray-400 dark:text-slate-600">/40</span></div>
+                            </div>
+                          )}
                           <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
                             <div className="text-sky-400 font-bold text-base">{g.priority_components.industry}</div>
                             <div className="text-gray-400 dark:text-slate-500 mt-0.5">Industry targeting<br/><span className="text-gray-400 dark:text-slate-600">/30</span></div>
                           </div>
-                          <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
-                            <div className="text-emerald-400 font-bold text-base">{g.priority_components.data_sources}</div>
-                            <div className="text-gray-400 dark:text-slate-500 mt-0.5">Data readiness<br/><span className="text-gray-400 dark:text-slate-600">/20</span></div>
-                          </div>
+                          {visibleColumns.has('data_sources') && (
+                            <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
+                              <div className="text-emerald-400 font-bold text-base">{g.priority_components.data_sources}</div>
+                              <div className="text-gray-400 dark:text-slate-500 mt-0.5">Data readiness<br/><span className="text-gray-400 dark:text-slate-600">/20</span></div>
+                            </div>
+                          )}
                           <div className="bg-gray-50 dark:bg-slate-900 rounded p-2 text-center">
                             <div className="text-purple-400 font-bold text-base">{g.priority_components.mitigation_guidance}</div>
                             <div className="text-gray-400 dark:text-slate-500 mt-0.5">Mit. guidance<br/><span className="text-gray-400 dark:text-slate-600">/10</span></div>
@@ -430,11 +564,13 @@ export default function GapAnalysis() {
                     )}
 
                     <div className="col-span-2 pt-2 border-t border-gray-200 dark:border-slate-800 flex items-center justify-between">
-                      <div className="flex gap-2">
-                        {g.tactic_names.map(t => (
-                          <span key={t} className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded text-xs">{t}</span>
-                        ))}
-                      </div>
+                      {visibleColumns.has('tactics') && (
+                        <div className="flex gap-2">
+                          {g.tactic_names.map(t => (
+                            <span key={t} className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 rounded text-xs">{t}</span>
+                          ))}
+                        </div>
+                      )}
                       <a href={`https://attack.mitre.org/techniques/${g.id}/`} target="_blank" rel="noreferrer"
                         className="text-xs text-blue-400 hover:text-blue-300">
                         View on MITRE ATT&CK ↗
