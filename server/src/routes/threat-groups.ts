@@ -34,6 +34,36 @@ router.post('/', async (req, res) => {
   res.status(201).json({ ...group, aliases: JSON.parse(group.aliases), targeted_sectors: JSON.parse(group.targeted_sectors ?? '[]') });
 });
 
+router.get('/mitre-catalogue', async (_req, res) => {
+  try {
+    const ghRes = await fetch(GITHUB_RELEASES_API, { headers: GH_HEADERS });
+    if (!ghRes.ok) return res.status(502).json({ error: 'Failed to reach GitHub releases API' });
+    const release = await ghRes.json() as any;
+    const tag: string = release.tag_name;
+    const version = tag.replace(/^(?:ATT&CK-v|v)/, '');
+    const stixUrl = `https://raw.githubusercontent.com/mitre-attack/attack-stix-data/${encodeURIComponent(tag)}/enterprise-attack/enterprise-attack-${version}.json`;
+    const stixRes = await fetch(stixUrl, { headers: { 'User-Agent': 'mitremap/1.0' } });
+    if (!stixRes.ok) return res.status(502).json({ error: 'Failed to fetch ATT&CK STIX bundle' });
+    const bundle = await stixRes.json() as any;
+    const groups = (bundle.objects ?? [])
+      .filter((o: any) => o.type === 'intrusion-set')
+      .map((g: any) => {
+        const mitreRef = (g.external_references ?? []).find((r: any) => r.source_name === 'mitre-attack');
+        return {
+          id: mitreRef?.external_id ?? g.id,
+          name: g.name,
+          aliases: g.aliases ?? [],
+          description: g.description ?? null,
+          url: mitreRef?.url ?? null,
+        };
+      })
+      .filter((g: any) => g.id.startsWith('G'));
+    res.json(groups);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   const db = getKnex();
   const group = await rawGet<any>(db, 'SELECT * FROM threat_groups WHERE id=?', [req.params.id]);
@@ -174,36 +204,6 @@ router.get('/:id/exposure', async (req, res) => {
     return { ...t, tactic_ids: JSON.parse(t.tactic_ids), detected: dCount > 0, mitigated: mCount > 0, exposed: dCount === 0 && mCount === 0 };
   }));
   res.json({ group_id: req.params.id, techniques: result, exposed_count: result.filter(t => t.exposed).length, total: result.length });
-});
-
-router.get('/mitre-catalogue', async (_req, res) => {
-  try {
-    const ghRes = await fetch(GITHUB_RELEASES_API, { headers: GH_HEADERS });
-    if (!ghRes.ok) return res.status(502).json({ error: 'Failed to reach GitHub releases API' });
-    const release = await ghRes.json() as any;
-    const tag: string = release.tag_name;
-    const version = tag.replace(/^(?:ATT&CK-v|v)/, '');
-    const stixUrl = `https://raw.githubusercontent.com/mitre-attack/attack-stix-data/${encodeURIComponent(tag)}/enterprise-attack/enterprise-attack-${version}.json`;
-    const stixRes = await fetch(stixUrl, { headers: { 'User-Agent': 'mitremap/1.0' } });
-    if (!stixRes.ok) return res.status(502).json({ error: 'Failed to fetch ATT&CK STIX bundle' });
-    const bundle = await stixRes.json() as any;
-    const groups = (bundle.objects ?? [])
-      .filter((o: any) => o.type === 'intrusion-set')
-      .map((g: any) => {
-        const mitreRef = (g.external_references ?? []).find((r: any) => r.source_name === 'mitre-attack');
-        return {
-          id: mitreRef?.external_id ?? g.id,
-          name: g.name,
-          aliases: g.aliases ?? [],
-          description: g.description ?? null,
-          url: mitreRef?.url ?? null,
-        };
-      })
-      .filter((g: any) => g.id.startsWith('G'));
-    res.json(groups);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
 });
 
 export default router;

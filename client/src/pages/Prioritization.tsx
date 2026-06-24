@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { PrioritizationItem, PrioritizationQueue, DataReadinessStatus } from '../types';
+import type { PrioritizationItem, PrioritizationQueue, DataReadinessStatus, TicketingConfig } from '../types';
 import { SkeletonRow } from '../components/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -70,17 +70,21 @@ function ActionBadge({ action }: { action: PrioritizationItem['action'] }) {
   );
 }
 
-function QueueCard({ item, expanded, onToggle }: {
+function QueueCard({ item, expanded, onToggle, ticketingConfigs }: {
   item: PrioritizationItem;
   expanded: boolean;
   onToggle: () => void;
+  ticketingConfigs: TicketingConfig[];
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [assigningSelf, setAssigningSelf] = useState(false);
+  const [creatingTicket, setCreatingTicket] = useState(false);
+  const [acceptingRisk, setAcceptingRisk] = useState(false);
   const sectorGroups = item.groups.filter(g => g.in_sector);
   const otherGroups = item.groups.filter(g => !g.in_sector);
+  const enabledTicketing = ticketingConfigs.filter(c => c.enabled !== 0);
 
   async function assignToSelf(e: React.MouseEvent) {
     e.stopPropagation();
@@ -100,6 +104,72 @@ function QueueCard({ item, expanded, onToggle }: {
     } finally {
       setAssigningSelf(false);
     }
+  }
+
+  async function acceptRisk(e: React.MouseEvent) {
+    e.stopPropagation();
+    const assignee = user?.name ?? user?.email ?? 'risk-owner';
+    setAcceptingRisk(true);
+    try {
+      await api.createAssignment({
+        entity_type: 'technique',
+        entity_id: item.technique_id,
+        assignee,
+        status: 'wont_fix',
+        priority: 'low',
+        due_date: null,
+        notes: `Accepted risk from Priority Queue. Score ${item.priority_score}/100; ${item.group_count} threat group(s); data readiness: ${item.data_readiness.status}.`,
+      });
+      toast.success('Risk acceptance recorded');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setAcceptingRisk(false);
+    }
+  }
+
+  async function createTicket(e: React.MouseEvent) {
+    e.stopPropagation();
+    const config = enabledTicketing[0];
+    if (!config) {
+      toast.error('Configure a ticketing integration first.');
+      return;
+    }
+    setCreatingTicket(true);
+    try {
+      const sectorText = sectorGroups.length
+        ? `\nIn-sector groups: ${sectorGroups.map(g => g.name).join(', ')}`
+        : '';
+      const result = await api.createTicket(config.id, {
+        summary: `[MitreMap] Build detection for ${item.technique_id} ${item.technique_name}`,
+        priority: item.priority_score >= 70 ? 'high' : item.priority_score >= 40 ? 'medium' : 'low',
+        description: [
+          `Technique: ${item.technique_id} ${item.technique_name}`,
+          `Priority score: ${item.priority_score}/100`,
+          `Coverage status: ${item.coverage_status}`,
+          `Recommended action: ${item.action === 'build_detection' ? 'Build detection' : 'Add detection'}`,
+          `Threat groups: ${item.groups.map(g => g.name).join(', ') || 'none'}`,
+          `Data readiness: ${item.data_readiness.status} (${item.data_readiness.available}/${item.data_readiness.required} sources collecting)`,
+          `Available sources: ${item.available_sources.join(', ') || 'none'}`,
+          `Missing sources: ${item.missing_sources.join(', ') || 'none'}`,
+          `Compliance mappings: ${item.compliance_count}`,
+          sectorText.trim(),
+        ].filter(Boolean).join('\n'),
+      });
+      toast.success(result.url ? `Ticket created: ${result.ticket_id}` : 'Ticket created');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setCreatingTicket(false);
+    }
+  }
+
+  function openPrefilledDetection() {
+    const params = new URLSearchParams({
+      prefill_technique: item.technique_id,
+      prefill_name: `${item.technique_id} ${item.technique_name}`,
+    });
+    navigate(`/detections?${params.toString()}`);
   }
 
   return (
@@ -279,10 +349,25 @@ function QueueCard({ item, expanded, onToggle }: {
 
             <div className="flex flex-col gap-2">
               <button
-                onClick={() => navigate('/detections')}
+                onClick={openPrefilledDetection}
                 className="w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 transition-colors text-left"
               >
                 → Create detection for {item.technique_id}
+              </button>
+              <button
+                onClick={createTicket}
+                disabled={creatingTicket || enabledTicketing.length === 0}
+                className="w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600/15 hover:bg-indigo-600/25 text-indigo-400 border border-indigo-500/30 transition-colors text-left disabled:opacity-50"
+                title={enabledTicketing.length === 0 ? 'Configure ticketing under Integrations first' : `Create ticket in ${enabledTicketing[0].name}`}
+              >
+                {creatingTicket ? 'Creating ticket...' : enabledTicketing.length === 0 ? 'Ticketing not configured' : `Create ticket in ${enabledTicketing[0].name}`}
+              </button>
+              <button
+                onClick={acceptRisk}
+                disabled={acceptingRisk}
+                className="w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-200 dark:bg-slate-800 hover:bg-gray-300 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 border border-gray-300 dark:border-slate-700 transition-colors text-left disabled:opacity-50"
+              >
+                {acceptingRisk ? 'Recording...' : 'Record accepted risk'}
               </button>
               <a
                 href={`https://attack.mitre.org/techniques/${item.technique_id}/`}
@@ -310,6 +395,7 @@ export default function Prioritization() {
   const [filterData, setFilterData] = useState('');
   const [orgSector, setOrgSector] = useState('');
   const [savingSector, setSavingSector] = useState(false);
+  const [ticketingConfigs, setTicketingConfigs] = useState<TicketingConfig[]>([]);
 
   const load = () => {
     setLoading(true);
@@ -320,6 +406,9 @@ export default function Prioritization() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    api.getTicketingConfigs().then(setTicketingConfigs).catch(() => setTicketingConfigs([]));
+  }, []);
 
   const saveSector = async (val: string) => {
     setSavingSector(true);
@@ -464,6 +553,7 @@ export default function Prioritization() {
               item={item}
               expanded={expanded === item.technique_id}
               onToggle={() => setExpanded(expanded === item.technique_id ? null : item.technique_id)}
+              ticketingConfigs={ticketingConfigs}
             />
           ))
         )}

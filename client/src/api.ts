@@ -506,6 +506,8 @@ export const api = {
   updateTicketingConfig: (id: number, data: Partial<{ name: string; base_url: string; credentials: Record<string, string>; default_project: string; enabled: boolean }>) =>
     put<TicketingConfig>(`/integrations/ticketing/${id}`, data),
   deleteTicketingConfig: (id: number) => del(`/integrations/ticketing/${id}`),
+  createTicket: (id: number, data: { summary: string; description: string; priority?: string }) =>
+    post<{ ticket_id: string; url?: string; message?: string }>(`/integrations/ticketing/${id}/create-ticket`, data),
 
   // Report schedules
   getReportSchedules: () => get<ReportSchedule[]>('/report-schedules'),

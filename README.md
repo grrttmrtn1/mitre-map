@@ -63,23 +63,36 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **Full CRUD** — create, edit, and delete threat groups; assign any subset of ATT&CK techniques with an inline searchable picker
 - **Procedures per TTP** — record specific observed behaviors for each technique a group uses: command lines, scripts, artifact paths, prose descriptions, or reference links. Each procedure is typed, color-coded, and editable inline within the detail pane.
 - **Industry sector targeting** — tag each threat group with the industry sectors it targets (stored as a JSON array)
+- **Campaign tracking** — record named campaigns per threat group with dates, source URL, description, and campaign-specific technique scope
+- **Indicator tracking** — record IOCs (`ip`, `domain`, `hash`, `url`, `email`) per group or technique, set confidence, and export indicators as STIX 2.1
 - Per-group detection coverage with technique-level status (detected / exposed)
 - Exposure percentage and risk level per group
-- Split-panel detail view with full technique and procedure breakdown
+- Split-panel detail view with coverage, techniques, procedures, campaigns, and IOCs
 
 ### Risk Scoring
 - **Overall risk score (0–100)** — weighted by coverage gap, exposed threat groups, and high-group-overlap techniques
 - Risk score by tactic — bar chart identifies highest-exposure kill-chain phases
 - Risk score by technique — sortable table for heat-map prioritization
 
+### Priority Queue
+- **Ranked detection backlog** — uncovered and mitigated-only techniques used by tracked threat groups are scored by industry targeting, total threat-group usage, data-source readiness, compliance impact, and gap severity
+- **Operational actions** — assign a technique to yourself, open a prefilled detection form, create a Jira/ServiceNow ticket, or record accepted risk directly from a queue item
+- **Data readiness context** — shows available and missing ATT&CK data sources for each queued technique so teams know whether to build a rule or fix collection first
+- **Sector weighting** — set your organization sector to boost techniques used by threat groups targeting your vertical
+
 ### Compliance Mapping
 - **NIST CSF 2.0** — all 6 functions (GV / ID / PR / DE / RS / RC) with control-level coverage
 - **CIS Controls v8** — 18 controls mapped to ATT&CK techniques
+- **Additional frameworks** — ISO 27001:2022, PCI DSS v4, and SOC 2 Trust Services Criteria mappings
 - Gap report per framework — shows which controls have no active detection coverage
+- **Compliance trends** — point-in-time snapshots track framework coverage over time
+- **Auditor exports** — export per-framework gap CSVs with mapped ATT&CK techniques
 
 ### Reports & Exports
 
 **Report Builder** — compose custom executive and operational reports from modular sections (coverage summary, risk score, gap table, threat landscape, tactic breakdown, compliance gaps) and export to PDF or copy as markdown.
+
+**Scheduled delivery** — schedule executive, trend, threat, gap, or compliance reports by cron expression with recipient lists and last-run status tracking.
 
 | Export | Format | Endpoint |
 |---|---|---|
@@ -87,6 +100,7 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 | Detections | CSV | `GET /api/exports/detections/csv` |
 | Security tools | CSV | `GET /api/exports/tools/csv` |
 | Coverage matrix | JSON | `GET /api/exports/coverage/json` |
+| Executive report deck | PPTX | `GET /api/exports/report/pptx` |
 | Executive summary | JSON API | `GET /api/reports/executive` |
 | Threat landscape | JSON API | `GET /api/reports/threat-landscape` |
 | Prioritized gaps | JSON API | `GET /api/reports/gaps` |
@@ -97,6 +111,8 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **One-click update** — fetches the latest enterprise STIX bundle from the official MITRE repo and upserts all tactics, techniques, mitigations, and relationships in a single transaction; optionally target a specific version
 - **Deprecated technique tracking** — techniques removed or revoked by an update are recorded in `deprecated_techniques` with a superseded-by pointer when available
 - **Migration scan** — scans all your detections for references to deprecated technique IDs and lists which detections need updating
+- **Preview and approval queue** — preview added, removed, and renamed techniques before applying; scheduled update checks can stage batches for review or auto-apply
+- **Detection migration** — admin-only migration updates detections from deprecated technique IDs to known superseding IDs and logs the bulk change
 
 ### Atomic Red Team & Custom Tests
 - **ART test library** — browse imported Atomic Red Team tests grouped by technique; each test shows name, GUID, platform, executor type, and the generated command
@@ -137,6 +153,12 @@ Ingest external threat intelligence from any TAXII 2.1 server directly into Mitr
 - **Webhook configs** — register outbound HTTP endpoints with an optional HMAC secret for payload signing and arbitrary custom headers; test connectivity with a single click
 - **Alert rules** — attach rules to webhook configs with three trigger types: `coverage_threshold` (fires when overall coverage drops below a set percentage), `detection_validation_failed`, and `new_uncovered_group_technique`
 - Alerts fire automatically after detection changes, coverage recalculations, and exercise test runs
+
+### Detection Engineering Integrations
+- **SIEM connectors** — configure Microsoft Sentinel, Splunk, Elastic Security, CrowdStrike Falcon, IBM QRadar, or Google Chronicle with encrypted credentials
+- **Rule push / pull** — push SIGMA-backed detections into SIEM platforms, pull rule status, test connections, and inspect recent sync logs
+- **GitHub rule sync** — pull SIGMA/YAML rules from configured GitHub repositories and stage them for import
+- **Ticketing** — configure Jira or ServiceNow and create tickets from detection gaps or Priority Queue items
 
 ### Application Settings
 - Key-value settings store accessible via API (`GET/PUT/DELETE /api/settings/:key`)
@@ -476,6 +498,14 @@ Authorization: Bearer <raw-key>
 | `POST` | `/api/attack/apply-update` | Fetch and apply ATT&CK STIX update `{ version? }` (admin) |
 | `GET` | `/api/attack/deprecated` | List deprecated / revoked techniques |
 | `GET` | `/api/attack/migration-scan` | Detections referencing deprecated technique IDs |
+| `GET` | `/api/attack/preview-update` | Preview added / removed / renamed techniques before applying an update |
+| `POST` | `/api/attack/migrate-detections` | Auto-migrate deprecated detection technique IDs when a superseding ID exists |
+| `GET/PUT` | `/api/attack/update-settings` | View / configure scheduled ATT&CK update checks |
+| `POST` | `/api/attack/check-now` | Start an asynchronous update check |
+| `GET` | `/api/attack/update-batches` | List staged ATT&CK update batches |
+| `GET` | `/api/attack/update-batches/:batch_id` | Batch detail with item-level change data |
+| `POST` | `/api/attack/update-batches/:batch_id/approve` | Approve an entire ATT&CK update batch |
+| `POST` | `/api/attack/update-batches/:batch_id/reject` | Reject an entire ATT&CK update batch |
 
 ### Detections
 
@@ -510,6 +540,9 @@ Authorization: Bearer <raw-key>
 | `GET` | `/api/coverage/stats` | KPIs and per-tactic breakdown |
 | `GET` | `/api/coverage/matrix` | Full ATT&CK matrix with per-cell status |
 | `GET` | `/api/coverage/gaps` | Gap techniques with D3FEND / mitigation recommendations |
+| `GET` | `/api/coverage/covered` | Techniques covered by active detections or active-tool-backed mitigations |
+| `GET` | `/api/coverage/attribution` | Coverage attribution log with filters and pagination |
+| `GET` | `/api/prioritization/queue` | Ranked detection backlog with scoring components and recommended actions |
 | `GET` | `/api/risk/score` | Overall risk score with component breakdown |
 | `GET` | `/api/risk/by-tactic` | Risk score per tactic |
 | `GET` | `/api/risk/by-technique` | Risk score per technique |
@@ -530,6 +563,7 @@ Authorization: Bearer <raw-key>
 | `POST` | `/api/threat-groups/:id/techniques/:technique_id/procedures` | Add a procedure `{ type, content, source? }` |
 | `PUT` | `/api/threat-groups/:id/procedures/:proc_id` | Update procedure fields |
 | `DELETE` | `/api/threat-groups/:id/procedures/:proc_id` | Delete procedure |
+| `GET` | `/api/threat-groups/mitre-catalogue` | Searchable MITRE group catalogue for enrichment/import workflows |
 
 **Procedure types:** `command` · `script` · `description` · `artifact` · `reference`
 
@@ -540,6 +574,18 @@ Authorization: Bearer <raw-key>
   "source": "FireEye UNC2452 Report, Dec 2020"
 }
 ```
+
+### Campaigns & Indicators
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/campaigns?group_id=` | List campaigns for a threat group |
+| `POST` | `/api/campaigns` | Create campaign `{ group_id, name, description?, start_date?, end_date?, source_url?, technique_ids? }` |
+| `PUT/DELETE` | `/api/campaigns/:id` | Update / delete campaign |
+| `GET` | `/api/indicators` | List indicators, filterable by `group_id` or `technique_id` |
+| `POST` | `/api/indicators` | Create IOC `{ type, value, group_id?, technique_id?, confidence?, notes? }` |
+| `PUT/DELETE` | `/api/indicators/:id` | Update / delete IOC |
+| `GET` | `/api/indicators/export/stix` | Export indicators as STIX 2.1 JSON |
 
 ### API Keys
 
@@ -575,7 +621,10 @@ Authorization: Bearer <raw-key>
 |---|---|---|
 | `GET` | `/api/compliance/frameworks` | Frameworks with coverage % |
 | `GET` | `/api/compliance/frameworks/:id` | Framework detail with per-control coverage |
+| `GET` | `/api/compliance/controls?framework_id=` | List controls, optionally filtered by framework |
 | `GET` | `/api/compliance/gap?framework_id=` | Controls with no detection coverage |
+| `GET` | `/api/compliance/snapshots?framework_id=` | Framework coverage snapshots |
+| `GET` | `/api/compliance/export/:framework_id` | CSV export of controls with no detection coverage |
 
 ### Collaboration
 
@@ -588,8 +637,10 @@ Authorization: Bearer <raw-key>
 | `GET/POST` | `/api/comments/:type/:id` | List / add comments |
 | `PUT/DELETE` | `/api/comments/:id` | Edit / delete comment |
 | `GET/POST` | `/api/assignments` | List / create assignments |
+| `GET` | `/api/assignments/:type/:id` | Assignments for one entity |
 | `PUT/DELETE` | `/api/assignments/:id` | Update / delete assignment |
 | `GET` | `/api/audit` | Audit log (filter: `entity_type`, `entity_id`, `actor`, `action`) |
+| `GET` | `/api/audit/:type/:id` | Audit log for one entity |
 
 ### Atomic Red Team & Custom Tests
 
@@ -700,6 +751,30 @@ Authorization: Bearer <raw-key>
 
 `threshold` (float, 0–100) is required when `type` is `coverage_threshold` and specifies the minimum coverage percentage below which the webhook fires.
 
+### Detection Engineering Integrations
+
+| Method | Path | Description |
+|---|---|---|
+| `GET/POST` | `/api/integrations/siem` | List / create SIEM integrations (`sentinel`, `splunk`, `elastic`, `crowdstrike`, `qradar`, `chronicle`) |
+| `GET/PUT/DELETE` | `/api/integrations/siem/:id` | View / update / delete a SIEM integration |
+| `POST` | `/api/integrations/siem/:id/test` | Test SIEM connection |
+| `POST` | `/api/integrations/siem/:id/push` | Push one or more SIGMA-backed detections to the SIEM |
+| `POST` | `/api/integrations/siem/:id/pull` | Pull rule statuses from the SIEM |
+| `GET` | `/api/integrations/siem/:id/log` | Recent SIEM sync log entries |
+| `GET/POST` | `/api/integrations/github-sync` | List / create GitHub rule sync configs |
+| `GET/PUT/DELETE` | `/api/integrations/github-sync/:id` | View / update / delete GitHub sync config |
+| `POST` | `/api/integrations/github-sync/:id/run` | Run GitHub rule sync now |
+| `GET/POST` | `/api/integrations/ticketing` | List / create Jira or ServiceNow ticketing configs |
+| `GET/PUT/DELETE` | `/api/integrations/ticketing/:id` | View / update / delete ticketing config |
+| `POST` | `/api/integrations/ticketing/:id/create-ticket` | Create a ticket `{ summary, description, priority? }` |
+
+### Report Schedules
+
+| Method | Path | Description |
+|---|---|---|
+| `GET/POST` | `/api/report-schedules` | List / create scheduled report delivery |
+| `PUT/DELETE` | `/api/report-schedules/:id` | Update / delete scheduled report |
+
 ### Settings
 
 | Method | Path | Description |
@@ -722,6 +797,7 @@ Known setting keys:
 | `GET` | `/api/exports/detections/csv` | Detections CSV (download) |
 | `GET` | `/api/exports/tools/csv` | Tools CSV (download) |
 | `GET` | `/api/exports/coverage/json` | Coverage matrix JSON (download) |
+| `GET` | `/api/exports/report/pptx` | Executive report PowerPoint deck (download) |
 
 ### API Documentation
 
@@ -777,13 +853,20 @@ mitremap/
 │       │       ├── 010_webhooks.ts                  # webhook_configs + alert_rules tables
 │       │       ├── 011_settings.ts                  # key-value app settings table
 │       │       ├── 012_taxii_auto_merge.ts          # auto_merge flag on taxii_servers
-│       │       └── 013_prioritization_and_versions.ts # detection_versions + targeted_sectors
+│       │       ├── 013_prioritization_and_versions.ts # detection_versions + targeted_sectors
+│       │       ├── 014_coverage_attribution.ts      # coverage attribution log
+│       │       ├── 015_attack_update_queue.ts       # staged ATT&CK update batches
+│       │       ├── 016_notifications.ts             # user notifications
+│       │       ├── 017_compliance_snapshots.ts      # compliance trend snapshots
+│       │       ├── 018_siem_integrations.ts         # SIEM, GitHub sync, ticketing configs
+│       │       ├── 019_intelligence.ts              # campaigns, indicators, CVEs
+│       │       └── 020_report_schedules.ts          # scheduled report delivery
 │       ├── data/
 │       │   ├── attack.ts           # ATT&CK tactics, techniques, mitigations
 │       │   ├── d3fend.ts           # D3FEND techniques + ATT&CK mappings
 │       │   ├── stix-fetch.ts       # Live ATT&CK STIX fetcher (GitHub)
 │       │   ├── threat-groups.ts
-│       │   ├── compliance.ts       # NIST CSF 2.0, CIS Controls v8
+│       │   ├── compliance.ts       # NIST CSF 2.0, CIS v8, ISO 27001, PCI DSS, SOC 2
 │       │   ├── atomic-tests.ts     # Live ART fetch + static baseline
 │       │   ├── data-sources.ts     # Seed ATT&CK data sources
 │       │   └── demo.ts             # Demo tools and detections
@@ -811,6 +894,13 @@ mitremap/
 │           ├── exercises.ts          # Exercise / purple team workflow
 │           ├── taxii.ts              # TAXII servers, jobs, pending-item review
 │           ├── threat-groups.ts      # CRUD + technique assignment + procedures
+│           ├── prioritization.ts     # Ranked detection backlog
+│           ├── notifications.ts      # Notification center data
+│           ├── integrations.ts       # SIEM, GitHub sync, ticketing
+│           ├── campaigns.ts          # Threat-group campaign tracking
+│           ├── indicators.ts         # IOC CRUD + STIX export
+│           ├── cves.ts               # CVE tracking + ATT&CK mapping
+│           ├── report-schedules.ts   # Scheduled report delivery
 │           ├── api-keys.ts           # API key lifecycle (hash, mask, revoke)
 │           ├── webhooks.ts           # Webhook config + alert rule CRUD
 │           ├── settings.ts           # Key-value settings store
@@ -843,7 +933,11 @@ mitremap/
 │           ├── DataSources.tsx     # ATT&CK data source management
 │           ├── Exercises.tsx       # Red/purple team exercise workflow
 │           ├── TaxiiIngest.tsx     # TAXII feed management + review queue
-│           ├── Reports.tsx
+│           ├── Prioritization.tsx    # Ranked detection backlog and actions
+│           ├── Compliance.tsx        # Framework coverage, trends, exports
+│           ├── SigmaLibrary.tsx      # SIGMA library search/import
+│           ├── Integrations.tsx      # SIEM, GitHub sync, ticketing
+│           ├── Reports.tsx           # Reports, exports, scheduled delivery
 │           ├── ApiPlayground.tsx   # Interactive API explorer
 │           └── Settings.tsx        # API keys · users · ATT&CK updates · data mgmt
 ├── certs/                      # Optional: TLS / enterprise CA certs (not committed)
