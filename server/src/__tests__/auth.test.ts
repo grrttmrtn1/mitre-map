@@ -112,6 +112,8 @@ function makeApp() {
   app.post('/api/detections', (_req, res) => res.json({ ok: true }));
   app.post('/api/users', (_req, res) => res.json({ ok: true }));
   app.post('/api/api-keys', (_req, res) => res.json({ ok: true }));
+  app.get('/api/auth/oidc/providers', (_req, res) => res.json({ sensitive: true }));
+  app.get('/api/auth/oidc/example', (_req, res) => res.json({ login: true }));
   return app;
 }
 
@@ -130,9 +132,11 @@ beforeEach(() => {
 });
 
 describe('requireApiKey middleware', () => {
-  it('allows reads but blocks ordinary mutations in bootstrap mode', async () => {
+  it('blocks protected reads and ordinary mutations in bootstrap mode', async () => {
     const app = makeApp();
-    await request(app).get('/api/test').expect(200);
+    const read = await request(app).get('/api/test');
+    expect(read.status).toBe(403);
+    expect(read.body.code).toBe('BOOTSTRAP_REQUIRED');
     const res = await request(app).post('/api/detections').send({});
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('BOOTSTRAP_REQUIRED');
@@ -170,6 +174,11 @@ describe('requireApiKey middleware', () => {
       const res = await request(app).get('/api/test');
       expect(res.status).toBe(401);
       expect(res.body.error).toContain('Authentication required');
+    });
+
+    it('does not treat the OIDC provider management route as a public login slug', async () => {
+      await request(makeApp()).get('/api/auth/oidc/providers').expect(401);
+      await request(makeApp()).get('/api/auth/oidc/example').expect(200);
     });
 
     it('rejects requests with malformed Authorization header', async () => {

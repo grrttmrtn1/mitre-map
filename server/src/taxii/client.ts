@@ -1,5 +1,4 @@
-import https from 'https';
-import http from 'http';
+import { safeHttpsRequest } from '../integrations/url-validator';
 
 export type TaxiiAuthType = 'none' | 'basic' | 'bearer';
 
@@ -63,33 +62,21 @@ export class TaxiiClient {
     return headers;
   }
 
-  private buildAgent(): https.Agent | http.Agent | undefined {
-    if (this.config.ssl_verify === false) {
-      return new https.Agent({ rejectUnauthorized: false });
-    }
-    return undefined;
-  }
-
   private async fetchJson(url: string, timeoutMs = 60_000): Promise<unknown> {
     const headers = this.buildHeaders();
-    const agent = this.buildAgent();
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const opts: RequestInit = { headers, signal: controller.signal };
-    if (agent) (opts as any).agent = agent;
-
     try {
-      const res = await fetch(url, opts);
+      const res = await safeHttpsRequest(url, {
+        headers,
+        timeoutMs,
+        rejectUnauthorized: this.config.ssl_verify !== false,
+      });
       if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`TAXII ${res.status} ${res.statusText}: ${body.slice(0, 200)}`);
+        throw new Error(`TAXII ${res.status}: ${res.body.slice(0, 200)}`);
       }
-      return res.json();
+      return JSON.parse(res.body);
     } catch (err: any) {
       if (err.name === 'AbortError') throw new Error(`TAXII request timed out after ${timeoutMs / 1000}s: ${url}`);
       throw err;
-    } finally {
-      clearTimeout(timer);
     }
   }
 

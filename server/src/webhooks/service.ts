@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 import crypto from 'crypto';
 import { rawAll, rawGet, rawRun, buildTechniqueGraph, resolveToParent } from '../db/database';
 import { decryptSecretValue } from '../security';
-import { validateBaseUrl } from '../integrations/url-validator';
+import { safeHttpsRequest, validateBaseUrl } from '../integrations/url-validator';
 
 export type AlertEventType =
   | 'coverage.threshold_breached'
@@ -38,13 +38,7 @@ async function sendWebhook(
       Object.assign(headers, extra);
     } catch { /* ignore malformed headers */ }
   }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  try {
-    await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
+  await safeHttpsRequest(url, { method: 'POST', headers, body, timeoutMs: 10_000 });
 }
 
 async function getCoveragePct(db: Knex): Promise<number> {
@@ -190,14 +184,10 @@ export async function fireTestWebhook(url: string, secret: string | null, custom
   if (customHeaders) {
     try { Object.assign(headers, JSON.parse(customHeaders)); } catch { /* ignore */ }
   }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
-    const res = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
+    const res = await safeHttpsRequest(url, { method: 'POST', headers, body, timeoutMs: 10_000 });
     return { ok: res.ok, status: res.status };
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Request failed' };
-  } finally {
-    clearTimeout(timeout);
   }
 }

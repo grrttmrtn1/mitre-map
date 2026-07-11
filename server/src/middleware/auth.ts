@@ -86,16 +86,16 @@ export async function requireApiKey(req: Request, res: Response, next: NextFunct
   if (method === 'GET' && (reqPath === '/docs' || reqPath.startsWith('/docs/'))) return next();
   // Only the interactive OIDC login entry and callback are public. Do not use a
   // broad prefix exemption: account-linking and management endpoints live here too.
-  if (method === 'GET' && /^\/auth\/oidc\/[^/]+(?:\/callback)?$/.test(reqPath)) return next();
+  if (method === 'GET' && /^\/auth\/oidc\/(?!providers(?:\/|$))[^/]+(?:\/callback)?$/.test(reqPath)) return next();
 
   try {
     const totalAuthEntities = await getAuthEntityTotal();
     if (totalAuthEntities === 0) {
-      // An uninitialized deployment must not expose the entire application for
-      // mutation. Only the one-time credential bootstrap endpoints are writable.
+      // An uninitialized deployment exposes no protected data or mutations.
+      // Only the one-time credential bootstrap endpoints are reachable.
       const bootstrapCredentialMutation = method === 'POST' &&
         (reqPath === '/users' || reqPath === '/api-keys') && validBootstrapToken(req);
-      const bootstrapAllowed = method === 'GET' || bootstrapCredentialMutation;
+      const bootstrapAllowed = bootstrapCredentialMutation;
       if (bootstrapAllowed) {
         if (bootstrapCredentialMutation) (req as any).bootstrap = true;
         return next();

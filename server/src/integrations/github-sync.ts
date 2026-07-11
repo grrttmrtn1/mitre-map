@@ -116,13 +116,12 @@ function stageFiles(
   files: Array<{ path: string; content: string }>,
 ): Promise<number> {
   if (files.length > 0) {
-    console.warn(
-      `[github-sync] ${files.length} SIGMA file(s) fetched but not staged: ` +
-        'taxii_pending_ingests schema is incompatible (STIX-only). ' +
-        'Add a github_sync_staged_files migration to enable persistent staging.',
+    throw new Error(
+      `GitHub sync fetched ${files.length} SIGMA file(s), but persistent staging is not configured. ` +
+      'Add a github_sync_staged_files migration before enabling sync.',
     );
   }
-  return Promise.resolve(files.length);
+  return Promise.resolve(0);
 }
 
 export async function runGithubSync(configId: number): Promise<{ staged: number; sha: string }> {

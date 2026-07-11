@@ -1,5 +1,6 @@
 import { promises as dnsPromises } from 'dns';
 import net from 'net';
+import https from 'https';
 
 // RFC1918/loopback/link-local/reserved IPv4 ranges as [network, mask] pairs
 const PRIVATE_V4: Array<[number, number]> = [
@@ -85,4 +86,64 @@ export async function validateBaseUrl(rawUrl: string): Promise<void> {
 
 export async function validateGitRepoUrl(rawUrl: string): Promise<void> {
   return check(rawUrl, 'Repository');
+}
+
+export interface SafeRequestResult {
+  status: number;
+  ok: boolean;
+  body: string;
+}
+
+/** HTTPS request that revalidates every redirect and pins the validated DNS result. */
+export async function safeHttpsRequest(
+  rawUrl: string,
+  options: { method?: string; headers?: Record<string, string>; body?: string; timeoutMs?: number; rejectUnauthorized?: boolean } = {},
+  redirectsLeft = 3,
+): Promise<SafeRequestResult> {
+  await validateBaseUrl(rawUrl);
+  const parsed = new URL(rawUrl);
+  const addresses = await dnsPromises.lookup(parsed.hostname, { all: true });
+  const publicAddresses = addresses.filter(a => a.family === 4 ? !isPrivateIPv4(a.address) : !isPrivateIPv6(a.address));
+  if (publicAddresses.length !== addresses.length || publicAddresses.length === 0) {
+    throw new Error('Integration URL must not point to a private or loopback address');
+  }
+  const pinned = publicAddresses[0];
+
+  return new Promise((resolve, reject) => {
+    const request = https.request(parsed, {
+      method: options.method ?? 'GET',
+      headers: options.headers,
+      rejectUnauthorized: options.rejectUnauthorized !== false,
+      lookup: (_hostname, _lookupOptions, callback) => callback(null, pinned.address, pinned.family),
+    }, response => {
+      const location = response.headers.location;
+      if (location && [301, 302, 303, 307, 308].includes(response.statusCode ?? 0)) {
+        response.resume();
+        if (redirectsLeft <= 0) return reject(new Error('Too many redirects'));
+        const nextUrl = new URL(location, parsed).toString();
+        const preserveBody = response.statusCode === 307 || response.statusCode === 308;
+        const next = new URL(nextUrl);
+        const headers = { ...(options.headers ?? {}) };
+        if (next.origin !== parsed.origin) {
+          for (const name of Object.keys(headers)) {
+            if (['authorization', 'cookie', 'proxy-authorization'].includes(name.toLowerCase())) delete headers[name];
+          }
+        }
+        safeHttpsRequest(nextUrl, preserveBody
+          ? { ...options, headers }
+          : { ...options, method: 'GET', body: undefined, headers }, redirectsLeft - 1).then(resolve, reject);
+        return;
+      }
+      const chunks: Buffer[] = [];
+      response.on('data', chunk => chunks.push(Buffer.from(chunk)));
+      response.on('end', () => {
+        const status = response.statusCode ?? 500;
+        resolve({ status, ok: status >= 200 && status < 300, body: Buffer.concat(chunks).toString('utf8') });
+      });
+    });
+    request.setTimeout(options.timeoutMs ?? 10_000, () => request.destroy(new Error('Request timed out')));
+    request.on('error', reject);
+    if (options.body) request.write(options.body);
+    request.end();
+  });
 }
