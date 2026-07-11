@@ -1,8 +1,11 @@
 import { createCipheriv, createDecipheriv, scryptSync, randomBytes } from 'crypto';
 
 function deriveKey(): Buffer {
-  const secret = process.env.JWT_SECRET ?? 'dev-insecure-key-change-me';
-  return scryptSync(secret, 'mitremap-siem-credentials', 32);
+  const secret = process.env.ENCRYPTION_SECRET ?? process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+    throw new Error('ENCRYPTION_SECRET or JWT_SECRET environment variable is required');
+  }
+  return scryptSync(secret ?? 'mitremap-test-encryption-secret', 'mitremap-siem-credentials', 32);
 }
 
 export interface EncryptedPayload {

@@ -3,7 +3,7 @@ import { Knex } from 'knex';
 export async function up(knex: Knex): Promise<void> {
   await knex.schema
     // Multi-user auth
-    .createTableIfNotExists('users', t => {
+    .createTable('users', t => {
       t.increments('id').primary();
       t.string('email').notNullable().unique();
       t.string('name').notNullable();
@@ -15,14 +15,14 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('last_login');
       t.integer('is_active').notNullable().defaultTo(1);
     })
-    .createTableIfNotExists('refresh_tokens', t => {
+    .createTable('refresh_tokens', t => {
       t.increments('id').primary();
       t.integer('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
       t.string('token_hash').notNullable().unique();
       t.timestamp('expires_at').notNullable();
       t.timestamp('created_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('oidc_providers', t => {
+    .createTable('oidc_providers', t => {
       t.increments('id').primary();
       t.string('name').notNullable().unique();
       t.string('slug').notNullable().unique();
@@ -33,18 +33,18 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('created_at').defaultTo(knex.fn.now());
     })
     // ATT&CK data sources
-    .createTableIfNotExists('data_sources', t => {
+    .createTable('data_sources', t => {
       t.increments('id').primary();
       t.string('name').notNullable().unique();
       t.string('category').notNullable();
       t.text('description');
     })
-    .createTableIfNotExists('technique_data_sources', t => {
+    .createTable('technique_data_sources', t => {
       t.string('technique_id').notNullable().references('id').inTable('attack_techniques');
       t.integer('data_source_id').notNullable().references('id').inTable('data_sources');
       t.primary(['technique_id', 'data_source_id']);
     })
-    .createTableIfNotExists('org_data_sources', t => {
+    .createTable('org_data_sources', t => {
       t.increments('id').primary();
       t.integer('data_source_id').notNullable().unique().references('id').inTable('data_sources');
       t.string('status').notNullable().defaultTo('not_collecting'); // collecting | partial | not_collecting
@@ -54,7 +54,7 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('updated_at').defaultTo(knex.fn.now());
     })
     // ATT&CK version management
-    .createTableIfNotExists('attack_version_info', t => {
+    .createTable('attack_version_info', t => {
       t.increments('id').primary();
       t.string('version').notNullable();
       t.string('name').notNullable();
@@ -62,14 +62,14 @@ export async function up(knex: Knex): Promise<void> {
       t.text('notes');
       t.integer('is_active').notNullable().defaultTo(1);
     })
-    .createTableIfNotExists('deprecated_techniques', t => {
+    .createTable('deprecated_techniques', t => {
       t.string('technique_id').primary();
       t.string('deprecated_in_version').notNullable();
       t.string('superseded_by');
       t.text('reason');
     })
     // Atomic Red Team tests
-    .createTableIfNotExists('art_tests', t => {
+    .createTable('art_tests', t => {
       t.increments('id').primary();
       t.string('technique_id').notNullable().references('id').inTable('attack_techniques');
       t.string('test_guid').unique();
@@ -79,7 +79,7 @@ export async function up(knex: Knex): Promise<void> {
       t.string('executor_type');
       t.text('auto_generated_command');
     })
-    .createTableIfNotExists('detection_art_results', t => {
+    .createTable('detection_art_results', t => {
       t.increments('id').primary();
       t.integer('detection_id').notNullable().references('id').inTable('detections').onDelete('CASCADE');
       t.integer('art_test_id').notNullable().references('id').inTable('art_tests').onDelete('CASCADE');

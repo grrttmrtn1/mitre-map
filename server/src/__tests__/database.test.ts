@@ -16,7 +16,7 @@ afterAll(async () => {
 
 // ─── resolveToParent ─────────────────────────────────────────────────────────
 
-import { resolveToParent, buildTechniqueGraph, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
+import { resolveToParent, buildTechniqueGraph, computeCoverageState, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
 
 describe('resolveToParent', () => {
   const parents = new Set(['T1001', 'T1002', 'T1003']);
@@ -94,6 +94,36 @@ describe('buildTechniqueGraph', () => {
     expect(parentToSubtechs.get('T1003')).toEqual(['T1003.001']);
     // A parent with no subtechniques should not appear in the map
     expect(parentToSubtechs.has('T1002')).toBe(false);
+  });
+});
+
+describe('computeCoverageState', () => {
+  beforeAll(async () => {
+    await db('attack_techniques').insert([
+      { id: 'T1001', name: 'Data Obfuscation', tactic_ids: '["TA0001"]', is_subtechnique: 0 },
+      { id: 'T1002', name: 'Data Compressed', tactic_ids: '["TA0001"]', is_subtechnique: 0 },
+      { id: 'T1003', name: 'OS Credential Dumping', tactic_ids: '["TA0006"]', is_subtechnique: 0 },
+    ]).onConflict('id').ignore();
+    await db('attack_techniques').insert({ id: 'T1001.001', name: 'Junk Data', tactic_ids: '["TA0001"]', is_subtechnique: 1, parent_id: 'T1001' }).onConflict('id').ignore();
+  });
+
+  it('combines active detections and active-tool mitigations without double counting', async () => {
+    await db.raw('INSERT INTO detections (name, technique_ids, status) VALUES (?, ?, ?)',
+      ['Canonical test', JSON.stringify(['T1001.001']), 'active']);
+    await db.raw("INSERT INTO attack_mitigations (id, name) VALUES ('M-test', 'Test mitigation')");
+    await db.raw("INSERT INTO technique_mitigations (technique_id, mitigation_id) VALUES ('T1002', 'M-test')");
+    const inserted = await db.raw("INSERT INTO tools (name, category, status) VALUES ('Test tool', 'endpoint', 'active') RETURNING id");
+    const toolId = (Array.isArray(inserted) ? inserted : inserted.rows)[0].id;
+    await db.raw('INSERT INTO tool_mitigations (tool_id, mitigation_id) VALUES (?, ?)', [toolId, 'M-test']);
+
+    const state = await computeCoverageState(db);
+    expect(state.methodology).toBe('mitremap-coverage-v1');
+    expect(state.detectedIds.has('T1001')).toBe(true);
+    expect(state.mitigatedIds.has('T1002')).toBe(true);
+    expect(state.coveredIds).toEqual(new Set(['T1001', 'T1002']));
+    expect(state.covered).toBe(2);
+    expect(state.total).toBe(3);
+    expect(state.pct).toBe(67);
   });
 });
 

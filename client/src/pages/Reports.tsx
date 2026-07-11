@@ -5,6 +5,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import CoverageBar from '../components/CoverageBar';
 import ReportBuilder from '../components/ReportBuilder';
+import KpiCard from '../components/ui/KpiCard';
 
 type TabId = 'executive' | 'trends' | 'threats' | 'gaps' | 'builder' | 'scheduled';
 
@@ -105,9 +106,9 @@ export default function Reports() {
   };
 
   const tabBar = (
-    <div className="flex gap-1 mt-4">
+    <div role="tablist" aria-label="Report views" className="flex gap-1 mt-4 overflow-x-auto pb-1">
       {TABS.map(tab => (
-        <button key={tab.id} onClick={() => switchTab(tab.id)}
+        <button role="tab" aria-selected={activeTab === tab.id} key={tab.id} onClick={() => switchTab(tab.id)}
           className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${activeTab === tab.id ? 'bg-blue-600/20 text-blue-400 font-medium' : 'text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 hover:bg-gray-100 dark:bg-slate-800'}`}>
           {tab.label}
         </button>
@@ -134,7 +135,7 @@ export default function Reports() {
           {addScheduleOpen && (
             <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
               <h3 className="text-sm font-medium text-gray-700 dark:text-slate-300">New Scheduled Report</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 dark:text-slate-400">Name</label>
                   <input type="text" value={scheduleForm.name} onChange={e => setScheduleForm(f => ({ ...f, name: e.target.value }))}
@@ -311,18 +312,14 @@ export default function Reports() {
             <div className="text-gray-400 dark:text-slate-500 text-center py-12">Failed to load report.</div>
           ) : (
             <div className="space-y-6">
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {[
                   { label: 'Coverage', value: `${report.summary.coverage_pct}%`, sub: `${report.summary.covered_techniques}/${report.summary.total_techniques} techniques`, color: 'text-blue-400', bg: 'border-blue-500/20 bg-blue-500/5' },
                   { label: 'Active Detections', value: report.summary.active_detections, sub: `of ${report.summary.total_detections} total`, color: 'text-emerald-400', bg: 'border-emerald-500/20 bg-emerald-500/5' },
                   { label: 'Coverage Gaps', value: report.summary.gap_count, sub: 'undetected techniques', color: 'text-red-400', bg: 'border-red-500/20 bg-red-500/5' },
                   { label: 'Active Tools', value: report.summary.active_tools, sub: 'in security stack', color: 'text-purple-400', bg: 'border-purple-500/20 bg-purple-500/5' },
                 ].map(kpi => (
-                  <div key={kpi.label} className={`rounded-xl border p-4 ${kpi.bg}`}>
-                    <div className="text-xs text-gray-500 dark:text-slate-400">{kpi.label}</div>
-                    <div className={`text-3xl font-bold mt-1 ${kpi.color}`}>{kpi.value}</div>
-                    <div className="text-xs text-gray-400 dark:text-slate-500 mt-1">{kpi.sub}</div>
-                  </div>
+                  <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} detail={kpi.sub} className={kpi.bg} valueClassName={kpi.color} />
                 ))}
               </div>
 

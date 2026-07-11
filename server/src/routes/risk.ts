@@ -1,20 +1,13 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent } from '../db/database';
+import { getKnex, rawAll, rawGet, resolveToParent, computeCoverageState } from '../db/database';
 
 const router = Router();
 
 router.get('/score', async (_req, res) => {
   const db = getKnex();
-  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
-  const total = parentTechIds.size;
-
-  // Build covered parent IDs from active detections (direct + via subtechniques)
-  const detections = await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'");
-  const covered = new Set<string>();
-  for (const d of detections) for (const id of JSON.parse(d.technique_ids)) {
-    const p = resolveToParent(id, parentTechIds, subtechToParent);
-    if (p) covered.add(p);
-  }
+  const coverage = await computeCoverageState(db);
+  const { parentTechIds, subtechToParent, coveredIds: covered } = coverage;
+  const total = coverage.total;
 
   // Load group_techniques once and compute exposure in memory
   const allGroupTechs = await rawAll<{ group_id: string; technique_id: string }>(db,
@@ -39,7 +32,7 @@ router.get('/score', async (_req, res) => {
   const criticalGaps = [...techGroupMap.entries()]
     .filter(([techId, gs]) => !covered.has(techId) && gs.size >= 3).length;
 
-  const coveragePct = Math.round((covered.size / total) * 100);
+  const coveragePct = coverage.pct;
   const baseRisk = 100 - coveragePct;
   const groupExposureFactor = Math.min(10, exposedGroups);
   const criticalFactor = Math.min(15, criticalGaps * 2);
@@ -50,21 +43,14 @@ router.get('/score', async (_req, res) => {
     score: riskScore, level,
     components: { coverage_gap_pct: 100 - coveragePct, exposed_threat_groups: exposedGroups, critical_gaps: criticalGaps },
     coverage_pct: coveragePct, gap_count: total - covered.size, total_techniques: total,
+    methodology: coverage.methodology,
   });
 });
 
 router.get('/by-tactic', async (_req, res) => {
   const db = getKnex();
-  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
-
-  // Build covered parent IDs upfront
-  const coveredParents = new Set<string>();
-  for (const d of await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'")) {
-    for (const id of JSON.parse(d.technique_ids)) {
-      const p = resolveToParent(id, parentTechIds, subtechToParent);
-      if (p) coveredParents.add(p);
-    }
-  }
+  const coverage = await computeCoverageState(db);
+  const coveredParents = coverage.coveredIds;
 
   const tactics = await rawAll(db, 'SELECT * FROM attack_tactics ORDER BY name');
   const result = await Promise.all(tactics.map(async (tac: any) => {
@@ -92,27 +78,9 @@ router.get('/by-tactic', async (_req, res) => {
 
 router.get('/by-technique', async (_req, res) => {
   const db = getKnex();
-  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
-
-  // Build covered parent IDs from detections
-  const coveredByDetection = new Set<string>();
-  for (const d of await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'")) {
-    for (const id of JSON.parse(d.technique_ids)) {
-      const p = resolveToParent(id, parentTechIds, subtechToParent);
-      if (p) coveredByDetection.add(p);
-    }
-  }
-
-  // Build mitigated parent IDs (direct + via subtechniques)
-  const mitigatedParents = new Set<string>();
-  for (const r of await rawAll<{ technique_id: string }>(db, `
-    SELECT DISTINCT tm.technique_id FROM technique_mitigations tm
-    JOIN tool_mitigations tlm ON tm.mitigation_id=tlm.mitigation_id
-    JOIN tools tl ON tlm.tool_id=tl.id WHERE tl.status='active'
-  `)) {
-    const p = resolveToParent(r.technique_id, parentTechIds, subtechToParent);
-    if (p) mitigatedParents.add(p);
-  }
+  const coverage = await computeCoverageState(db);
+  const coveredByDetection = coverage.detectedIds;
+  const mitigatedParents = coverage.mitigatedIds;
 
   const techniques = await rawAll<{ id: string; name: string; tactic_ids: string }>(
     db, 'SELECT id, name, tactic_ids FROM attack_techniques WHERE is_subtechnique=0');

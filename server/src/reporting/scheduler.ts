@@ -1,36 +1,21 @@
 import cron, { type ScheduledTask } from 'node-cron';
 import { getKnex, rawAll, rawRun } from '../db/database';
 import { sendReportEmail, buildReportHtml } from './mailer';
+import { buildScheduledReportData, REPORT_TYPES, type ReportType } from './data';
 
 const _jobs = new Map<number, ScheduledTask>();
-
-const VALID_TYPES = ['executive', 'trends', 'threats', 'gaps', 'compliance'] as const;
-type ValidType = typeof VALID_TYPES[number];
-
-const TYPE_TO_PATH: Record<ValidType, string> = {
-  executive: '/api/reports/executive',
-  trends:    '/api/reports/trends',
-  threats:   '/api/reports/threats',
-  gaps:      '/api/reports/gaps',
-  compliance: '/api/reports/compliance',
-};
 
 async function runSchedule(scheduleId: number): Promise<void> {
   const db = getKnex();
   const rows = await rawAll<any>(db, 'SELECT * FROM report_schedules WHERE id = ?', [scheduleId]);
   const s = rows[0];
   if (!s || !s.enabled) return;
-  if (!VALID_TYPES.includes(s.report_type)) return; // reject unknown types stored in DB
+  if (!REPORT_TYPES.includes(s.report_type)) return; // reject unknown types stored in DB
   const recipients: string[] = JSON.parse(s.recipients ?? '[]');
   if (recipients.length === 0) return;
   try {
-    const port = process.env.PORT ?? '4000';
-    const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const path = TYPE_TO_PATH[s.report_type as ValidType];
-    const res = await fetch(`${proto}://localhost:${port}${path}`, {
-      headers: { 'x-internal-report': 'true' },
-    }).catch(() => null);
-    const data = res?.ok ? await res.json().catch(() => null) : null;
+    const data = await buildScheduledReportData(db, s.report_type as ReportType, s.framework_id);
+    if (!data) throw new Error('Report generation returned no data');
     const html = buildReportHtml(s.report_type, data);
     await sendReportEmail({ to: recipients, subject: `MitreMap Report: ${s.name} — ${new Date().toLocaleDateString()}`, htmlBody: html });
     await rawRun(db, "UPDATE report_schedules SET last_run_at=CURRENT_TIMESTAMP, last_run_status='ok', last_run_error=NULL WHERE id=?", [scheduleId]);

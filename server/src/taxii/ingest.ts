@@ -3,6 +3,8 @@ import type { DB } from '../db/database';
 import { getKnex, rawAll, rawGet, rawRun } from '../db/database';
 import { TaxiiClient } from './client';
 import { parseStixBundle } from './parser';
+import { decryptSecretValue } from '../security';
+import { validateBaseUrl } from '../integrations/url-validator';
 
 export interface PendingItem {
   id: number;
@@ -33,6 +35,7 @@ export async function runFetch(serverId: number, jobId: number | null = null): P
   const db = getKnex();
   const server = await rawGet<any>(db, 'SELECT * FROM taxii_servers WHERE id=?', [serverId]);
   if (!server) throw new Error(`TAXII server ${serverId} not found`);
+  await validateBaseUrl(server.url);
   const autoMerge = server.auto_merge === 1;
 
   const client = new TaxiiClient({
@@ -41,8 +44,8 @@ export async function runFetch(serverId: number, jobId: number | null = null): P
     collection_id: server.collection_id,
     auth_type: server.auth_type,
     username: server.username,
-    password: server.password,
-    token: server.token,
+    password: decryptSecretValue(server.password),
+    token: decryptSecretValue(server.token),
     ssl_verify: server.ssl_verify === 1,
   });
 

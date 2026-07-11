@@ -81,6 +81,15 @@ export function buildReportHtml(reportType: string, data: any): string {
   ${reportType === 'gaps' && data?.gaps ? `<h2>Top Priority Gaps</h2><table><thead><tr><th>Technique</th><th>ID</th><th>Priority</th><th>Tactics</th></tr></thead><tbody>
     ${(data.gaps ?? []).slice(0,20).map((g: any) => `<tr><td>${esc(g.name)}</td><td style="font-family:monospace">${esc(g.id)}</td><td>${n(g.priority_score)}</td><td>${esc((g.tactic_names??[]).join(', '))}</td></tr>`).join('')}
   </tbody></table>` : ''}
+  ${reportType === 'trends' && data?.snapshots ? `<h2>Coverage History</h2><table><thead><tr><th>Date</th><th>Coverage</th><th>Covered</th><th>Detections</th></tr></thead><tbody>
+    ${(data.snapshots ?? []).map((s: any) => `<tr><td>${esc(s.taken_at)}</td><td>${n(s.coverage_pct)}%</td><td>${n(s.covered_techniques)} / ${n(s.total_techniques)}</td><td>${n(s.active_detections)}</td></tr>`).join('')}
+  </tbody></table>` : ''}
+  ${reportType === 'threats' && data?.groups ? `<h2>Threat Landscape</h2><table><thead><tr><th>Group</th><th>Country</th><th>Motivation</th><th>Techniques</th></tr></thead><tbody>
+    ${(data.groups ?? []).map((g: any) => `<tr><td>${esc(g.name)}</td><td>${esc(g.country)}</td><td>${esc(g.motivation)}</td><td>${n(g.total_techniques)}</td></tr>`).join('')}
+  </tbody></table>` : ''}
+  ${reportType === 'compliance' && data?.frameworks ? `<h2>Compliance Frameworks</h2><table><thead><tr><th>Framework</th><th>Controls</th></tr></thead><tbody>
+    ${(data.frameworks ?? []).map((f: any) => `<tr><td>${esc(f.name)}</td><td>${n(f.total_controls)}</td></tr>`).join('')}
+  </tbody></table>` : ''}
   <div class="footer">MitreMap · Detection Coverage Platform · Report generated automatically by scheduled delivery</div>
   </body></html>`;
 }

@@ -11,7 +11,7 @@ const ROLE_INFO: Record<string, { label: string; description: string; color: str
   admin:     { label: 'Admin',      description: 'Full access — includes user management, API key management, data purge, and all write operations.', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
 };
 
-type TabId = 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data' | 'users' | 'attack_version' | 'sso' | 'webhooks' | 'integrations';
+type TabId = 'account' | 'tags' | 'motivations' | 'countries' | 'risk' | 'audit' | 'api_keys' | 'data' | 'users' | 'attack_version' | 'sso' | 'webhooks' | 'integrations';
 
 const SCOPES = ['read', 'write', 'admin'];
 const SCOPE_DESC: Record<string, string> = {
@@ -98,6 +98,13 @@ export default function Settings() {
   const [riskScore, setRiskScore] = useState<any>(null);
   const [riskByTactic, setRiskByTactic] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<TabId>('tags');
+  const [sessions, setSessions] = useState<Array<{ id: string; created_at: string; expires_at: string }>>([]);
+  const [accountProviders, setAccountProviders] = useState<Array<{ id: number; name: string; slug: string }>>([]);
+  const loadAccountSecurity = () => {
+    if (!currentUser) return;
+    api.getSessions().then(setSessions).catch(() => {});
+    api.getPublicOidcProviders().then(setAccountProviders).catch(() => {});
+  };
 
   // Tags state
   const [tagForm, setTagForm] = useState({ name: '', color: '#6366f1', description: '' });
@@ -331,6 +338,7 @@ export default function Settings() {
   };
 
   const ALL_TABS: { id: TabId; label: string; adminOnly?: boolean; disabled?: boolean }[] = [
+    { id: 'account', label: 'My Account' },
     { id: 'tags', label: 'Tag Management' },
     { id: 'motivations', label: 'Motivations' },
     { id: 'countries', label: 'Countries' },
@@ -339,7 +347,7 @@ export default function Settings() {
     { id: 'api_keys', label: 'API Keys' },
     { id: 'data', label: 'Data Management' },
     { id: 'users', label: 'Users', adminOnly: true },
-    { id: 'sso', label: 'SSO / OIDC', adminOnly: true, disabled: true },
+    { id: 'sso', label: 'SSO / OIDC', adminOnly: true },
     { id: 'attack_version', label: 'ATT&CK Version', adminOnly: true },
     { id: 'webhooks', label: 'Webhooks' },
     { id: 'integrations', label: 'Integrations' },
@@ -375,6 +383,21 @@ export default function Settings() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
+
+        {activeTab === 'account' && (
+          <div className="max-w-3xl space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="text-sm font-medium text-gray-800 dark:text-slate-200">Account security</h2>
+              <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">{currentUser ? `${currentUser.email} · ${currentUser.role}` : 'User session management is unavailable in API-key mode.'}</p>
+              {currentUser && <button onClick={loadAccountSecurity} className="mt-3 rounded-lg border border-gray-300 px-3 py-1.5 text-xs dark:border-slate-700">Load security details</button>}
+            </div>
+            {currentUser && <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between gap-3"><h2 className="text-sm font-medium">Active sessions</h2><button onClick={async () => { await api.revokeOtherSessions(); loadAccountSecurity(); toast.success('Other sessions revoked'); }} className="text-xs text-red-500">Revoke other sessions</button></div>
+              <div className="mt-3 space-y-2">{sessions.map(session => <div key={session.id} className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 text-xs dark:border-slate-800"><div className="flex-1"><div>Created {new Date(session.created_at).toLocaleString()}</div><div className="text-gray-400">Expires {new Date(session.expires_at).toLocaleString()}</div></div><button onClick={async () => { await api.revokeSession(session.id); loadAccountSecurity(); }} className="text-red-500">Revoke</button></div>)}{sessions.length === 0 && <p className="py-3 text-center text-xs text-gray-400">Load security details to view sessions.</p>}</div>
+            </div>}
+            {currentUser && accountProviders.length > 0 && <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-900"><h2 className="text-sm font-medium">Link single sign-on</h2><div className="mt-3 flex flex-wrap gap-2">{accountProviders.map(provider => <button key={provider.id} onClick={async () => { const result = await api.startOidcLink(provider.slug); window.location.assign(result.authorization_url); }} className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-500">Link {provider.name}</button>)}</div></div>}
+          </div>
+        )}
 
         {/* ── Tag Management ── */}
         {activeTab === 'tags' && (
@@ -997,8 +1020,8 @@ export default function Settings() {
           </div>
         )}
 
-        {/* ── SSO / OIDC (disabled) ── */}
-        {false && activeTab === 'sso' && (
+        {/* ── SSO / OIDC ── */}
+        {activeTab === 'sso' && (
           <div className="max-w-3xl space-y-6">
             <div className="text-xs text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4 space-y-2">
               <div className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Single Sign-On</div>
@@ -1013,7 +1036,7 @@ export default function Settings() {
               {oidcError && (
                 <div className="mb-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{oidcError}</div>
               )}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Display Name</label>
                   <input value={oidcForm.name} onChange={e => setOidcForm(f => ({ ...f, name: e.target.value }))}
@@ -1026,7 +1049,7 @@ export default function Settings() {
                     placeholder="e.g. okta, azure-ad"
                     className="w-full px-3 py-2 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-800 dark:text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
                 </div>
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                   <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Issuer URL</label>
                   <input value={oidcForm.issuer_url} onChange={e => setOidcForm(f => ({ ...f, issuer_url: e.target.value }))}
                     placeholder="https://your-idp.example.com"
@@ -1044,7 +1067,7 @@ export default function Settings() {
                     type="password" placeholder="Client secret"
                     className="w-full px-3 py-2 bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-800 dark:text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
                 </div>
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                   <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Callback URL (configure in your IdP)</label>
                   <div className="px-3 py-2 bg-gray-100/50 dark:bg-slate-800/50 border border-gray-300 dark:border-slate-700 rounded-lg text-xs font-mono text-gray-500 dark:text-slate-400 select-all">
                     {window.location.origin}/api/auth/oidc/{oidcForm.slug || '<slug>'}/callback
@@ -1058,7 +1081,7 @@ export default function Settings() {
                 )}
                 <button
                   onClick={async () => {
-                    if (!oidcForm.name || !oidcForm.slug || !oidcForm.issuer_url || !oidcForm.client_id || !oidcForm.client_secret) {
+                    if (!oidcForm.name || !oidcForm.slug || !oidcForm.issuer_url || !oidcForm.client_id || (editOidcId === null && !oidcForm.client_secret)) {
                       setOidcError('All fields are required.'); return;
                     }
                     setSavingOidc(true); setOidcError('');
@@ -1091,6 +1114,14 @@ export default function Settings() {
                   <span className={`text-xs px-2 py-0.5 rounded border ${p.enabled ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-gray-400 dark:text-slate-500 border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800'}`}>
                     {p.enabled ? 'Enabled' : 'Disabled'}
                   </span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const result = await api.startOidcLink(p.slug);
+                        window.location.assign(result.authorization_url);
+                      } catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to start account linking'); }
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1">Link my account</button>
                   <button
                     onClick={() => { setEditOidcId(p.id); setOidcForm({ name: p.name, slug: p.slug, issuer_url: p.issuer_url, client_id: p.client_id, client_secret: '', enabled: !!p.enabled }); setOidcError(''); }}
                     className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 px-2 py-1">Edit</button>

@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema
-    .createTableIfNotExists('webhook_configs', t => {
+    .createTable('webhook_configs', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('url').notNullable();
@@ -12,7 +12,7 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('created_at').defaultTo(knex.fn.now());
       t.timestamp('updated_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('alert_rules', t => {
+    .createTable('alert_rules', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('type').notNullable(); // coverage_threshold | detection_validation_failed | new_uncovered_group_technique

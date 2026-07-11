@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getKnex, rawGet, rawAll, rawInsert, logAudit } from '../db/database';
+import { getSettingValue } from './settings';
 
 const router = Router();
 
@@ -257,9 +258,7 @@ router.post('/import', async (req, res) => {
 async function getGithubToken(): Promise<string | null> {
   if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
   try {
-    const db = getKnex();
-    const row = await rawGet<{ value: string }>(db, "SELECT value FROM settings WHERE key='github_token'");
-    return row?.value ?? null;
+    return await getSettingValue('github_token');
   } catch { return null; }
 }
 

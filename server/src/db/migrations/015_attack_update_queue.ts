@@ -1,7 +1,7 @@
 import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.schema.createTableIfNotExists('attack_update_settings', t => {
+  await knex.schema.createTable('attack_update_settings', t => {
     t.increments('id').primary();
     t.integer('enabled').notNullable().defaultTo(0);
     t.string('schedule').notNullable().defaultTo('0 3 * * *');
@@ -16,7 +16,7 @@ export async function up(knex: Knex): Promise<void> {
   // Seed the singleton settings row
   await knex.raw(`INSERT OR IGNORE INTO attack_update_settings (id, enabled, schedule, auto_apply) VALUES (1, 0, '0 3 * * *', 0)`);
 
-  await knex.schema.createTableIfNotExists('attack_update_batches', t => {
+  await knex.schema.createTable('attack_update_batches', t => {
     t.increments('id').primary();
     t.string('batch_id').notNullable().unique();
     t.string('from_version').notNullable();
@@ -31,7 +31,7 @@ export async function up(knex: Knex): Promise<void> {
     t.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
   });
 
-  await knex.schema.createTableIfNotExists('attack_update_items', t => {
+  await knex.schema.createTable('attack_update_items', t => {
     t.increments('id').primary();
     t.string('batch_id').notNullable().references('batch_id').inTable('attack_update_batches').onDelete('CASCADE');
     t.string('change_type').notNullable(); // add_technique | remove_technique | rename_technique | add_mitigation | add_mit_rel

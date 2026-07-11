@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema
-    .createTableIfNotExists('taxii_servers', t => {
+    .createTable('taxii_servers', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('url').notNullable();
@@ -18,7 +18,7 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('created_at').defaultTo(knex.fn.now());
       t.timestamp('updated_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('taxii_ingest_jobs', t => {
+    .createTable('taxii_ingest_jobs', t => {
       t.increments('id').primary();
       t.integer('server_id').notNullable().references('id').inTable('taxii_servers').onDelete('CASCADE');
       t.string('name').notNullable();
@@ -31,7 +31,7 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('created_at').defaultTo(knex.fn.now());
       t.timestamp('updated_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('taxii_pending_ingests', t => {
+    .createTable('taxii_pending_ingests', t => {
       t.increments('id').primary();
       t.integer('job_id');
       t.integer('server_id').notNullable().references('id').inTable('taxii_servers').onDelete('CASCADE');

@@ -35,6 +35,7 @@ MitreMap maps your SIEM detections and security tooling against the full MITRE A
 - **OIDC / SSO** — configurable OAuth2/OIDC providers; new users provisioned automatically as `analyst` on first login
 - **Bootstrap mode** — no lockout: the app runs open until the first user or API key is created
 - **Bootstrap admin** — set `ADMIN_EMAIL` + `ADMIN_PASSWORD` in `.env` to seed an initial admin on first run
+- **Protected API bootstrap** — alternatively, initial user/API-key creation requires `X-Bootstrap-Token` matching `BOOTSTRAP_TOKEN` during the 30-minute bootstrap window; all other mutations remain locked and the token becomes unusable after the first credential exists
 - **User management** — full CRUD for users, password reset (invalidates all active sessions), and active/inactive toggling
 
 ### Coverage Intelligence

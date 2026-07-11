@@ -13,13 +13,13 @@ export function createTestDb(): KnexType {
 // Create the full application schema directly (avoids dynamic .ts migration loading)
 export async function setupTestDb(db: KnexType): Promise<void> {
   await db.schema
-    .createTableIfNotExists('attack_tactics', t => {
+    .createTable('attack_tactics', t => {
       t.string('id').primary();
       t.string('name').notNullable();
       t.string('shortname').notNullable();
       t.text('description');
     })
-    .createTableIfNotExists('attack_techniques', t => {
+    .createTable('attack_techniques', t => {
       t.string('id').primary();
       t.string('name').notNullable();
       t.text('description');
@@ -28,18 +28,18 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.string('parent_id');
       t.string('url');
     })
-    .createTableIfNotExists('attack_mitigations', t => {
+    .createTable('attack_mitigations', t => {
       t.string('id').primary();
       t.string('name').notNullable();
       t.text('description');
       t.string('url');
     })
-    .createTableIfNotExists('technique_mitigations', t => {
+    .createTable('technique_mitigations', t => {
       t.string('technique_id').notNullable();
       t.string('mitigation_id').notNullable();
       t.primary(['technique_id', 'mitigation_id']);
     })
-    .createTableIfNotExists('d3fend_techniques', t => {
+    .createTable('d3fend_techniques', t => {
       t.string('id').primary();
       t.string('name').notNullable();
       t.text('description');
@@ -47,12 +47,12 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.string('subcategory');
       t.string('url');
     })
-    .createTableIfNotExists('attack_d3fend', t => {
+    .createTable('attack_d3fend', t => {
       t.string('attack_id').notNullable();
       t.string('d3fend_id').notNullable();
       t.primary(['attack_id', 'd3fend_id']);
     })
-    .createTableIfNotExists('tools', t => {
+    .createTable('tools', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('vendor');
@@ -63,19 +63,19 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('tool_d3fend', t => {
+    .createTable('tool_d3fend', t => {
       t.integer('tool_id').notNullable();
       t.string('d3fend_id').notNullable();
       t.text('notes');
       t.primary(['tool_id', 'd3fend_id']);
     })
-    .createTableIfNotExists('tool_mitigations', t => {
+    .createTable('tool_mitigations', t => {
       t.integer('tool_id').notNullable();
       t.string('mitigation_id').notNullable();
       t.text('notes');
       t.primary(['tool_id', 'mitigation_id']);
     })
-    .createTableIfNotExists('detections', t => {
+    .createTable('detections', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.text('description');
@@ -95,20 +95,29 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('tags', t => {
+    .createTable('detection_versions', t => {
+      t.increments('id').primary();
+      t.integer('detection_id').notNullable();
+      t.integer('version_number').notNullable();
+      t.text('snapshot').notNullable();
+      t.string('changed_by').notNullable().defaultTo('user');
+      t.string('change_summary').nullable();
+      t.timestamp('changed_at').defaultTo(db.fn.now());
+    })
+    .createTable('tags', t => {
       t.increments('id').primary();
       t.string('name').notNullable().unique();
       t.string('color').notNullable().defaultTo('#6366f1');
       t.text('description');
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('entity_tags', t => {
+    .createTable('entity_tags', t => {
       t.string('entity_type').notNullable();
       t.string('entity_id').notNullable();
       t.integer('tag_id').notNullable();
       t.primary(['entity_type', 'entity_id', 'tag_id']);
     })
-    .createTableIfNotExists('comments', t => {
+    .createTable('comments', t => {
       t.increments('id').primary();
       t.string('entity_type').notNullable();
       t.string('entity_id').notNullable();
@@ -117,7 +126,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('assignments', t => {
+    .createTable('assignments', t => {
       t.increments('id').primary();
       t.string('entity_type').notNullable();
       t.string('entity_id').notNullable();
@@ -129,7 +138,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('audit_log', t => {
+    .createTable('audit_log', t => {
       t.increments('id').primary();
       t.string('entity_type').notNullable();
       t.string('entity_id').notNullable();
@@ -139,7 +148,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.string('source_ip');
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('coverage_snapshots', t => {
+    .createTable('coverage_snapshots', t => {
       t.increments('id').primary();
       t.timestamp('taken_at').defaultTo(db.fn.now());
       t.integer('total_techniques').notNullable();
@@ -152,7 +161,21 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.integer('total_tools').notNullable();
       t.text('notes');
     })
-    .createTableIfNotExists('threat_groups', t => {
+    .createTable('coverage_attribution_log', t => {
+      t.increments('id').primary();
+      t.string('triggered_by_entity_type').notNullable();
+      t.string('triggered_by_entity_id').notNullable();
+      t.string('triggered_by_entity_name').nullable();
+      t.string('action').notNullable();
+      t.string('actor').notNullable().defaultTo('user');
+      t.integer('coverage_pct_before').notNullable();
+      t.integer('coverage_pct_after').notNullable();
+      t.integer('covered_techniques_before').notNullable();
+      t.integer('covered_techniques_after').notNullable();
+      t.integer('total_techniques').notNullable();
+      t.timestamp('created_at').defaultTo(db.fn.now());
+    })
+    .createTable('threat_groups', t => {
       t.string('id').primary();
       t.string('name').notNullable();
       t.text('aliases').notNullable().defaultTo('[]');
@@ -161,12 +184,12 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.string('motivation');
       t.string('url');
     })
-    .createTableIfNotExists('group_techniques', t => {
+    .createTable('group_techniques', t => {
       t.string('group_id').notNullable();
       t.string('technique_id').notNullable();
       t.primary(['group_id', 'technique_id']);
     })
-    .createTableIfNotExists('group_technique_procedures', t => {
+    .createTable('group_technique_procedures', t => {
       t.increments('id').primary();
       t.string('group_id').notNullable();
       t.string('technique_id').notNullable();
@@ -176,21 +199,21 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('motivations', t => {
+    .createTable('motivations', t => {
       t.increments('id').primary();
       t.string('name').notNullable().unique();
       t.string('color').notNullable().defaultTo('#6366f1');
       t.text('description');
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('countries', t => {
+    .createTable('countries', t => {
       t.increments('id').primary();
       t.string('name').notNullable().unique();
       t.string('color').notNullable().defaultTo('#6366f1');
       t.string('flag');
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('api_keys', t => {
+    .createTable('api_keys', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('key_hash').notNullable().unique();
@@ -200,26 +223,26 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('last_used_at');
       t.timestamp('expires_at');
     })
-    .createTableIfNotExists('compliance_frameworks', t => {
+    .createTable('compliance_frameworks', t => {
       t.string('id').primary();
       t.string('name').notNullable();
       t.string('version');
       t.text('description');
     })
-    .createTableIfNotExists('compliance_controls', t => {
+    .createTable('compliance_controls', t => {
       t.string('id').primary();
       t.string('framework_id').notNullable();
       t.string('name').notNullable();
       t.text('description');
       t.string('category');
     })
-    .createTableIfNotExists('technique_compliance', t => {
+    .createTable('technique_compliance', t => {
       t.string('technique_id').notNullable();
       t.string('control_id').notNullable();
       t.primary(['technique_id', 'control_id']);
     })
     // Migration 002
-    .createTableIfNotExists('users', t => {
+    .createTable('users', t => {
       t.increments('id').primary();
       t.string('email').notNullable().unique();
       t.string('name').notNullable();
@@ -231,14 +254,19 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('last_login');
       t.integer('is_active').notNullable().defaultTo(1);
     })
-    .createTableIfNotExists('refresh_tokens', t => {
+    .createTable('refresh_tokens', t => {
       t.increments('id').primary();
       t.integer('user_id').notNullable();
       t.string('token_hash').notNullable().unique();
       t.timestamp('expires_at').notNullable();
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('oidc_providers', t => {
+    .createTable('settings', t => {
+      t.string('key').primary();
+      t.text('value');
+      t.timestamp('updated_at').defaultTo(db.fn.now());
+    })
+    .createTable('oidc_providers', t => {
       t.increments('id').primary();
       t.string('name').notNullable().unique();
       t.string('slug').notNullable().unique();
@@ -248,18 +276,18 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.integer('enabled').notNullable().defaultTo(1);
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('data_sources', t => {
+    .createTable('data_sources', t => {
       t.increments('id').primary();
       t.string('name').notNullable().unique();
       t.string('category').notNullable();
       t.text('description');
     })
-    .createTableIfNotExists('technique_data_sources', t => {
+    .createTable('technique_data_sources', t => {
       t.string('technique_id').notNullable();
       t.integer('data_source_id').notNullable();
       t.primary(['technique_id', 'data_source_id']);
     })
-    .createTableIfNotExists('org_data_sources', t => {
+    .createTable('org_data_sources', t => {
       t.increments('id').primary();
       t.integer('data_source_id').notNullable().unique();
       t.string('status').notNullable().defaultTo('not_collecting');
@@ -268,7 +296,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('attack_version_info', t => {
+    .createTable('attack_version_info', t => {
       t.increments('id').primary();
       t.string('version').notNullable();
       t.string('name').notNullable();
@@ -276,13 +304,13 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.text('notes');
       t.integer('is_active').notNullable().defaultTo(1);
     })
-    .createTableIfNotExists('deprecated_techniques', t => {
+    .createTable('deprecated_techniques', t => {
       t.string('technique_id').primary();
       t.string('deprecated_in_version').notNullable();
       t.string('superseded_by');
       t.text('reason');
     })
-    .createTableIfNotExists('art_tests', t => {
+    .createTable('art_tests', t => {
       t.increments('id').primary();
       t.string('technique_id').notNullable();
       t.string('test_guid').unique();
@@ -293,7 +321,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.text('auto_generated_command');
       t.string('source').notNullable().defaultTo('atomic');
     })
-    .createTableIfNotExists('detection_art_results', t => {
+    .createTable('detection_art_results', t => {
       t.increments('id').primary();
       t.integer('detection_id').notNullable();
       t.integer('art_test_id').notNullable();
@@ -304,7 +332,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('notifications', t => {
+    .createTable('notifications', t => {
       t.increments('id').primary();
       t.integer('user_id').nullable();
       t.string('type').notNullable();
@@ -315,7 +343,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.integer('read').notNullable().defaultTo(0);
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('compliance_snapshots', t => {
+    .createTable('compliance_snapshots', t => {
       t.increments('id').primary();
       t.string('framework_id').notNullable();
       t.integer('total_controls').notNullable();
@@ -324,7 +352,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('taken_at').defaultTo(db.fn.now());
     })
     // Migration 018
-    .createTableIfNotExists('siem_integrations', t => {
+    .createTable('siem_integrations', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('type').notNullable();
@@ -339,7 +367,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('siem_sync_log', t => {
+    .createTable('siem_sync_log', t => {
       t.increments('id').primary();
       t.integer('integration_id').notNullable();
       t.string('direction').notNullable();
@@ -348,7 +376,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.text('detail').nullable();
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('github_sync_configs', t => {
+    .createTable('github_sync_configs', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('repo_url').notNullable();
@@ -360,7 +388,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('last_synced_at').nullable();
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('ticketing_configs', t => {
+    .createTable('ticketing_configs', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('type').notNullable();
@@ -372,7 +400,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
     // Migration 019
-    .createTableIfNotExists('group_campaigns', t => {
+    .createTable('group_campaigns', t => {
       t.increments('id').primary();
       t.string('group_id').notNullable();
       t.string('name').notNullable();
@@ -383,12 +411,12 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.timestamp('created_at').defaultTo(db.fn.now());
       t.timestamp('updated_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('campaign_techniques', t => {
+    .createTable('campaign_techniques', t => {
       t.integer('campaign_id').notNullable();
       t.string('technique_id').notNullable();
       t.primary(['campaign_id', 'technique_id']);
     })
-    .createTableIfNotExists('cves', t => {
+    .createTable('cves', t => {
       t.string('id').primary();
       t.text('description').nullable();
       t.float('cvss_score').nullable();
@@ -399,12 +427,12 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.integer('patch_available').notNullable().defaultTo(0);
       t.timestamp('synced_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('cve_techniques', t => {
+    .createTable('cve_techniques', t => {
       t.string('cve_id').notNullable();
       t.string('technique_id').notNullable();
       t.primary(['cve_id', 'technique_id']);
     })
-    .createTableIfNotExists('indicators', t => {
+    .createTable('indicators', t => {
       t.increments('id').primary();
       t.string('type').notNullable();
       t.string('value').notNullable();
@@ -416,7 +444,7 @@ export async function setupTestDb(db: KnexType): Promise<void> {
       t.string('last_seen').nullable();
       t.timestamp('created_at').defaultTo(db.fn.now());
     })
-    .createTableIfNotExists('report_schedules', t => {
+    .createTable('report_schedules', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('report_type').notNullable();

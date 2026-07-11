@@ -129,7 +129,12 @@ router.get('/export/:framework_id', async (req, res) => {
     ['Control ID', 'Control Name', 'Category', 'Mapped Techniques (no active detection)'],
     ...(gaps as any[]).map(g => [g.id, g.name, g.category ?? '', g.technique_ids ?? '']),
   ];
-  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const safeCell = (c: unknown) => {
+    const raw = String(c);
+    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+  const csv = rows.map(r => r.map(safeCell).join(',')).join('\n');
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="${req.params.framework_id}-gaps.csv"`);
   res.send(csv);

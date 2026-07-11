@@ -52,7 +52,7 @@ export default function LoginPage() {
   }, [user, navigate]);
 
   useEffect(() => {
-    api.getOidcProviders().then(setProviders).catch(() => {});
+    api.getPublicOidcProviders().then(providers => setProviders(providers as OidcProvider[])).catch(() => {});
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {

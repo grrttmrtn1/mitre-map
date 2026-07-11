@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Reject runtime databases and private keys
+        run: |
+          if git ls-files | grep -E '(^|/)([^/]+\.db(-wal|-shm)?|[^/]+\.(pem|key))$'; then
+            echo "Runtime database or private-key artifact is tracked"
+            exit 1
+          fi
+      - run: npm run build
+      - run: npm run migrate:smoke --workspace=server
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm test --workspace=server
+      - run: npm test --workspace=client
+      - run: npm run test:coverage --workspace=server

@@ -1,26 +1,19 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent } from '../db/database';
+import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent, computeCoverageState } from '../db/database';
 
 const router = Router();
 
 router.get('/executive', async (_req, res) => {
   const db = getKnex();
-  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
-  const totalTechniques = parentTechIds.size;
+  const coverage = await computeCoverageState(db);
+  const { parentTechIds, coveredIds: covered } = coverage;
+  const totalTechniques = coverage.total;
 
   const [{ c: activeDetections }, { c: totalDetections }, { c: activeTools }] = await Promise.all([
     rawGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM detections WHERE status='active'"),
     rawGet<{ c: number }>(db, 'SELECT COUNT(*) as c FROM detections'),
     rawGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM tools WHERE status='active'"),
   ]) as any[];
-
-  // Build covered parent IDs from active detections
-  const detections = await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'");
-  const covered = new Set<string>();
-  for (const d of detections) for (const id of JSON.parse(d.technique_ids)) {
-    const p = resolveToParent(id, parentTechIds, subtechToParent);
-    if (p) covered.add(p);
-  }
 
   // Tactic coverage using in-memory covered set
   const tacticsData = await rawAll<{ id: string; name: string }>(db, 'SELECT id, name FROM attack_tactics ORDER BY name');
@@ -32,13 +25,21 @@ router.get('/executive', async (_req, res) => {
     return { id: ta.id, name: ta.name, total, covered: coveredCount, pct: total ? Math.round((coveredCount / total) * 100) : 0 };
   }));
 
-  // Top gaps: parent techniques not covered, with subtechnique count context
+  // Top gaps: rank the complete uncovered set by threat and compliance impact.
   const topGaps = await rawAll<any>(db, `
-    SELECT t.id, t.name, t.tactic_ids FROM attack_techniques t WHERE t.is_subtechnique=0
-    ORDER BY t.id LIMIT 100
+    SELECT t.id, t.name, t.tactic_ids,
+      COUNT(DISTINCT gt.group_id) AS group_count,
+      COUNT(DISTINCT tc.control_id) AS compliance_impact
+    FROM attack_techniques t
+    LEFT JOIN group_techniques gt ON gt.technique_id=t.id
+    LEFT JOIN technique_compliance tc ON tc.technique_id=t.id
+    WHERE t.is_subtechnique=0
+    GROUP BY t.id, t.name, t.tactic_ids
   `);
   const uncoveredGaps = topGaps
     .filter(t => !covered.has(t.id))
+    .map(t => ({ ...t, priority_score: Number(t.group_count) * 8 + Number(t.compliance_impact) * 2 }))
+    .sort((a, b) => b.priority_score - a.priority_score || a.id.localeCompare(b.id))
     .slice(0, 20)
     .map(t => ({ ...t, tactic_ids: JSON.parse(t.tactic_ids) }));
 
@@ -56,10 +57,11 @@ router.get('/executive', async (_req, res) => {
     generated_at: new Date().toISOString(),
     summary: {
       total_techniques: totalTechniques, covered_techniques: covered.size,
-      coverage_pct: Math.round((covered.size / totalTechniques) * 100),
+      coverage_pct: coverage.pct,
       gap_count: totalTechniques - covered.size,
       active_detections: activeDetections, total_detections: totalDetections, active_tools: activeTools,
     },
+    methodology: coverage.methodology,
     trend, severity_breakdown: severityCounts,
     tactic_coverage: tacticCoverage,
     top_gaps: uncoveredGaps,

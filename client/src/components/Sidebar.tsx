@@ -26,6 +26,7 @@ import {
   Moon,
   ClipboardCheck,
   Plug,
+  X,
 } from 'lucide-react';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
@@ -114,7 +115,7 @@ function ShieldLogo() {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
   const { user, logout } = useAuth();
   const { theme, toggle, density, setDensity } = useTheme();
   const navigate = useNavigate();
@@ -130,7 +131,9 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col relative print:hidden">
+    <>
+    {open && <button aria-label="Close navigation" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm md:hidden print:hidden" />}
+    <aside aria-label="Primary navigation" className={`fixed inset-y-0 left-0 z-50 w-64 flex-shrink-0 bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col transition-transform duration-200 print:hidden md:static md:z-auto md:w-56 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Top gradient accent strip */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-600 opacity-80" />
 
@@ -141,6 +144,9 @@ export default function Sidebar() {
             <div className="text-sm font-semibold text-gray-900 dark:text-white leading-tight tracking-tight">MitreMap</div>
             <div className="text-xs text-gray-500 dark:text-slate-400 leading-tight">Detection Coverage</div>
           </div>
+          <button aria-label="Close navigation" onClick={onClose} className="ml-auto rounded p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-slate-800 dark:hover:text-white md:hidden">
+            <X size={18} />
+          </button>
         </div>
       </div>
 
@@ -157,6 +163,7 @@ export default function Sidebar() {
                 <NavLink
                   key={to}
                   to={to}
+                  onClick={onClose}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150 relative ${
                       isActive
@@ -228,5 +235,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }

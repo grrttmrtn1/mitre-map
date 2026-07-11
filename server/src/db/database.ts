@@ -83,7 +83,17 @@ export interface CoverageSummary {
   total: number;
 }
 
-export async function computeCoverageSummary(db: DB): Promise<CoverageSummary> {
+export interface CoverageState extends CoverageSummary {
+  methodology: 'mitremap-coverage-v1';
+  detectedIds: Set<string>;
+  mitigatedIds: Set<string>;
+  coveredIds: Set<string>;
+  parentTechIds: Set<string>;
+  subtechToParent: Map<string, string>;
+}
+
+/** Canonical coverage calculation used by dashboards, snapshots, and reports. */
+export async function computeCoverageState(db: DB): Promise<CoverageState> {
   const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
   const total = parentTechIds.size;
 
@@ -107,8 +117,24 @@ export async function computeCoverageSummary(db: DB): Promise<CoverageSummary> {
     if (p) mitigatedIds.add(p);
   }
 
-  const covered = new Set([...detectedIds, ...mitigatedIds]).size;
-  return { pct: total > 0 ? Math.round((covered / total) * 100) : 0, covered, total };
+  const coveredIds = new Set([...detectedIds, ...mitigatedIds]);
+  const covered = coveredIds.size;
+  return {
+    methodology: 'mitremap-coverage-v1',
+    pct: total > 0 ? Math.round((covered / total) * 100) : 0,
+    covered,
+    total,
+    detectedIds,
+    mitigatedIds,
+    coveredIds,
+    parentTechIds,
+    subtechToParent,
+  };
+}
+
+export async function computeCoverageSummary(db: DB): Promise<CoverageSummary> {
+  const { pct, covered, total } = await computeCoverageState(db);
+  return { pct, covered, total };
 }
 
 // Map a technique ID (parent or subtechnique) to its parent technique ID.

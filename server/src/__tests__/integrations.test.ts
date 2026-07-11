@@ -15,7 +15,9 @@ vi.mock('../db/database', async (importOriginal) => {
 
 // Mock URL validator so tests don't make real DNS lookups
 vi.mock('../integrations/url-validator', () => ({
-  validateBaseUrl: vi.fn().mockResolvedValue(undefined),
+  validateBaseUrl: vi.fn().mockImplementation(async (url: string) => {
+    if (!url.startsWith('https://')) throw new Error('Integration URL must use HTTPS');
+  }),
   validateGitRepoUrl: vi.fn().mockImplementation(async (url: string) => {
     if (!url.startsWith('https://')) throw new Error('Repository URL must use HTTPS');
   }),
@@ -281,13 +283,12 @@ describe('POST /api/integrations/ticketing', () => {
     await request(app).post('/api/integrations/ticketing').send({ name: 'X', type: 'jira' }).expect(400);
   });
 
-  it('accepts http base_url (ticketing route does not enforce https)', async () => {
-    // The ticketing POST does NOT call validateBaseUrl, so http:// is accepted
+  it('returns 400 when base_url uses http instead of https', async () => {
     const res = await request(app)
       .post('/api/integrations/ticketing')
       .send({ name: 'Internal Jira', type: 'jira', base_url: 'http://internal.jira.corp' })
-      .expect(201);
-    expect(res.body.base_url).toBe('http://internal.jira.corp');
+      .expect(400);
+    expect(res.body.error).toMatch(/https/i);
   });
 });
 

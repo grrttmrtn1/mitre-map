@@ -19,6 +19,9 @@ services:
       APP_URL: ${APP_URL:-https://localhost:8443}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Required for one-time API bootstrap if ADMIN_EMAIL/ADMIN_PASSWORD are not used.
+      BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-}
+      BOOTSTRAP_WINDOW_MS: ${BOOTSTRAP_WINDOW_MS:-1800000}
       # Optional: provide paths to your own TLS cert/key (PEM format).
       # If omitted, a self-signed certificate is generated at startup.
       SSL_CERT_PATH: ${SSL_CERT_PATH:-}

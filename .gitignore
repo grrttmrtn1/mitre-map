@@ -209,6 +209,12 @@ __marimo__/
 node_modules/
 .vscode/
 
+# Runtime databases and SQLite sidecar files must never be committed. They can
+# contain user records, session hashes, integration secrets, and audit data.
+server/data/*.db
+server/data/*.db-wal
+server/data/*.db-shm
+
 # Enterprise CA certificates — keep dir tracked, ignore actual cert files
 certs/*.crt
 

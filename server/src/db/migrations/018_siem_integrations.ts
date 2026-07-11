@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema
-    .createTableIfNotExists('siem_integrations', t => {
+    .createTable('siem_integrations', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('type').notNullable();
@@ -18,7 +18,7 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('created_at').defaultTo(knex.fn.now());
       t.timestamp('updated_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('siem_sync_log', t => {
+    .createTable('siem_sync_log', t => {
       t.increments('id').primary();
       t.integer('integration_id').notNullable()
         .references('id').inTable('siem_integrations').onDelete('CASCADE');
@@ -28,7 +28,7 @@ export async function up(knex: Knex): Promise<void> {
       t.text('detail').nullable();
       t.timestamp('created_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('github_sync_configs', t => {
+    .createTable('github_sync_configs', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('repo_url').notNullable();
@@ -40,7 +40,7 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('last_synced_at').nullable();
       t.timestamp('created_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('ticketing_configs', t => {
+    .createTable('ticketing_configs', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.string('type').notNullable();

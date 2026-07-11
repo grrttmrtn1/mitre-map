@@ -2,9 +2,11 @@ import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert } from '../db/database';
 import { scheduleReport, stopReport } from '../reporting/scheduler';
 import cron from 'node-cron';
+import { REPORT_TYPES } from '../reporting/data';
+import { validateBody } from '../middleware/validation';
 
 const router = Router();
-const VALID_TYPES = ['executive', 'trends', 'threats', 'gaps', 'compliance'];
+const VALID_TYPES: readonly string[] = REPORT_TYPES;
 
 router.get('/', async (_req, res) => {
   try {
@@ -14,7 +16,15 @@ router.get('/', async (_req, res) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({
+  name: { type: 'string', required: true, minLength: 1, maxLength: 200 },
+  report_type: { type: 'string', required: true, enum: REPORT_TYPES },
+  schedule: { type: 'string', required: true, maxLength: 100 },
+  recipients: { type: 'array', required: true, itemType: 'string' },
+  format: { type: 'string', enum: ['pdf', 'html'] },
+  framework_id: { type: 'string', maxLength: 100 },
+  enabled: { type: 'boolean' },
+}, { rejectUnknown: true }), async (req, res) => {
   try {
     const db = getKnex();
     const { name, report_type, schedule, recipients = [], format = 'pdf', framework_id, enabled = true } = req.body;
@@ -22,6 +32,8 @@ router.post('/', async (req, res) => {
     if (!VALID_TYPES.includes(report_type)) return res.status(400).json({ error: `report_type must be one of: ${VALID_TYPES.join(', ')}` });
     if (!cron.validate(schedule)) return res.status(400).json({ error: 'schedule must be a valid cron expression' });
     if (!Array.isArray(recipients) || recipients.length === 0) return res.status(400).json({ error: 'At least one recipient is required' });
+    const invalidRecipient = recipients.find((r: unknown) => typeof r !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r));
+    if (invalidRecipient) return res.status(400).json({ error: 'Every recipient must be a valid email address' });
     const id = await rawInsert(db,
       'INSERT INTO report_schedules (name, report_type, schedule, recipients, format, framework_id, enabled) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
       [name.trim(), report_type, schedule, JSON.stringify(recipients), format, framework_id ?? null, enabled ? 1 : 0]

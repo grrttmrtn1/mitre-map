@@ -2,6 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
 import { invalidateAuthCache } from '../middleware/auth';
+import { validateBody } from '../middleware/validation';
 
 const router = Router();
 
@@ -14,10 +15,16 @@ router.get('/', async (_req, res) => {
   res.json(await rawAll(db, 'SELECT id, name, masked_key, created_at, last_used_at, expires_at, scopes FROM api_keys ORDER BY created_at DESC'));
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({
+  name: { type: 'string', required: true, minLength: 1, maxLength: 200 },
+  scopes: { type: 'array', itemType: 'string' },
+  expires_at: { type: 'string', maxLength: 100 },
+}, { rejectUnknown: true }), async (req, res) => {
   const db = getKnex();
-  const { name, scopes = ['read'], expires_at } = req.body;
+  const { name, expires_at } = req.body;
+  const scopes = (req as any).bootstrap ? ['admin', 'write', 'read'] : (req.body.scopes ?? ['read']);
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+  if (!scopes.every((scope: string) => ['read', 'write', 'admin'].includes(scope))) return res.status(400).json({ error: 'Invalid API key scope' });
   const rawKey = 'mm_' + crypto.randomBytes(32).toString('hex');
   const masked = maskKey(rawKey);
   const hash = crypto.createHash('sha256').update(rawKey).digest('hex');

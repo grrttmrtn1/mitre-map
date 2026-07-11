@@ -1,7 +1,7 @@
 import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.schema.createTableIfNotExists('compliance_snapshots', t => {
+  await knex.schema.createTable('compliance_snapshots', t => {
     t.increments('id').primary();
     t.string('framework_id').notNullable();
     t.integer('total_controls').notNullable();

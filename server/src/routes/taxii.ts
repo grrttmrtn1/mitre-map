@@ -4,6 +4,8 @@ import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, createNotificatio
 import { TaxiiClient } from '../taxii/client';
 import { runFetch, applyPendingItem, rejectPendingItem } from '../taxii/ingest';
 import { scheduleJob, stopJob, runJob } from '../taxii/scheduler';
+import { decryptSecretValue, encryptSecretValue } from '../security';
+import { validateBaseUrl } from '../integrations/url-validator';
 
 const router = Router();
 
@@ -19,11 +21,12 @@ router.post('/servers', async (req, res) => {
   const db = getKnex();
   const { name, url, api_root, collection_id, auth_type = 'none', username, password, token, ssl_verify = 1, auto_merge = 0, notes } = req.body;
   if (!name || !url) return res.status(400).json({ error: 'name and url are required' });
+  try { await validateBaseUrl(url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
 
   const id = await rawInsert(db,
     `INSERT INTO taxii_servers (name, url, api_root, collection_id, auth_type, username, password, token, ssl_verify, auto_merge, notes)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-    [name, url, api_root ?? null, collection_id ?? null, auth_type, username ?? null, password ?? null, token ?? null, ssl_verify ? 1 : 0, auto_merge ? 1 : 0, notes ?? null],
+    [name, url, api_root ?? null, collection_id ?? null, auth_type, username ?? null, encryptSecretValue(password), encryptSecretValue(token), ssl_verify ? 1 : 0, auto_merge ? 1 : 0, notes ?? null],
   );
   await logAudit(db, 'taxii_server', String(id), 'create', (req as any).actor ?? 'user', { name, url }, (req as any).sourceIp);
   const server = await rawGet(db, 'SELECT id, name, url, api_root, collection_id, auth_type, ssl_verify, auto_merge, notes, created_at FROM taxii_servers WHERE id=?', [id]);
@@ -36,19 +39,30 @@ router.put('/servers/:id', async (req, res) => {
   if (!server) return res.status(404).json({ error: 'Not found' });
 
   const { name, url, api_root, collection_id, auth_type, username, password, token, ssl_verify, auto_merge, notes } = req.body;
+  if (url !== undefined) {
+    try { await validateBaseUrl(url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+  }
+  const encryptedPassword = password !== undefined ? encryptSecretValue(password) : null;
+  const encryptedToken = token !== undefined ? encryptSecretValue(token) : null;
   await rawRun(db,
     `UPDATE taxii_servers SET
       name=COALESCE(?,name), url=COALESCE(?,url), api_root=?, collection_id=?,
-      auth_type=COALESCE(?,auth_type), username=?, password=?, token=?,
+      auth_type=COALESCE(?,auth_type), username=COALESCE(?,username),
+      password=CASE WHEN ? IS NOT NULL THEN ? ELSE password END,
+      token=CASE WHEN ? IS NOT NULL THEN ? ELSE token END,
       ssl_verify=COALESCE(?,ssl_verify), auto_merge=COALESCE(?,auto_merge), notes=?, updated_at=CURRENT_TIMESTAMP
      WHERE id=?`,
     [name ?? null, url ?? null, api_root ?? null, collection_id ?? null,
-     auth_type ?? null, username ?? null, password ?? null, token ?? null,
+     auth_type ?? null, username ?? null,
+     encryptedPassword, encryptedPassword,
+     encryptedToken, encryptedToken,
      ssl_verify !== undefined ? (ssl_verify ? 1 : 0) : null,
      auto_merge !== undefined ? (auto_merge ? 1 : 0) : null,
      notes ?? null, req.params.id],
   );
-  await logAudit(db, 'taxii_server', req.params.id, 'update', (req as any).actor ?? 'user', req.body, (req as any).sourceIp);
+  await logAudit(db, 'taxii_server', req.params.id, 'update', (req as any).actor ?? 'user',
+    { name, url, api_root, collection_id, auth_type, username, ssl_verify, auto_merge, notes, password_changed: password !== undefined, token_changed: token !== undefined },
+    (req as any).sourceIp);
   const updated = await rawGet(db, 'SELECT id, name, url, api_root, collection_id, auth_type, ssl_verify, auto_merge, notes, updated_at FROM taxii_servers WHERE id=?', [req.params.id]);
   res.json(updated);
 });
@@ -67,11 +81,12 @@ router.post('/servers/:id/test', async (req, res) => {
   const db = getKnex();
   const server = await rawGet<any>(db, 'SELECT * FROM taxii_servers WHERE id=?', [req.params.id]);
   if (!server) return res.status(404).json({ error: 'Not found' });
+  try { await validateBaseUrl(server.url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
 
   const client = new TaxiiClient({
     url: server.url, api_root: server.api_root, collection_id: server.collection_id,
-    auth_type: server.auth_type, username: server.username, password: server.password,
-    token: server.token, ssl_verify: server.ssl_verify === 1,
+    auth_type: server.auth_type, username: server.username, password: decryptSecretValue(server.password),
+    token: decryptSecretValue(server.token), ssl_verify: server.ssl_verify === 1,
   });
 
   try {

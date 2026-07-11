@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   // Full snapshots of detection fields at each create/update for diff history
-  await knex.schema.createTableIfNotExists('detection_versions', t => {
+  await knex.schema.createTable('detection_versions', t => {
     t.increments('id').primary();
     t.integer('detection_id').notNullable();
     t.integer('version_number').notNullable();

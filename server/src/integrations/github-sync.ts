@@ -19,6 +19,36 @@ function validateBranch(branch: string): void {
   }
 }
 
+function globToRegExp(glob: string): RegExp {
+  let out = '^';
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    const next = glob[i + 1];
+    if (c === '*') {
+      if (next === '*') {
+        if (glob[i + 2] === '/') {
+          out += '(?:.*/)?';
+          i += 2;
+        } else {
+          out += '.*';
+          i++;
+        }
+      } else {
+        out += '[^/]*';
+      }
+    } else if (c === '?') {
+      out += '[^/]';
+    } else {
+      out += c.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+    }
+  }
+  return new RegExp(out + '$');
+}
+
+function pathMatches(path: string, glob: string): boolean {
+  return globToRegExp(glob).test(path);
+}
+
 function toApiBase(repoUrl: string): string {
   const match = repoUrl.match(/github\.com\/([^/]+\/[^/]+)/);
   if (!match) throw new Error(`Cannot parse GitHub repo URL: ${repoUrl}`);
@@ -36,6 +66,7 @@ async function getLatestSha(apiBase: string, branch: string, token: string | nul
 async function getChangedYmlFiles(
   apiBase: string,
   branch: string,
+  pathGlob: string,
   lastSha: string | null,
   token: string | null,
 ): Promise<Array<{ path: string; content: string }>> {
@@ -47,7 +78,7 @@ async function getChangedYmlFiles(
     if (!treeRes.ok) throw new Error(`GitHub tree error: ${treeRes.status}`);
     const tree = (await treeRes.json()) as any;
     const ymlPaths = ((tree.tree ?? []) as any[])
-      .filter((f: any) => f.type === 'blob' && f.path.endsWith('.yml'))
+      .filter((f: any) => f.type === 'blob' && f.path.endsWith('.yml') && pathMatches(f.path, pathGlob))
       .slice(0, 200);
     const files: Array<{ path: string; content: string }> = [];
     for (const f of ymlPaths) {
@@ -64,7 +95,7 @@ async function getChangedYmlFiles(
   if (!compareRes.ok) throw new Error(`GitHub compare error: ${compareRes.status}`);
   const compare = (await compareRes.json()) as any;
   const files: Array<{ path: string; content: string }> = [];
-  for (const f of ((compare.files ?? []) as any[]).filter((f: any) => f.filename.endsWith('.yml'))) {
+  for (const f of ((compare.files ?? []) as any[]).filter((f: any) => f.filename.endsWith('.yml') && pathMatches(f.filename, pathGlob))) {
     const params = new URLSearchParams({ ref: branch });
     const contentRes = await fetch(`${apiBase}/contents/${encodeURIComponent(f.filename)}?${params}`, { headers });
     if (!contentRes.ok) continue;
@@ -110,7 +141,7 @@ export async function runGithubSync(configId: number): Promise<{ staged: number;
 
   if (sha === cfg.last_sha) return { staged: 0, sha };
 
-  const files = await getChangedYmlFiles(apiBase, cfg.branch, cfg.last_sha, token);
+  const files = await getChangedYmlFiles(apiBase, cfg.branch, cfg.path_glob, cfg.last_sha, token);
   const staged = await stageFiles(db, configId, files);
   await rawRun(db, 'UPDATE github_sync_configs SET last_sha = ?, last_synced_at = CURRENT_TIMESTAMP WHERE id = ?', [
     sha,

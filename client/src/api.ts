@@ -14,27 +14,41 @@ import type {
 
 const BASE = '/api';
 const STORAGE_KEY = 'mitremap_api_key';
+let _legacyApiKey: string | null = null;
 
 export function getStoredApiKey(): string | null {
-  return localStorage.getItem(STORAGE_KEY);
+  // Migrate older installations away from persistent browser storage. API keys
+  // now live only for the current page lifetime and disappear on reload.
+  if (_legacyApiKey) return _legacyApiKey;
+  const legacy = localStorage.getItem(STORAGE_KEY);
+  if (legacy) {
+    _legacyApiKey = legacy;
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  return _legacyApiKey;
 }
 export function setStoredApiKey(key: string): void {
-  localStorage.setItem(STORAGE_KEY, key);
+  _legacyApiKey = key;
+  localStorage.removeItem(STORAGE_KEY);
 }
 export function clearStoredApiKey(): void {
+  _legacyApiKey = null;
   localStorage.removeItem(STORAGE_KEY);
 }
 
 let _jwtToken: string | null = null;
+let _bootstrapToken: string | null = null;
 export function setJwtToken(token: string | null) { _jwtToken = token; }
 export function getJwtToken(): string | null { return _jwtToken; }
+export function setBootstrapToken(token: string | null) { _bootstrapToken = token; }
 
 let _authErrorHandler: (() => void) | null = null;
 export function onAuthError(fn: () => void) { _authErrorHandler = fn; }
 
 function authHeaders(): Record<string, string> {
   const token = _jwtToken ?? getStoredApiKey();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (token) return { Authorization: `Bearer ${token}` };
+  return _bootstrapToken ? { 'X-Bootstrap-Token': _bootstrapToken } : {};
 }
 
 function handleUnauth(status: number) {
@@ -262,11 +276,16 @@ export const api = {
   logout: () => fetch(`${BASE}/auth/logout`, { method: 'POST', credentials: 'include', headers: authHeaders() }),
   refreshToken: () => fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' }).then(r => r.ok ? r.json() as Promise<{ token: string }> : null),
   getMe: () => get<User>('/auth/me'),
+  getSessions: () => get<Array<{ id: string; created_at: string; expires_at: string }>>('/auth/sessions'),
+  revokeSession: (id: string) => del(`/auth/sessions/${encodeURIComponent(id)}`),
+  revokeOtherSessions: () => del('/auth/sessions'),
   getOidcProviders: () => get<OidcProvider[]>('/auth/oidc/providers'),
+  getPublicOidcProviders: () => get<Array<Pick<OidcProvider, 'id' | 'name' | 'slug'>>>('/auth/oidc/providers/public'),
   getOidcLoginUrl: (slug: string) => `${BASE}/auth/oidc/${slug}`,
   createOidcProvider: (data: { name: string; slug: string; issuer_url: string; client_id: string; client_secret: string; enabled?: boolean }) => post<OidcProvider>('/auth/oidc/providers', data),
   updateOidcProvider: (id: number, data: { name?: string; slug?: string; issuer_url?: string; client_id?: string; client_secret?: string; enabled?: boolean }) => put<OidcProvider>(`/auth/oidc/providers/${id}`, data),
   deleteOidcProvider: (id: number) => del(`/auth/oidc/providers/${id}`),
+  startOidcLink: (slug: string) => post<{ authorization_url: string }>(`/auth/oidc/${encodeURIComponent(slug)}/link`, {}),
 
   // Users (admin)
   getUsers: () => get<User[]>('/users'),

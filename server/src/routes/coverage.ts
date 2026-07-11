@@ -1,12 +1,13 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent } from '../db/database';
+import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent, computeCoverageState } from '../db/database';
 
 const router = Router();
 
 router.get('/stats', async (_req, res) => {
   const db = getKnex();
-  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
-  const totalTechniques = parentTechIds.size;
+  const coverage = await computeCoverageState(db);
+  const { parentTechIds, detectedIds: detectedTechniqueIds, mitigatedIds: mitigatedTechniqueIds } = coverage;
+  const totalTechniques = coverage.total;
 
   const [{ c: totalDetections }, { c: activeDetections }, { c: tuningDetections }, { c: disabledDetections }, { c: plannedDetections }, { c: totalTools }, { c: activeTools }] = await Promise.all([
     rawGet<any>(db, 'SELECT COUNT(*) as c FROM detections'),
@@ -18,25 +19,7 @@ router.get('/stats', async (_req, res) => {
     rawGet<any>(db, "SELECT COUNT(*) as c FROM tools WHERE status='active'"),
   ]);
 
-  const detectedTechniqueIds = new Set<string>();
-  const allDetections = await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'");
-  for (const d of allDetections) for (const id of JSON.parse(d.technique_ids)) {
-    const p = resolveToParent(id, parentTechIds, subtechToParent);
-    if (p) detectedTechniqueIds.add(p);
-  }
-
-  const mitigatedTechniqueIds = new Set<string>();
-  const techsWithMitigations = await rawAll<{ technique_id: string }>(db, `
-    SELECT DISTINCT tm.technique_id FROM technique_mitigations tm
-    JOIN tool_mitigations tom ON tm.mitigation_id = tom.mitigation_id
-    JOIN tools t ON tom.tool_id = t.id WHERE t.status='active'
-  `);
-  for (const r of techsWithMitigations) {
-    const p = resolveToParent(r.technique_id, parentTechIds, subtechToParent);
-    if (p) mitigatedTechniqueIds.add(p);
-  }
-
-  const coveredCount = new Set([...detectedTechniqueIds, ...mitigatedTechniqueIds]).size;
+  const coveredCount = coverage.covered;
 
   const tactics = await rawAll(db, 'SELECT * FROM attack_tactics ORDER BY id');
   const tacticStats = await Promise.all(tactics.map(async (tactic: any) => {
@@ -58,7 +41,8 @@ router.get('/stats', async (_req, res) => {
     total_techniques: totalTechniques, detected_techniques: detectedTechniqueIds.size,
     mitigated_techniques: mitigatedTechniqueIds.size, covered_techniques: coveredCount,
     gap_techniques: totalTechniques - coveredCount,
-    coverage_pct: Math.round((coveredCount / totalTechniques) * 100),
+    coverage_pct: coverage.pct,
+    coverage_methodology: coverage.methodology,
     detection_pct: Math.round((detectedTechniqueIds.size / totalTechniques) * 100),
     total_detections: totalDetections, active_detections: activeDetections,
     tuning_detections: tuningDetections, disabled_detections: disabledDetections,

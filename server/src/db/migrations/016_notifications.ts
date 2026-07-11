@@ -1,7 +1,7 @@
 import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.schema.createTableIfNotExists('notifications', t => {
+  await knex.schema.createTable('notifications', t => {
     t.increments('id').primary();
     t.integer('user_id').nullable(); // null = all active analysts see it
     t.string('type').notNullable();  // taxii_batch_ready | deprecated_technique | assignment_due | coverage_alert

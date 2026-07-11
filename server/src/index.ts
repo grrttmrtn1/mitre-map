@@ -51,10 +51,13 @@ import indicatorsRouter from './routes/indicators';
 import { initScheduler } from './taxii/scheduler';
 import { initAttackScheduler } from './attack/scheduler';
 import { requireApiKey } from './middleware/auth';
+import { requireJwtSecret } from './security';
+import { apiErrorHandler, requestContext } from './middleware/errors';
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? '4000', 10);
 
+app.use(requestContext);
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -149,11 +152,19 @@ app.get('/api/health', async (_req, res) => {
       rawGet<{ n: number }>(db, 'SELECT COUNT(*) as n FROM users', []),
     ]);
     const totalAuthEntities = ((keyCount as any)?.n ?? 0) + ((userCount as any)?.n ?? 0);
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), bootstrap: totalAuthEntities === 0 });
+    res.json({
+      status: 'ok', timestamp: new Date().toISOString(), bootstrap: totalAuthEntities === 0,
+      bootstrap_token_configured: totalAuthEntities === 0 ? Boolean(process.env.BOOTSTRAP_TOKEN) : undefined,
+    });
   } catch {
     res.status(503).json({ status: 'error', timestamp: new Date().toISOString() });
   }
 });
+
+app.use('/api', (req, res) => res.status(404).json({
+  error: 'API endpoint not found', path: req.path, request_id: (req as any).requestId,
+}));
+app.use(apiErrorHandler);
 
 const clientDist = path.join(__dirname, '../../client/dist');
 if (process.env.NODE_ENV === 'production' && fs.existsSync(clientDist)) {
@@ -186,6 +197,7 @@ async function loadTlsOptions(): Promise<https.ServerOptions> {
 }
 
 async function start() {
+  requireJwtSecret();
   await runMigrations();
   const db = getKnex();
   await seedDatabase(db);

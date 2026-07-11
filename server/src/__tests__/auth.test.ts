@@ -11,11 +11,18 @@ import type { Knex as KnexType } from 'knex';
 import { requiredScope, scopeGranted } from '../middleware/auth';
 
 describe('requiredScope', () => {
-  it('returns "read" for all GET requests regardless of path', () => {
+  it('returns "read" for GET requests on regular paths', () => {
     expect(requiredScope('GET', '/detections')).toBe('read');
-    expect(requiredScope('GET', '/api-keys')).toBe('read');
-    expect(requiredScope('GET', '/admin/purge')).toBe('read');
-    expect(requiredScope('GET', '/users')).toBe('read');
+  });
+
+  it('returns "admin" for admin-only paths regardless of method', () => {
+    expect(requiredScope('GET', '/api-keys')).toBe('admin');
+    expect(requiredScope('GET', '/admin/purge')).toBe('admin');
+    expect(requiredScope('GET', '/users')).toBe('admin');
+    expect(requiredScope('POST', '/auth/oidc/providers')).toBe('admin');
+    expect(requiredScope('PUT', '/settings/github_token')).toBe('admin');
+    expect(requiredScope('POST', '/integrations/siem')).toBe('admin');
+    expect(requiredScope('POST', '/report-schedules')).toBe('admin');
   });
 
   it('returns "admin" for non-GET requests to /api-keys', () => {
@@ -104,6 +111,7 @@ function makeApp() {
   app.get('/api/test', (_req, res) => res.json({ ok: true }));
   app.post('/api/detections', (_req, res) => res.json({ ok: true }));
   app.post('/api/users', (_req, res) => res.json({ ok: true }));
+  app.post('/api/api-keys', (_req, res) => res.json({ ok: true }));
   return app;
 }
 
@@ -122,11 +130,21 @@ beforeEach(() => {
 });
 
 describe('requireApiKey middleware', () => {
-  it('allows all requests in bootstrap mode (no users or keys)', async () => {
+  it('allows reads but blocks ordinary mutations in bootstrap mode', async () => {
     const app = makeApp();
-    const res = await request(app).get('/api/test');
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
+    await request(app).get('/api/test').expect(200);
+    const res = await request(app).post('/api/detections').send({});
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('BOOTSTRAP_REQUIRED');
+  });
+
+  it('requires the configured bootstrap token for initial credentials', async () => {
+    process.env.BOOTSTRAP_TOKEN = 'test-bootstrap-secret';
+    const testApp = makeApp();
+    await request(testApp).post('/api/api-keys').send({}).expect(403);
+    await request(testApp).post('/api/api-keys').set('X-Bootstrap-Token', 'wrong').send({}).expect(403);
+    await request(testApp).post('/api/api-keys').set('X-Bootstrap-Token', 'test-bootstrap-secret').send({}).expect(200);
+    delete process.env.BOOTSTRAP_TOKEN;
   });
 
   describe('with auth entities present', () => {

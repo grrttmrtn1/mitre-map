@@ -6,6 +6,9 @@ import type { CoverageAttributionEntry, CoverageStats, CoverageSnapshot, RiskSco
 import CoverageBar from '../components/CoverageBar';
 import { SkeletonDashboard } from '../components/Skeleton';
 import { useTheme } from '../context/ThemeContext';
+import { PageContent, PageHeader, PageShell } from '../components/ui/PageShell';
+import KpiCard from '../components/ui/KpiCard';
+import ChartCard from '../components/ui/ChartCard';
 
 type WidgetId = 'kpis' | 'tactic_bars' | 'detection_status' | 'radar' | 'tactic_chart' | 'trend' | 'risk' | 'lowest_tactics' | 'attribution';
 const DEFAULT_WIDGET_ORDER: WidgetId[] = ['kpis', 'tactic_bars', 'detection_status', 'radar', 'tactic_chart', 'trend', 'risk', 'lowest_tactics', 'attribution'];
@@ -231,15 +234,8 @@ export default function Dashboard() {
     }));
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Coverage Dashboard</h1>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">MITRE ATT&CK Enterprise detection and defense coverage</p>
-          </div>
-          <div className="flex gap-2">
+    <PageShell>
+      <PageHeader title="Coverage Dashboard" description="MITRE ATT&CK Enterprise detection and defense coverage" actions={<>
             <button
               onClick={resetWidgetLayout}
               className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-400 dark:border-slate-600 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
@@ -253,39 +249,19 @@ export default function Dashboard() {
             <Link to="/matrix" className="px-3 py-1.5 text-sm bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600/30 transition-colors">
               ATT&CK Matrix →
             </Link>
-          </div>
-        </div>
-      </div>
+      </>} />
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      <div className="grid grid-cols-4 gap-4">
+      <PageContent className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpis.map(kpi => (
-          <div key={kpi.label} className={`rounded-xl border p-4 relative overflow-hidden ${kpi.bg}`}>
-            {/* Radial glow */}
-            <div
-              className="absolute -top-4 -right-4 w-28 h-28 rounded-full blur-2xl pointer-events-none"
-              style={{ background: kpi.glow }}
-            />
-            {/* One-shot shimmer sweep on data load */}
-            <div className="animate-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent skew-x-[-20deg] pointer-events-none" />
-            <div className="relative">
-              <div className="text-xs uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1 font-medium">{kpi.label}</div>
-              <div className="flex items-end gap-2">
-                <div className={`text-3xl font-bold bg-gradient-to-br bg-clip-text text-transparent ${kpi.gradient}`}>
-                  {kpi.value}
-                </div>
-                <div className="mb-1">
-                  <TrendBadge delta={kpi.delta ?? null} invert={kpi.invert} unit={kpi.deltaUnit} />
-                </div>
-              </div>
-              <div className="text-xs text-gray-400 dark:text-slate-500 mt-1">{kpi.sub}</div>
-            </div>
-          </div>
+          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} detail={kpi.sub} className={kpi.bg}
+            valueClassName={`bg-gradient-to-br bg-clip-text text-transparent ${kpi.gradient}`}
+            trend={<TrendBadge delta={kpi.delta ?? null} invert={kpi.invert} unit={kpi.deltaUnit} />} />
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
           <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-3">Coverage by Tactic</h2>
           <div className="space-y-2.5">
             {stats.tactic_stats.map(t => (
@@ -317,9 +293,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-2">Coverage Radar by Tactic</h2>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <ChartCard title="Coverage Radar by Tactic" description="Relative coverage across ATT&CK tactics" summary={radarData.map(item => `${item.tactic}: ${item.coverage}%`).join('; ')}>
           <ResponsiveContainer width="100%" height={280}>
             <RadarChart data={radarData} margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
               <PolarGrid stroke={theme === 'dark' ? '#1e293b' : '#e2e8f0'} strokeDasharray="3 3" />
@@ -344,10 +319,9 @@ export default function Dashboard() {
               />
             </RadarChart>
           </ResponsiveContainer>
-        </div>
+        </ChartCard>
 
-        <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-2">Technique Coverage vs. Gaps</h2>
+        <ChartCard title="Technique Coverage vs. Gaps" description="Covered and uncovered parent techniques by tactic" summary={barData.map(item => `${item.name}: ${item.covered} covered, ${item.gap} gaps`).join('; ')}>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={barData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 80 }}>
               <XAxis type="number" tick={{ fill: theme === 'dark' ? '#475569' : '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -361,7 +335,7 @@ export default function Dashboard() {
               <Bar dataKey="gap" name="Gap" stackId="a" fill={theme === 'dark' ? '#1e293b' : '#f3f4f6'} stroke={theme === 'dark' ? '#334155' : '#d1d5db'} strokeWidth={1} radius={[0, 3, 3, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </ChartCard>
       </div>
 
       <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
@@ -369,7 +343,7 @@ export default function Dashboard() {
           <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500">Coverage Trend</h2>
           <div className="flex gap-1">
             {(['7D', '30D', '90D', 'All'] as const).map(r => (
-              <button key={r} onClick={() => setTrendRange(r)}
+              <button key={r} onClick={() => setTrendRange(r)} aria-pressed={trendRange === r} aria-label={`Show ${r === 'All' ? 'all' : r} coverage history`}
                 className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${trendRange === r ? 'bg-blue-600/30 text-blue-400 border border-blue-500/40' : 'text-gray-400 dark:text-slate-500 hover:text-gray-500 dark:text-slate-400'}`}>
                 {r}
               </button>
@@ -481,7 +455,7 @@ export default function Dashboard() {
           <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500">Lowest Coverage Tactics</h2>
           <Link to="/gaps" className="text-xs text-blue-400 hover:text-blue-300">View all gaps →</Link>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {[...stats.tactic_stats].sort((a, b) => a.pct - b.pct).slice(0, 6).map(t => (
             <div key={t.tactic_id} className="bg-gray-100/50 dark:bg-slate-800/50 rounded-lg p-3 border border-gray-300/50 dark:border-slate-700/50">
               <div className="text-xs font-medium text-gray-700 dark:text-slate-300 truncate">{t.tactic_name}</div>
@@ -564,7 +538,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-      </div>
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }

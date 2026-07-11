@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
 import { invalidateAuthCache } from '../middleware/auth';
+import { validateBody } from '../middleware/validation';
 
 const router = Router();
 
@@ -10,16 +11,22 @@ router.get('/', async (_req, res) => {
   res.json(await rawAll(db, 'SELECT id, email, name, role, is_active, created_at, last_login FROM users ORDER BY created_at DESC', []));
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody({
+  email: { type: 'string', required: true, minLength: 3, maxLength: 320 },
+  name: { type: 'string', maxLength: 200 },
+  password: { type: 'string', required: true, minLength: 8, maxLength: 1024 },
+  role: { type: 'string', enum: ['admin', 'analyst', 'readonly'] },
+}, { rejectUnknown: true }), async (req, res) => {
   const db = getKnex();
-  const { email, name, password, role = 'analyst' } = req.body;
+  const { email, name, password } = req.body;
+  const role = (req as any).bootstrap ? 'admin' : (req.body.role ?? 'analyst');
   if (!email?.trim() || !password) return res.status(400).json({ error: 'email and password are required' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
   if (!['admin', 'analyst', 'readonly'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
   const hash = await bcrypt.hash(password, 12);
   try {
     const id = await rawInsert(db, 'INSERT INTO users (email, name, password_hash, role) VALUES (?, ?, ?, ?) RETURNING id',
-      [email.toLowerCase().trim(), name?.trim() ?? null, hash, role]);
+      [email.toLowerCase().trim(), name?.trim() || email.trim().split('@')[0], hash, role]);
     await logAudit(db, 'user', String(id), 'create', (req as any).actor ?? 'system', { email, role }, (req as any).sourceIp);
     invalidateAuthCache();
     res.status(201).json(await rawGet(db, 'SELECT id, email, name, role, is_active, created_at FROM users WHERE id=?', [id]));

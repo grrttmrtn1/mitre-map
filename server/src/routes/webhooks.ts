@@ -1,31 +1,39 @@
 import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert } from '../db/database';
 import { fireTestWebhook } from '../webhooks/service';
+import { decryptSecretValue, encryptSecretValue } from '../security';
+import { validateBaseUrl } from '../integrations/url-validator';
 
 const router = Router();
 
 const ALERT_TYPES = ['coverage_threshold', 'detection_validation_failed', 'new_uncovered_group_technique'];
+
+function safeConfig(row: any) {
+  if (!row) return row;
+  const { secret: _secret, custom_headers: _customHeaders, ...rest } = row;
+  return { ...rest, has_secret: !!row.secret, has_custom_headers: !!row.custom_headers };
+}
 
 // ── Webhook Configs ─────────────────────────────────────────────────────────
 
 router.get('/configs', async (_req, res) => {
   const db = getKnex();
   const rows = await rawAll(db, 'SELECT * FROM webhook_configs ORDER BY created_at DESC');
-  res.json(rows);
+  res.json((rows as any[]).map(safeConfig));
 });
 
 router.post('/configs', async (req, res) => {
   const db = getKnex();
   const { name, url, secret, custom_headers, enabled = true } = req.body;
   if (!name?.trim() || !url?.trim()) return res.status(400).json({ error: 'name and url are required' });
-  try { new URL(url); } catch { return res.status(400).json({ error: 'url must be a valid URL' }); }
+  try { await validateBaseUrl(url.trim()); } catch (e: any) { return res.status(400).json({ error: e.message }); }
   if (custom_headers != null) {
     try { JSON.parse(custom_headers); } catch { return res.status(400).json({ error: 'custom_headers must be valid JSON' }); }
   }
   const id = await rawInsert(db,
     'INSERT INTO webhook_configs (name, url, secret, custom_headers, enabled) VALUES (?, ?, ?, ?, ?) RETURNING id',
-    [name.trim(), url.trim(), secret ?? null, custom_headers ?? null, enabled ? 1 : 0]);
-  res.status(201).json(await rawGet(db, 'SELECT * FROM webhook_configs WHERE id=?', [id]));
+    [name.trim(), url.trim(), encryptSecretValue(secret), encryptSecretValue(custom_headers), enabled ? 1 : 0]);
+  res.status(201).json(safeConfig(await rawGet(db, 'SELECT * FROM webhook_configs WHERE id=?', [id])));
 });
 
 router.put('/configs/:id', async (req, res) => {
@@ -35,7 +43,7 @@ router.put('/configs/:id', async (req, res) => {
   }
   const { name, url, secret, custom_headers, enabled } = req.body;
   if (url != null) {
-    try { new URL(url); } catch { return res.status(400).json({ error: 'url must be a valid URL' }); }
+    try { await validateBaseUrl(url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
   }
   if (custom_headers != null) {
     try { JSON.parse(custom_headers); } catch { return res.status(400).json({ error: 'custom_headers must be valid JSON' }); }
@@ -44,9 +52,9 @@ router.put('/configs/:id', async (req, res) => {
     name=COALESCE(?,name), url=COALESCE(?,url), secret=COALESCE(?,secret),
     custom_headers=COALESCE(?,custom_headers), enabled=COALESCE(?,enabled),
     updated_at=CURRENT_TIMESTAMP WHERE id=?`,
-    [name ?? null, url ?? null, secret ?? null, custom_headers ?? null,
+    [name ?? null, url ?? null, secret !== undefined ? encryptSecretValue(secret) : null, custom_headers !== undefined ? encryptSecretValue(custom_headers) : null,
       enabled != null ? (enabled ? 1 : 0) : null, req.params.id]);
-  res.json(await rawGet(db, 'SELECT * FROM webhook_configs WHERE id=?', [req.params.id]));
+  res.json(safeConfig(await rawGet(db, 'SELECT * FROM webhook_configs WHERE id=?', [req.params.id])));
 });
 
 router.delete('/configs/:id', async (req, res) => {
@@ -62,7 +70,7 @@ router.post('/configs/:id/test', async (req, res) => {
   const db = getKnex();
   const config = await rawGet<any>(db, 'SELECT * FROM webhook_configs WHERE id=?', [req.params.id]);
   if (!config) return res.status(404).json({ error: 'Not found' });
-  const result = await fireTestWebhook(config.url, config.secret, config.custom_headers);
+  const result = await fireTestWebhook(config.url, decryptSecretValue(config.secret), decryptSecretValue(config.custom_headers));
   res.json(result);
 });
 

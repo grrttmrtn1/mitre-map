@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema
-    .createTableIfNotExists('exercises', t => {
+    .createTable('exercises', t => {
       t.increments('id').primary();
       t.string('name').notNullable();
       t.text('description');
@@ -17,12 +17,12 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('created_at').defaultTo(knex.fn.now());
       t.timestamp('updated_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('exercise_techniques', t => {
+    .createTable('exercise_techniques', t => {
       t.integer('exercise_id').notNullable().references('id').inTable('exercises').onDelete('CASCADE');
       t.string('technique_id').notNullable().references('id').inTable('attack_techniques');
       t.primary(['exercise_id', 'technique_id']);
     })
-    .createTableIfNotExists('exercise_test_runs', t => {
+    .createTable('exercise_test_runs', t => {
       t.increments('id').primary();
       t.integer('exercise_id').notNullable().references('id').inTable('exercises').onDelete('CASCADE');
       t.integer('art_test_id').notNullable().references('id').inTable('art_tests').onDelete('CASCADE');
@@ -34,7 +34,7 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('created_at').defaultTo(knex.fn.now());
       t.timestamp('updated_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('exercise_findings', t => {
+    .createTable('exercise_findings', t => {
       t.increments('id').primary();
       t.integer('exercise_id').notNullable().references('id').inTable('exercises').onDelete('CASCADE');
       t.string('technique_id').references('id').inTable('attack_techniques').onDelete('SET NULL');

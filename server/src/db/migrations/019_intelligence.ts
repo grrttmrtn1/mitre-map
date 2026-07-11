@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema
-    .createTableIfNotExists('group_campaigns', t => {
+    .createTable('group_campaigns', t => {
       t.increments('id').primary();
       t.string('group_id').notNullable()
         .references('id').inTable('threat_groups').onDelete('CASCADE');
@@ -14,13 +14,13 @@ export async function up(knex: Knex): Promise<void> {
       t.timestamp('created_at').defaultTo(knex.fn.now());
       t.timestamp('updated_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('campaign_techniques', t => {
+    .createTable('campaign_techniques', t => {
       t.integer('campaign_id').notNullable()
         .references('id').inTable('group_campaigns').onDelete('CASCADE');
       t.string('technique_id').notNullable();
       t.primary(['campaign_id', 'technique_id']);
     })
-    .createTableIfNotExists('cves', t => {
+    .createTable('cves', t => {
       t.string('id').primary();
       t.text('description').nullable();
       t.float('cvss_score').nullable();
@@ -31,13 +31,13 @@ export async function up(knex: Knex): Promise<void> {
       t.integer('patch_available').notNullable().defaultTo(0);
       t.timestamp('synced_at').defaultTo(knex.fn.now());
     })
-    .createTableIfNotExists('cve_techniques', t => {
+    .createTable('cve_techniques', t => {
       t.string('cve_id').notNullable()
         .references('id').inTable('cves').onDelete('CASCADE');
       t.string('technique_id').notNullable();
       t.primary(['cve_id', 'technique_id']);
     })
-    .createTableIfNotExists('indicators', t => {
+    .createTable('indicators', t => {
       t.increments('id').primary();
       t.string('type').notNullable();
       t.string('value').notNullable();

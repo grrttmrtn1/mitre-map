@@ -1,7 +1,7 @@
 import { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.schema.createTableIfNotExists('coverage_attribution_log', t => {
+  await knex.schema.createTable('coverage_attribution_log', t => {
     t.increments('id').primary();
     t.string('triggered_by_entity_type').notNullable();
     t.string('triggered_by_entity_id').notNullable();

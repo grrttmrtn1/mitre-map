@@ -1,6 +1,8 @@
 import { Knex } from 'knex';
 import crypto from 'crypto';
 import { rawAll, rawGet, rawRun, buildTechniqueGraph, resolveToParent } from '../db/database';
+import { decryptSecretValue } from '../security';
+import { validateBaseUrl } from '../integrations/url-validator';
 
 export type AlertEventType =
   | 'coverage.threshold_breached'
@@ -20,6 +22,7 @@ async function sendWebhook(
   customHeaders: string | null,
   payload: WebhookPayload,
 ): Promise<void> {
+  await validateBaseUrl(url);
   const body = JSON.stringify(payload);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -86,7 +89,7 @@ export async function checkCoverageAlerts(db: Knex): Promise<void> {
 
   for (const rule of rules) {
     if (coveragePct < rule.threshold) {
-      sendWebhook(rule.url, rule.secret, rule.custom_headers, {
+      sendWebhook(rule.url, decryptSecretValue(rule.secret), decryptSecretValue(rule.custom_headers), {
         event: 'coverage.threshold_breached',
         timestamp: new Date().toISOString(),
         data: { coverage_pct: coveragePct, threshold: rule.threshold },
@@ -108,7 +111,7 @@ export async function checkValidationFailedAlerts(
     WHERE r.type='detection_validation_failed' AND r.enabled=1 AND w.enabled=1
   `);
   for (const rule of rules) {
-    sendWebhook(rule.url, rule.secret, rule.custom_headers, {
+    sendWebhook(rule.url, decryptSecretValue(rule.secret), decryptSecretValue(rule.custom_headers), {
       event: 'detection.validation_failed',
       timestamp: new Date().toISOString(),
       data: { detection_id: detectionId, detection_name: detectionName, test_name: testName },
@@ -154,7 +157,7 @@ export async function checkUncoveredGroupTechniqueAlerts(db: Knex): Promise<void
     });
 
     for (const t of uncovered) {
-      sendWebhook(rule.url, rule.secret, rule.custom_headers, {
+      sendWebhook(rule.url, decryptSecretValue(rule.secret), decryptSecretValue(rule.custom_headers), {
         event: 'threat_group.new_uncovered_technique',
         timestamp: new Date().toISOString(),
         data: {
@@ -170,6 +173,11 @@ export async function checkUncoveredGroupTechniqueAlerts(db: Knex): Promise<void
 }
 
 export async function fireTestWebhook(url: string, secret: string | null, customHeaders: string | null): Promise<{ ok: boolean; status?: number; error?: string }> {
+  try {
+    await validateBaseUrl(url);
+  } catch (e: any) {
+    return { ok: false, error: e.message };
+  }
   const body = JSON.stringify({ event: 'webhook.test', timestamp: new Date().toISOString(), data: { message: 'MitreMap webhook test' } });
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

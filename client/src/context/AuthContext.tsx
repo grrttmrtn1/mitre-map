@@ -9,6 +9,7 @@ interface AuthContextValue {
   loginWithOidc: (slug: string) => void;
   logout: () => Promise<void>;
   isBootstrapMode: boolean;
+  bootstrapTokenConfigured: boolean;
   /** True for admin, analyst, and API-key/bootstrap mode (null user) */
   canWrite: boolean;
   /** True for admin and API-key/bootstrap mode (null user) */
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isBootstrapMode, setIsBootstrapMode] = useState(false);
+  const [bootstrapTokenConfigured, setBootstrapTokenConfigured] = useState(false);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scheduleRefresh = useCallback((token: string) => {
@@ -81,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const health = await fetch('/api/health').then(r => r.json());
         setIsBootstrapMode(health.bootstrap === true);
+        setBootstrapTokenConfigured(health.bootstrap_token_configured === true);
       } catch {}
       setLoading(false);
     }
@@ -110,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const canAdmin = user === null || user.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithOidc, logout, isBootstrapMode, canWrite, canAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithOidc, logout, isBootstrapMode, bootstrapTokenConfigured, canWrite, canAdmin }}>
       {children}
     </AuthContext.Provider>
   );

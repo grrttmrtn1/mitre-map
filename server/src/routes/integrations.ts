@@ -330,6 +330,7 @@ router.post('/ticketing', async (req, res) => {
     const { name, type, base_url, credentials = {}, default_project, enabled = 1 } = req.body;
     if (!name || !type || !base_url) return res.status(400).json({ error: 'name, type, and base_url required' });
     if (!['jira', 'servicenow'].includes(type)) return res.status(400).json({ error: 'type must be jira or servicenow' });
+    try { await validateBaseUrl(base_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
     const credentials_enc = Object.keys(credentials).length ? encryptJson(credentials) : null;
     const id = await rawInsert(db, `INSERT INTO ticketing_configs (name, type, base_url, credentials_enc, default_project, enabled) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [name, type, base_url, credentials_enc, default_project ?? null, enabled ? 1 : 0]);
@@ -361,6 +362,9 @@ router.put('/ticketing/:id', async (req, res) => {
     const existing = await rawGet<any>(db, 'SELECT id FROM ticketing_configs WHERE id = ?', [id]);
     if (!existing) return res.status(404).json({ error: 'Not found' });
     const { name, base_url, credentials, default_project, enabled } = req.body;
+    if (base_url !== undefined) {
+      try { await validateBaseUrl(base_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
+    }
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
     if (base_url !== undefined) updates.base_url = base_url;
@@ -395,6 +399,7 @@ router.post('/ticketing/:id/create-ticket', async (req, res) => {
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
     const row = await rawGet<any>(db, 'SELECT * FROM ticketing_configs WHERE id = ?', [id]);
     if (!row) return res.status(404).json({ error: 'Not found' });
+    try { await validateBaseUrl(row.base_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
     const { summary, description, priority } = req.body;
     if (!summary || !description) return res.status(400).json({ error: 'summary and description required' });
     const creds = row.credentials_enc ? decryptJson(row.credentials_enc) : {};

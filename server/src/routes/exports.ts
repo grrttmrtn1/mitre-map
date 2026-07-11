@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent } from '../db/database';
+import { getKnex, rawAll, rawGet, computeCoverageState } from '../db/database';
 import PptxGenJS from 'pptxgenjs';
 
 const router = Router();
@@ -55,7 +55,9 @@ router.get('/detections/csv', async (_req, res) => {
   const cols = ['id', 'name', 'rule_id', 'source', 'technique_ids', 'status', 'severity', 'confidence', 'false_positive_rate', 'notes', 'created_at', 'updated_at'];
   const escape = (v: unknown) => {
     if (v === null || v === undefined) return '';
-    const s = String(v).replace(/"/g, '""');
+    const raw = String(v);
+    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    const s = safe.replace(/"/g, '""');
     return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
   };
   const csv = [cols.join(','), ...rows.map(r => cols.map(c => escape(r[c])).join(','))].join('\n');
@@ -75,7 +77,9 @@ router.get('/tools/csv', async (_req, res) => {
   const cols = ['id', 'name', 'vendor', 'category', 'status', 'd3fend_count', 'mitigation_count', 'description', 'notes', 'created_at'];
   const escape = (v: unknown) => {
     if (v === null || v === undefined) return '';
-    const s = String(v).replace(/"/g, '""');
+    const raw = String(v);
+    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    const s = safe.replace(/"/g, '""');
     return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
   };
   const csv = [cols.join(','), ...withLinks.map(r => cols.map(c => escape((r as any)[c])).join(','))].join('\n');
@@ -86,25 +90,9 @@ router.get('/tools/csv', async (_req, res) => {
 
 router.get('/coverage/json', async (_req, res) => {
   const db = getKnex();
-  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
-
-  // Build detected and mitigated sets, resolving subtechniques to their parents
-  const detectedParents = new Set<string>();
-  for (const d of await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'")) {
-    for (const id of JSON.parse(d.technique_ids)) {
-      const p = resolveToParent(id, parentTechIds, subtechToParent);
-      if (p) detectedParents.add(p);
-    }
-  }
-  const mitigatedParents = new Set<string>();
-  for (const r of await rawAll<{ technique_id: string }>(db, `
-    SELECT DISTINCT tm.technique_id FROM technique_mitigations tm
-    JOIN tool_mitigations tlm ON tm.mitigation_id = tlm.mitigation_id
-    JOIN tools tl ON tlm.tool_id = tl.id WHERE tl.status = 'active'
-  `)) {
-    const p = resolveToParent(r.technique_id, parentTechIds, subtechToParent);
-    if (p) mitigatedParents.add(p);
-  }
+  const coverage = await computeCoverageState(db);
+  const detectedParents = coverage.detectedIds;
+  const mitigatedParents = coverage.mitigatedIds;
 
   const techniques = await rawAll<any>(db, 'SELECT id, name, tactic_ids FROM attack_techniques WHERE is_subtechnique = 0', []);
   const result = techniques.map(t => {
@@ -116,12 +104,14 @@ router.get('/coverage/json', async (_req, res) => {
     };
   });
   res.setHeader('Content-Disposition', 'attachment; filename="coverage-matrix.json"');
+  res.setHeader('X-Mitremap-Coverage-Methodology', coverage.methodology);
   res.json(result);
 });
 
 router.get('/report/pptx', async (_req, res) => {
   const db = getKnex();
-  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
+  const coverage = await computeCoverageState(db);
+  const { coveredIds } = coverage;
 
   const [techniques, detections, tools, threatGroups] = await Promise.all([
     rawAll<any>(db, 'SELECT id, name, tactic_ids FROM attack_techniques WHERE is_subtechnique=0', []),
@@ -131,14 +121,7 @@ router.get('/report/pptx', async (_req, res) => {
   ]);
 
   const activeDetections = detections.filter((d: any) => d.status === 'active');
-  const coveredIds = new Set<string>();
-  for (const d of activeDetections) {
-    for (const id of JSON.parse(d.technique_ids)) {
-      const p = resolveToParent(id, parentTechIds, subtechToParent);
-      if (p) coveredIds.add(p);
-    }
-  }
-  const coveragePct = techniques.length ? Math.round((coveredIds.size / techniques.length) * 100) : 0;
+  const coveragePct = coverage.pct;
 
   const tacticOrder = ['initial-access', 'execution', 'persistence', 'privilege-escalation', 'defense-evasion', 'credential-access', 'discovery', 'lateral-movement', 'collection', 'command-and-control', 'exfiltration', 'impact'];
   const tacticCoverage: Record<string, { total: number; covered: number }> = {};

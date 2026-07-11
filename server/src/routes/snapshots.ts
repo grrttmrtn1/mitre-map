@@ -1,33 +1,22 @@
 import { Router } from 'express';
-import { getKnex, rawAll, rawGet, rawRun, rawInsert, buildTechniqueGraph, resolveToParent, logAudit } from '../db/database';
+import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, computeCoverageState } from '../db/database';
 import { snapshotComplianceCoverage } from './compliance';
 
 const router = Router();
 
 export async function takeSnapshot(notes?: string | null, actor?: string, sourceIp?: string): Promise<any> {
   const db = getKnex();
-  const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
-  const total = parentTechIds.size;
-  const active = await rawAll<{ technique_ids: string }>(db, "SELECT technique_ids FROM detections WHERE status='active'");
-  const covered = new Set<string>();
-  for (const d of active) for (const id of JSON.parse(d.technique_ids)) {
-    const p = resolveToParent(id, parentTechIds, subtechToParent);
-    if (p) covered.add(p);
-  }
-  const { c: mitigated } = await rawGet<{ c: number }>(db, `
-    SELECT COUNT(DISTINCT tm.technique_id) as c FROM technique_mitigations tm
-    JOIN tool_mitigations tlm ON tm.mitigation_id = tlm.mitigation_id
-    JOIN tools t ON tlm.tool_id = t.id WHERE t.status='active'
-  `) as any;
+  const coverage = await computeCoverageState(db);
+  const total = coverage.total;
   const { c: activeDetCount } = await rawGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM detections WHERE status='active'") as any;
   const { c: toolCount } = await rawGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM tools WHERE status='active'") as any;
-  const coveredCount = covered.size;
+  const coveredCount = coverage.covered;
   const id = await rawInsert(db, `
     INSERT INTO coverage_snapshots (total_techniques, covered_techniques, detected_techniques,
       mitigated_techniques, gap_techniques, coverage_pct, active_detections, total_tools, notes)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-  `, [total, coveredCount, coveredCount, mitigated,
-    total - coveredCount, Math.round((coveredCount / total) * 100),
+  `, [total, coveredCount, coverage.detectedIds.size, coverage.mitigatedIds.size,
+    total - coveredCount, coverage.pct,
     activeDetCount, toolCount, notes ?? null]);
   const snapshot = await rawGet<any>(db, 'SELECT * FROM coverage_snapshots WHERE id = ?', [id]);
   await logAudit(db, 'snapshot', String(id), 'created', actor ?? 'system',
