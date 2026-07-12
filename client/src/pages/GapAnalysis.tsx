@@ -233,7 +233,7 @@ export default function GapAnalysis() {
 
   if (loading) return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+      <div className="page-command-header">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="h-6 w-36 bg-gray-100 dark:bg-slate-800 rounded animate-pulse" />
         <div className="h-3.5 w-64 bg-gray-100/60 dark:bg-slate-800/60 rounded animate-pulse mt-2" />
@@ -248,7 +248,7 @@ export default function GapAnalysis() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+      <div className="page-command-header">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between">
           <div>

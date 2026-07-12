@@ -2,17 +2,25 @@ import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit } from '../db/database';
 import { checkUncoveredGroupTechniqueAlerts } from '../webhooks/service';
 import { GITHUB_RELEASES_API, GH_HEADERS } from '../data/stix-fetch';
+import { pageOptions, pageResult } from '../lib/pagination';
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   const db = getKnex();
-  const groups = await rawAll(db, 'SELECT * FROM threat_groups ORDER BY name');
-  res.json(groups.map((g: any) => ({
+  const page = pageOptions(req);
+  const where = page.search ? "WHERE LOWER(name) LIKE ? OR LOWER(COALESCE(aliases,'')) LIKE ? OR LOWER(COALESCE(country,'')) LIKE ?" : '';
+  const params = page.search ? Array(3).fill(`%${page.search.toLowerCase()}%`) : [];
+  const count = await rawGet<{ c: number }>(db, `SELECT COUNT(*) AS c FROM threat_groups ${where}`, params);
+  let sql = `SELECT * FROM threat_groups ${where} ORDER BY name`;
+  if (page.paginated) { sql += ' LIMIT ? OFFSET ?'; params.push(page.limit, page.offset); }
+  const groups = await rawAll(db, sql, params);
+  const parsed = groups.map((g: any) => ({
     ...g,
     aliases: JSON.parse(g.aliases),
     targeted_sectors: JSON.parse(g.targeted_sectors ?? '[]'),
-  })));
+  }));
+  res.json(page.paginated ? pageResult(parsed, Number(count?.c ?? 0), page.limit, page.offset) : parsed);
 });
 
 router.post('/', async (req, res) => {

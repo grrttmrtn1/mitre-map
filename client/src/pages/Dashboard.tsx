@@ -9,6 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 import { PageContent, PageHeader, PageShell } from '../components/ui/PageShell';
 import KpiCard from '../components/ui/KpiCard';
 import ChartCard from '../components/ui/ChartCard';
+import { Activity, AlertTriangle, Clock3, LayoutDashboard, ShieldCheck, Wrench } from 'lucide-react';
 
 type WidgetId = 'kpis' | 'tactic_bars' | 'detection_status' | 'radar' | 'tactic_chart' | 'trend' | 'risk' | 'lowest_tactics' | 'attribution';
 const DEFAULT_WIDGET_ORDER: WidgetId[] = ['kpis', 'tactic_bars', 'detection_status', 'radar', 'tactic_chart', 'trend', 'risk', 'lowest_tactics', 'attribution'];
@@ -157,7 +158,7 @@ export default function Dashboard() {
 
   if (loading) return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+      <div className="page-command-header">
         <div className="h-6 w-48 bg-gray-200 dark:bg-slate-800 rounded animate-pulse" />
         <div className="h-3.5 w-72 bg-gray-200/60 dark:bg-slate-800/60 rounded animate-pulse mt-2" />
       </div>
@@ -182,6 +183,7 @@ export default function Dashboard() {
       glow: 'rgba(59,130,246,0.18)',
       delta: baseline ? stats.coverage_pct - baseline.coverage_pct : null,
       deltaUnit: '%',
+      icon: ShieldCheck, accent: 'from-blue-500/25 to-cyan-400/10', featured: true,
     },
     {
       label: 'Active Detections', value: stats.active_detections,
@@ -191,6 +193,7 @@ export default function Dashboard() {
       glow: 'rgba(16,185,129,0.18)',
       delta: baseline ? stats.active_detections - baseline.active_detections : null,
       deltaUnit: '',
+      icon: Activity, accent: 'from-emerald-500/20 to-teal-400/5',
     },
     {
       label: 'Coverage Gaps', value: stats.gap_techniques,
@@ -200,6 +203,7 @@ export default function Dashboard() {
       glow: 'rgba(239,68,68,0.18)',
       delta: baseline ? stats.gap_techniques - baseline.gap_techniques : null,
       deltaUnit: '', invert: true,
+      icon: AlertTriangle, accent: 'from-red-500/20 to-orange-400/5',
     },
     {
       label: 'Active Tools', value: stats.active_tools,
@@ -208,6 +212,7 @@ export default function Dashboard() {
       bg: 'border-purple-500/20 bg-purple-500/5',
       glow: 'rgba(168,85,247,0.18)',
       delta: null, deltaUnit: '',
+      icon: Wrench, accent: 'from-purple-500/20 to-violet-400/5',
     },
   ];
 
@@ -235,7 +240,11 @@ export default function Dashboard() {
 
   return (
     <PageShell>
-      <PageHeader title="Coverage Dashboard" description="MITRE ATT&CK Enterprise detection and defense coverage" actions={<>
+      <PageHeader icon={LayoutDashboard} eyebrow="Security posture" title="Coverage Dashboard" description="MITRE ATT&CK Enterprise detection and defense coverage"
+        meta={<>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-2.5 py-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />Live posture</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/60 px-2.5 py-1 text-[11px] text-gray-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400"><Clock3 size={12} />Updated now</span>
+        </>} actions={<>
             <button
               onClick={resetWidgetLayout}
               className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-400 dark:border-slate-600 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
@@ -252,17 +261,18 @@ export default function Dashboard() {
       </>} />
 
       <PageContent className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {kpis.map(kpi => (
-          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} detail={kpi.sub} className={kpi.bg}
+          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} detail={kpi.sub} className={`${kpi.bg} ${kpi.featured ? 'xl:col-span-2' : ''}`}
             valueClassName={`bg-gradient-to-br bg-clip-text text-transparent ${kpi.gradient}`}
+            icon={kpi.icon} accent={kpi.accent} featured={kpi.featured}
             trend={<TrendBadge delta={kpi.delta ?? null} invert={kpi.invert} unit={kpi.deltaUnit} />} />
         ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500 mb-3">Coverage by Tactic</h2>
+        <div className="surface-card xl:col-span-2 p-5">
+          <h2 className="mb-4 text-base font-semibold tracking-tight text-gray-800 dark:text-slate-100">Coverage by Tactic</h2>
           <div className="space-y-2.5">
             {stats.tactic_stats.map(t => (
               <div key={t.tactic_id} className="grid grid-cols-[1fr_120px_36px] items-center gap-3">
@@ -338,9 +348,9 @@ export default function Dashboard() {
         </ChartCard>
       </div>
 
-      <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-4">
+      <div className="surface-card p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] uppercase tracking-widest font-semibold text-gray-400 dark:text-slate-500">Coverage Trend</h2>
+          <div><h2 className="text-base font-semibold tracking-tight text-gray-800 dark:text-slate-100">Coverage Trend</h2><p className="mt-1 text-xs text-gray-500 dark:text-slate-400">Historical posture and annotated milestones</p></div>
           <div className="flex gap-1">
             {(['7D', '30D', '90D', 'All'] as const).map(r => (
               <button key={r} onClick={() => setTrendRange(r)} aria-pressed={trendRange === r} aria-label={`Show ${r === 'All' ? 'all' : r} coverage history`}
@@ -384,8 +394,9 @@ export default function Dashboard() {
                 <Line
                   type="monotone"
                   dataKey="coverage_pct"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    className="animate-draw"
                   dot={(props: any) => {
                     const { cx, cy, payload } = props;
                     const isSelected = payload.id === selectedSnapId;

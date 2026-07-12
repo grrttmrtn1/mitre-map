@@ -12,6 +12,8 @@ import type {
   Campaign, Indicator, CveGapSummary, ReportSchedule,
 } from './types';
 
+export interface Page<T> { rows: T[]; total: number; limit: number; offset: number; next_offset: number | null }
+
 const BASE = '/api';
 const STORAGE_KEY = 'mitremap_api_key';
 let _legacyApiKey: string | null = null;
@@ -55,66 +57,87 @@ function handleUnauth(status: number) {
   if (status === 401) _authErrorHandler?.();
 }
 
-async function errorMessage(res: Response): Promise<string> {
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly requestId: string | null,
+    public readonly field?: string,
+    public readonly retryAfter?: number,
+  ) { super(message); this.name = 'ApiError'; }
+}
+
+const REQUEST_TIMEOUT_MS = 20_000;
+
+async function request<T>(path: string, init: RequestInit = {}, retry = 0): Promise<T> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const body = await res.json();
-    return body.error ?? `${res.status} ${res.statusText}`;
-  } catch {
-    return `${res.status} ${res.statusText}`;
+    const res = await fetch(`${BASE}${path}`, { ...init, signal: controller.signal });
+    handleUnauth(res.status);
+    if (!res.ok) {
+      const retryAfter = Number(res.headers.get('retry-after')) || undefined;
+      if ((res.status === 429 || res.status >= 500) && retry < 2 && (init.method ?? 'GET') === 'GET') {
+        await new Promise(resolve => window.setTimeout(resolve, retryAfter ? retryAfter * 1000 : 300 * (2 ** retry)));
+        return request<T>(path, init, retry + 1);
+      }
+      let body: any = {};
+      try { body = await res.json(); } catch { /* non-JSON error response */ }
+      throw new ApiError(
+        body.error ?? `${res.status} ${res.statusText}`,
+        res.status,
+        body.request_id ?? res.headers.get('x-request-id'),
+        body.field,
+        retryAfter,
+      );
+    }
+    if (res.status === 204) return undefined as T;
+    const ct = res.headers.get('content-type') ?? '';
+    return (ct.includes('application/json') ? await res.json() : undefined) as T;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiError('Request timed out. Please try again.', 408, null);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
-  handleUnauth(res.status);
-  if (!res.ok) throw new Error(await errorMessage(res));
-  return res.json();
+  return request<T>(path, { headers: authHeaders() });
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  return request<T>(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
-  handleUnauth(res.status);
-  if (!res.ok) throw new Error(await errorMessage(res));
-  return res.json();
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  return request<T>(path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
-  handleUnauth(res.status);
-  if (!res.ok) throw new Error(await errorMessage(res));
-  return res.json();
 }
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  return request<T>(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
-  handleUnauth(res.status);
-  if (!res.ok) throw new Error(await errorMessage(res));
-  return res.json();
 }
 
 async function del(path: string, body?: unknown): Promise<any> {
-  const res = await fetch(`${BASE}${path}`, {
+  return request<any>(path, {
     method: 'DELETE',
     headers: { ...authHeaders(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  handleUnauth(res.status);
-  if (!res.ok && res.status !== 204) throw new Error(await errorMessage(res));
-  if (res.status === 204) return;
-  const ct = res.headers.get('content-type') ?? '';
-  return ct.includes('application/json') ? res.json() : undefined;
 }
 
 export const api = {
@@ -144,6 +167,11 @@ export const api = {
     const q = params.toString();
     return get<Detection[]>(`/detections${q ? `?${q}` : ''}`);
   },
+  getDetectionPage: (filters: { status?: string; source?: string; severity?: string; technique?: string; search?: string; limit?: number; offset?: number } = {}) => {
+    const params = new URLSearchParams({ paginated: 'true' });
+    Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
+    return get<Page<Detection>>(`/detections?${params}`);
+  },
   getDetectionQualityScores: () => get<DetectionQualityScore[]>('/detections/quality-scores'),
   getDetection: (id: number) => get<Detection>(`/detections/${id}`),
   getDetectionHistory: (id: number) => get<DetectionHistory>(`/detections/${id}/history`),
@@ -151,6 +179,8 @@ export const api = {
   updateDetection: (id: number, data: Partial<Detection>) => put<Detection>(`/detections/${id}`, data),
   deleteDetection: (id: number) => del(`/detections/${id}`),
   importDetections: (detections: Partial<Detection>[]) => post<{ imported: number }>('/detections/import', { detections }),
+  previewDetectionImport: (detections: Partial<Detection>[]) => post<{ summary: { total: number; create: number; duplicate: number; invalid: number }; rows: Array<{ index: number; action: string; errors: string[] }> }>('/detections/import?preview=true', { detections }),
+  rollbackDetectionImport: (importId: number) => del(`/detections/imports/${importId}/rollback`),
   bulkUpdateDetections: (ids: number[], status: string) => patch<{ updated: number }>('/detections/bulk', { ids, status }),
   bulkDeleteDetections: (ids: number[]) => del('/detections/bulk', { ids }),
   logDetectionFire: (id: number, outcome: 'true_positive' | 'false_positive' | 'suppressed') =>
@@ -159,6 +189,11 @@ export const api = {
 
   // Tools
   getTools: () => get<Tool[]>('/tools'),
+  getToolPage: (filters: { search?: string; limit?: number; offset?: number } = {}) => {
+    const params = new URLSearchParams({ paginated: 'true' });
+    Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
+    return get<Page<Tool>>(`/tools?${params}`);
+  },
   getTool: (id: number) => get<ToolDetail>(`/tools/${id}`),
   createTool: (data: Partial<Tool> & { d3fend_ids?: string[]; mitigation_ids?: string[] }) => post<Tool>('/tools', data),
   updateTool: (id: number, data: Partial<Tool> & { d3fend_ids?: string[]; mitigation_ids?: string[] }) => put<Tool>(`/tools/${id}`, data),
@@ -231,6 +266,11 @@ export const api = {
 
   // Threat groups
   getThreatGroups: () => get<ThreatGroup[]>('/threat-groups'),
+  getThreatGroupPage: (filters: { search?: string; limit?: number; offset?: number } = {}) => {
+    const params = new URLSearchParams({ paginated: 'true' });
+    Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
+    return get<Page<ThreatGroup>>(`/threat-groups?${params}`);
+  },
   getThreatGroup: (id: string) => get<ThreatGroupDetail>(`/threat-groups/${id}`),
   getThreatGroupExposure: (id: string) => get<{ group_id: string; techniques: any[]; exposed_count: number; total: number }>(`/threat-groups/${id}/exposure`),
   createThreatGroup: (data: Partial<ThreatGroup> & { technique_ids?: string[] }) => post<ThreatGroup>('/threat-groups', data),
@@ -472,6 +512,8 @@ export const api = {
 
   // Prioritization
   getPrioritizationQueue: () => get<PrioritizationQueue>('/prioritization/queue'),
+  getTechniqueTimeline: (techniqueId: string) => get<any>(`/prioritization/techniques/${encodeURIComponent(techniqueId)}/timeline`),
+  getOperations: () => get<{ summary: Record<string, number>; operations: any[] }>('/operations'),
 
   // Notifications
   getNotifications: () => get<Notification[]>('/notifications'),

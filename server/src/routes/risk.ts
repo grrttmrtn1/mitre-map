@@ -42,6 +42,11 @@ router.get('/score', async (_req, res) => {
   res.json({
     score: riskScore, level,
     components: { coverage_gap_pct: 100 - coveragePct, exposed_threat_groups: exposedGroups, critical_gaps: criticalGaps },
+    explanation: {
+      formula: 'coverage_gap_pct + min(10, exposed_threat_groups) + min(15, critical_gaps * 2)',
+      contributions: { coverage_gap: baseRisk, threat_group_exposure: groupExposureFactor, critical_gap_concentration: criticalFactor },
+      maximums: { score: 100, threat_group_exposure: 10, critical_gap_concentration: 15 },
+    },
     coverage_pct: coveragePct, gap_count: total - covered.size, total_techniques: total,
     methodology: coverage.methodology,
   });
@@ -70,6 +75,7 @@ router.get('/by-tactic', async (_req, res) => {
       tactic_id: tac.id, tactic_name: tac.name,
       total_techniques: techniques.length, covered, gap_count: techniques.length - covered,
       coverage_pct: pct, group_exposure_score: groupExposure, risk_score: riskScore,
+      risk_components: { coverage_gap: 100 - pct, threat_group_exposure: Math.min(20, groupExposure) },
       risk_level: riskScore >= 75 ? 'critical' : riskScore >= 50 ? 'high' : riskScore >= 25 ? 'medium' : 'low',
     };
   }));
@@ -99,6 +105,7 @@ router.get('/by-technique', async (_req, res) => {
       id: t.id, name: t.name, tactic_ids: JSON.parse(t.tactic_ids),
       detected, mitigated, group_count: groupCount, compliance_count: complianceCount,
       risk_score: riskScore,
+      risk_components: { coverage: detectionScore, threat_groups: groupScore, compliance: complianceScore },
       risk_level: riskScore >= 75 ? 'critical' : riskScore >= 50 ? 'high' : riskScore >= 25 ? 'medium' : 'low',
     };
   }));

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
@@ -20,15 +21,42 @@ export default function NotificationCenter() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPosition, setPanelPosition] = useState({ left: 0, bottom: 0 });
   const navigate = useNavigate();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        ref.current &&
+        !ref.current.contains(e.target as Node) &&
+        !panelRef.current?.contains(e.target as Node)
+      ) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const positionPanel = () => {
+      const rect = ref.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPanelPosition({
+        left: Math.min(rect.left, window.innerWidth - 296),
+        bottom: window.innerHeight - rect.top + 8,
+      });
+    };
+
+    positionPanel();
+    window.addEventListener('resize', positionPanel);
+    window.addEventListener('scroll', positionPanel, true);
+    return () => {
+      window.removeEventListener('resize', positionPanel);
+      window.removeEventListener('scroll', positionPanel, true);
+    };
+  }, [open]);
 
   const handleClick = async (n: { id: number; entity_type: string | null; entity_id: string | null }) => {
     await markRead(n.id);
@@ -52,8 +80,12 @@ export default function NotificationCenter() {
         )}
       </button>
 
-      {open && (
-        <div className="absolute bottom-8 left-0 w-72 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          style={{ left: Math.max(8, panelPosition.left), bottom: panelPosition.bottom }}
+          className="fixed w-72 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-[200] overflow-hidden"
+        >
           <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-slate-800">
             <span className="text-xs font-semibold text-gray-700 dark:text-slate-300">Notifications</span>
             {unreadCount > 0 && (
@@ -88,7 +120,8 @@ export default function NotificationCenter() {
               ))}
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

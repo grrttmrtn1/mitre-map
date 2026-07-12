@@ -7,7 +7,8 @@
     "build": "npm run build --workspace=server && npm run build --workspace=client",
     "start": "npm run start --workspace=server",
     "typecheck": "npm run typecheck --workspace=server && npm run typecheck --workspace=client",
-    "test": "npm test --workspace=server"
+    "test": "npm test --workspace=server && npm test --workspace=client",
+    "test:all": "npm run typecheck && npm test && npm run test:e2e --workspace=client"
   },
   "devDependencies": {
     "concurrently": "^9"

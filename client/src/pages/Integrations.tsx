@@ -23,6 +23,18 @@ interface SiemSchema {
   credentialsHints: Record<string, string>;
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  tenant_id: 'Tenant ID', subscription_id: 'Subscription ID', resource_group: 'Resource group',
+  workspace_name: 'Workspace name', client_id: 'Client ID', client_secret: 'Client secret',
+  base_url: 'Base URL', app: 'App namespace', token: 'API token', api_key: 'API key',
+  space_id: 'Space ID', project_id: 'Project ID', instance_id: 'Instance ID',
+  region: 'Region', service_account_json: 'Service account key', username: 'Username', password: 'Password',
+};
+
+const OPTIONAL_SIEM_FIELDS = new Set(['space_id']);
+const fieldLabel = (key: string) => FIELD_LABELS[key] ?? key.replace(/_/g, ' ').replace(/^./, (c: string) => c.toUpperCase());
+const inputType = (key: string) => key === 'base_url' ? 'url' : /secret|token|api_key|password/.test(key) ? 'password' : 'text';
+
 const SIEM_SCHEMA: Record<string, SiemSchema> = {
   sentinel: {
     doc: 'https://learn.microsoft.com/en-us/azure/sentinel/connect-rest-api-template',
@@ -128,7 +140,7 @@ function SiemTab() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', type: 'splunk', config: JSON.stringify(SIEM_SCHEMA.splunk.configTemplate, null, 2), credentials: JSON.stringify(SIEM_SCHEMA.splunk.credentialsTemplate, null, 2) });
+  const [form, setForm] = useState({ name: '', type: 'splunk', config: { ...SIEM_SCHEMA.splunk.configTemplate }, credentials: { ...SIEM_SCHEMA.splunk.credentialsTemplate } });
 
   useEffect(() => {
     api.getSiemIntegrations().then(setIntegrations).finally(() => setLoading(false));
@@ -136,15 +148,17 @@ function SiemTab() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    let config: Record<string, any> = {};
-    let credentials: Record<string, string> = {};
-    try { config = JSON.parse(form.config); } catch { toast.error('Config must be valid JSON'); return; }
-    try { credentials = JSON.parse(form.credentials); } catch { toast.error('Credentials must be valid JSON'); return; }
+    const config = form.config;
+    const credentials = form.credentials;
+    if (form.type === 'chronicle') {
+      try { JSON.parse(credentials.service_account_json); }
+      catch { toast.error('Service account key must be the JSON from the downloaded key file'); return; }
+    }
     try {
       const created = await api.createSiemIntegration({ name: form.name, type: form.type, config, credentials });
       setIntegrations(prev => [created, ...prev]);
       setShowForm(false);
-      setForm({ name: '', type: 'splunk', config: JSON.stringify(SIEM_SCHEMA.splunk.configTemplate, null, 2), credentials: JSON.stringify(SIEM_SCHEMA.splunk.credentialsTemplate, null, 2) });
+      setForm({ name: '', type: 'splunk', config: { ...SIEM_SCHEMA.splunk.configTemplate }, credentials: { ...SIEM_SCHEMA.splunk.credentialsTemplate } });
       toast.success('Integration created');
     } catch { toast.error('Failed to create integration'); }
   }
@@ -216,7 +230,7 @@ function SiemTab() {
                 <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Type</label>
                 <select value={form.type} onChange={e => {
                   const s = SIEM_SCHEMA[e.target.value];
-                  setForm(f => ({ ...f, type: e.target.value, config: JSON.stringify(s.configTemplate, null, 2), credentials: JSON.stringify(s.credentialsTemplate, null, 2) }));
+                  setForm(f => ({ ...f, type: e.target.value, config: { ...s.configTemplate }, credentials: { ...s.credentialsTemplate } }));
                 }} className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100">
                   {SIEM_TYPES.map(t => <option key={t} value={t}>{SIEM_LABELS[t]}</option>)}
                 </select>
@@ -229,39 +243,45 @@ function SiemTab() {
               <a href={schema.doc} target="_blank" rel="noopener noreferrer" className="hover:underline">{schema.docLabel}</a>
             </div>
 
-            {/* Config */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Config <span className="font-normal text-gray-400 dark:text-slate-500">(non-sensitive — not encrypted)</span>
-              </label>
-              <div className="mb-2 space-y-1">
-                {Object.entries(schema.configHints).map(([key, hint]) => (
-                  <div key={key} className="flex gap-2 text-xs">
-                    <code className="flex-shrink-0 font-mono text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-1 rounded">{key}</code>
-                    <span className="text-gray-500 dark:text-slate-400">{hint}</span>
+            <fieldset>
+              <legend className="text-xs font-medium text-gray-700 dark:text-slate-300 mb-2">Connection details</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Object.keys(schema.configTemplate).map(key => (
+                  <div key={key} className={key === 'base_url' ? 'sm:col-span-2' : ''}>
+                    <label htmlFor={`siem-config-${key}`} className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      {fieldLabel(key)} {OPTIONAL_SIEM_FIELDS.has(key) && <span className="font-normal text-gray-400">(optional)</span>}
+                    </label>
+                    <input id={`siem-config-${key}`} type={inputType(key)} value={form.config[key] ?? ''} required={!OPTIONAL_SIEM_FIELDS.has(key)}
+                      onChange={e => setForm(f => ({ ...f, config: { ...f.config, [key]: e.target.value } }))}
+                      aria-describedby={`siem-config-${key}-help`}
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+                    <p id={`siem-config-${key}-help`} className="mt-1 text-xs text-gray-500 dark:text-slate-400">{schema.configHints[key]}</p>
                   </div>
                 ))}
               </div>
-              <textarea value={form.config} onChange={e => setForm(f => ({ ...f, config: e.target.value }))} rows={Object.keys(schema.configTemplate).length + 2}
-                className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
-            </div>
+            </fieldset>
 
-            {/* Credentials */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Credentials <span className="font-normal text-gray-400 dark:text-slate-500">(stored AES-256-GCM encrypted)</span>
-              </label>
-              <div className="mb-2 space-y-1">
-                {Object.entries(schema.credentialsHints).map(([key, hint]) => (
-                  <div key={key} className="flex gap-2 text-xs">
-                    <code className="flex-shrink-0 font-mono text-amber-500 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-1 rounded">{key}</code>
-                    <span className="text-gray-500 dark:text-slate-400">{hint}</span>
+            <fieldset className="border-t border-gray-200 dark:border-slate-700 pt-3">
+              <legend className="text-xs font-medium text-gray-700 dark:text-slate-300 px-1">Credentials <span className="font-normal text-gray-400 dark:text-slate-500">(encrypted at rest)</span></legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                {Object.keys(schema.credentialsTemplate).map(key => (
+                  <div key={key} className={key === 'service_account_json' ? 'sm:col-span-2' : ''}>
+                    <label htmlFor={`siem-credential-${key}`} className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">{fieldLabel(key)}</label>
+                    {key === 'service_account_json' ? (
+                      <textarea id={`siem-credential-${key}`} value={form.credentials[key] ?? ''} required rows={5}
+                        placeholder="Paste the contents of your downloaded service account key file"
+                        onChange={e => setForm(f => ({ ...f, credentials: { ...f.credentials, [key]: e.target.value } }))}
+                        className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+                    ) : (
+                      <input id={`siem-credential-${key}`} type={inputType(key)} value={form.credentials[key] ?? ''} required autoComplete="new-password"
+                        onChange={e => setForm(f => ({ ...f, credentials: { ...f.credentials, [key]: e.target.value } }))}
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+                    )}
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">{schema.credentialsHints[key]}</p>
                   </div>
                 ))}
               </div>
-              <textarea value={form.credentials} onChange={e => setForm(f => ({ ...f, credentials: e.target.value }))} rows={Object.keys(schema.credentialsTemplate).length + 2}
-                className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
-            </div>
+            </fieldset>
 
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-sm text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg">Cancel</button>
@@ -462,7 +482,7 @@ function TicketingTab() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', type: 'jira', base_url: '', default_project: '', credentials: '{}' });
+  const [form, setForm] = useState({ name: '', type: 'jira', base_url: '', default_project: '', username: '', secret: '' });
 
   useEffect(() => {
     api.getTicketingConfigs().then(setConfigs).finally(() => setLoading(false));
@@ -470,13 +490,14 @@ function TicketingTab() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    let credentials: Record<string, string> = {};
-    try { credentials = JSON.parse(form.credentials); } catch { toast.error('Credentials must be valid JSON'); return; }
+    const credentials: Record<string, string> = form.type === 'jira'
+      ? { username: form.username, token: form.secret }
+      : { username: form.username, password: form.secret };
     try {
       const created = await api.createTicketingConfig({ name: form.name, type: form.type, base_url: form.base_url, credentials, default_project: form.default_project || undefined });
       setConfigs(prev => [created, ...prev]);
       setShowForm(false);
-      setForm({ name: '', type: 'jira', base_url: '', default_project: '', credentials: '{}' });
+      setForm({ name: '', type: 'jira', base_url: '', default_project: '', username: '', secret: '' });
       toast.success('Ticketing config created');
     } catch { toast.error('Failed to create config'); }
   }
@@ -524,7 +545,7 @@ function TicketingTab() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Type</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value, base_url: '', username: '', secret: '' }))}
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100">
                 <option value="jira">Jira</option>
                 <option value="servicenow">ServiceNow</option>
@@ -532,7 +553,7 @@ function TicketingTab() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">Base URL</label>
-              <input value={form.base_url} onChange={e => setForm(f => ({ ...f, base_url: e.target.value }))} required placeholder="https://acme.atlassian.net"
+              <input type="url" value={form.base_url} onChange={e => setForm(f => ({ ...f, base_url: e.target.value }))} required placeholder={form.type === 'jira' ? 'https://acme.atlassian.net' : 'https://acme.service-now.com'}
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
             </div>
             <div>
@@ -541,13 +562,22 @@ function TicketingTab() {
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">
-              Credentials (JSON — stored encrypted)
-              {form.type === 'jira' ? ' — e.g. {"username":"user@co.com","token":"xxx"}' : ' — e.g. {"username":"admin","password":"xxx"}'}
-            </label>
-            <textarea value={form.credentials} onChange={e => setForm(f => ({ ...f, credentials: e.target.value }))} rows={3}
-              className="w-full px-3 py-1.5 text-sm font-mono border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+          <div className="border-t border-gray-200 dark:border-slate-700 pt-3">
+            <p className="text-xs font-medium text-gray-700 dark:text-slate-300 mb-2">Credentials <span className="font-normal text-gray-400">(encrypted at rest)</span></p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">{form.type === 'jira' ? 'Email address' : 'Username'}</label>
+                <input type={form.type === 'jira' ? 'email' : 'text'} value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} required autoComplete="username"
+                  placeholder={form.type === 'jira' ? 'user@company.com' : 'integration.user'}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1">{form.type === 'jira' ? 'API token' : 'Password'}</label>
+                <input type="password" value={form.secret} onChange={e => setForm(f => ({ ...f, secret: e.target.value }))} required autoComplete="new-password"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">{form.type === 'jira' ? 'Use an Atlassian API token, not your account password.' : 'Use a dedicated ServiceNow integration account with the minimum required permissions.'}</p>
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-sm text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg">Cancel</button>
@@ -594,7 +624,7 @@ export default function Integrations() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
+      <div className="page-command-header">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Integrations</h1>
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">SIEM connectors, SIGMA sync, and ticketing</p>
       </div>

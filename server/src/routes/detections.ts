@@ -1,7 +1,9 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, computeCoverageSummary, type DB } from '../db/database';
 import { checkCoverageAlerts } from '../webhooks/service';
 import { recordCoverageChangeDirect } from '../coverage/attribution';
+import { pageOptions, pageResult } from '../lib/pagination';
 
 const router = Router();
 
@@ -18,15 +20,20 @@ async function saveVersion(db: DB, detectionId: number | string, snapshot: any, 
 router.get('/', async (req, res) => {
   const db = getKnex();
   const { status, source, severity, technique } = req.query;
+  const page = pageOptions(req);
   let sql = 'SELECT * FROM detections WHERE 1=1';
   const params: any[] = [];
   if (status) { sql += ' AND status = ?'; params.push(status); }
   if (source) { sql += ' AND source = ?'; params.push(source); }
   if (severity) { sql += ' AND severity = ?'; params.push(severity); }
   if (technique) { sql += ' AND technique_ids LIKE ?'; params.push(`%"${technique}"%`); }
+  if (page.search) { sql += ' AND (LOWER(name) LIKE ? OR LOWER(COALESCE(rule_id,\'\')) LIKE ? OR LOWER(COALESCE(source,\'\')) LIKE ?)'; params.push(...Array(3).fill(`%${page.search.toLowerCase()}%`)); }
+  const count = await rawGet<{ c: number }>(db, `SELECT COUNT(*) AS c FROM (${sql}) filtered`, params);
   sql += ' ORDER BY updated_at DESC';
+  if (page.paginated) { sql += ' LIMIT ? OFFSET ?'; params.push(page.limit, page.offset); }
   const rows = await rawAll(db, sql, params);
-  res.json(rows.map((d: any) => ({ ...d, technique_ids: JSON.parse(d.technique_ids) })));
+  const parsed = rows.map((d: any) => ({ ...d, technique_ids: JSON.parse(d.technique_ids) }));
+  res.json(page.paginated ? pageResult(parsed, Number(count?.c ?? 0), page.limit, page.offset) : parsed);
 });
 
 export const SEVERITY_SCORES: Record<string, number> = { critical: 25, high: 20, medium: 15, low: 10, informational: 5 };
@@ -263,22 +270,42 @@ router.post('/import', async (req, res) => {
   const db = getKnex();
   const { detections } = req.body;
   if (!Array.isArray(detections)) return res.status(400).json({ error: 'detections array required' });
+  if (detections.length > 5000) return res.status(413).json({ error: 'A single import is limited to 5,000 detections' });
+  const existing = await rawAll<{ name: string; source: string | null; rule_id: string | null }>(db, 'SELECT name, source, rule_id FROM detections');
+  const duplicateKeys = new Set(existing.flatMap(d => [d.rule_id ? `rule:${d.rule_id}` : '', `name:${d.name}|${d.source ?? ''}`]).filter(Boolean));
+  const preview = detections.map((d: any, index: number) => {
+    const errors: string[] = [];
+    if (!d?.name || typeof d.name !== 'string') errors.push('name is required');
+    if (!Array.isArray(d?.technique_ids) || d.technique_ids.length === 0) errors.push('technique_ids must be a non-empty array');
+    const duplicate = Boolean((d?.rule_id && duplicateKeys.has(`rule:${d.rule_id}`)) || duplicateKeys.has(`name:${d?.name}|${d?.source ?? ''}`));
+    return { index, action: errors.length ? 'invalid' : duplicate ? 'duplicate' : 'create', errors };
+  });
+  const summary = {
+    total: preview.length,
+    create: preview.filter(p => p.action === 'create').length,
+    duplicate: preview.filter(p => p.action === 'duplicate').length,
+    invalid: preview.filter(p => p.action === 'invalid').length,
+  };
+  if (req.query.preview === 'true' || req.body.preview === true) return res.json({ summary, rows: preview });
   const actor = (req as any).actor ?? 'user';
   const coverageBefore = await computeCoverageSummary(db);
   let imported = 0;
+  const importedIds: number[] = [];
   await db.transaction(async trx => {
-    for (const d of detections) {
-      if (!d.name || !d.technique_ids) continue;
-      await trx.raw(`
+    for (const item of preview) {
+      if (item.action !== 'create') continue;
+      const d = detections[item.index];
+      const id = await rawInsert(trx, `
         INSERT INTO detections (name, description, rule_id, source, technique_ids, status, severity, confidence, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
       `, [d.name, d.description ?? null, d.rule_id ?? null, d.source ?? null,
-        JSON.stringify(Array.isArray(d.technique_ids) ? d.technique_ids : [d.technique_ids]),
+        JSON.stringify(d.technique_ids),
         d.status ?? 'active', d.severity ?? 'medium', d.confidence ?? 'medium', d.notes ?? null]);
+      importedIds.push(id);
       imported++;
     }
     if (imported > 0) {
-      await logAudit(trx, 'detection', 'bulk', 'imported', actor, { count: imported }, (req as any).sourceIp);
+      await logAudit(trx, 'detection_import', crypto.randomUUID(), 'applied', actor, { count: imported, detection_ids: importedIds }, (req as any).sourceIp);
     }
   });
   if (imported > 0) {
@@ -286,7 +313,27 @@ router.post('/import', async (req, res) => {
       recordCoverageChangeDirect(db, 'detection', 'bulk', `${imported} detections`, 'imported', actor, coverageBefore, after)
     ).catch(() => {});
   }
-  res.json({ imported });
+  const audit = await rawGet<any>(db, "SELECT id,entity_id,created_at FROM audit_log WHERE entity_type='detection_import' AND actor=? ORDER BY id DESC", [actor]);
+  res.json({ imported, skipped: summary.duplicate, invalid: summary.invalid, import_id: audit?.id, batch_id: audit?.entity_id });
+});
+
+router.delete('/imports/:id/rollback', async (req, res) => {
+  const db = getKnex();
+  const audit = await rawGet<any>(db, "SELECT * FROM audit_log WHERE id=? AND entity_type='detection_import' AND action='applied'", [req.params.id]);
+  if (!audit) return res.status(404).json({ error: 'Import batch not found or already rolled back' });
+  const changes = JSON.parse(audit.changes ?? '{}');
+  const ids = Array.isArray(changes.detection_ids) ? changes.detection_ids.filter(Number.isInteger) : [];
+  if (!ids.length) return res.status(409).json({ error: 'This import has no rollback manifest' });
+  const placeholders = ids.map(() => '?').join(',');
+  let deleted = 0;
+  await db.transaction(async trx => {
+    const count = await rawGet<{ c: number }>(trx, `SELECT COUNT(*) AS c FROM detections WHERE id IN (${placeholders})`, ids);
+    deleted = Number(count?.c ?? 0);
+    await rawRun(trx, `DELETE FROM detections WHERE id IN (${placeholders})`, ids);
+    await rawRun(trx, "UPDATE audit_log SET action='rolled_back' WHERE id=?", [audit.id]);
+    await logAudit(trx, 'detection_import', audit.entity_id, 'rollback', (req as any).actor ?? 'user', { deleted }, (req as any).sourceIp);
+  });
+  res.json({ rolled_back: deleted });
 });
 
 export default router;

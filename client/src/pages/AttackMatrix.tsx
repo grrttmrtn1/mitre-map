@@ -411,7 +411,7 @@ export default function AttackMatrix() {
   return (
     <div className="flex flex-col h-full">
       {/* ── Header ── */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+      <div className="page-command-header">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -582,7 +582,7 @@ export default function AttackMatrix() {
                             tacticName: col.tactic.name,
                           })}
                           title={`${cell.id} · ${cell.name}`}
-                          className={`w-24 text-left px-1.5 py-1 rounded text-xs transition-colors cursor-pointer ${hasTwoOverlay ? '' : (heatmapMode ? '' : CELL_COLORS[cell.status])} ${ringClass} ${dimClass}`}
+                          className={`matrix-cell w-24 text-left px-1.5 py-1 rounded text-xs cursor-pointer ${selected?.id === cell.id ? 'matrix-cell-selected' : ''} ${hasTwoOverlay ? '' : (heatmapMode ? '' : CELL_COLORS[cell.status])} ${ringClass} ${dimClass}`}
                           style={twoOverlayStyle ?? (heatmapMode ? densityStyle(cellDensityRatio(cell)) : undefined)}
                         >
                           <div className="font-mono text-xs opacity-75">{cell.id}</div>
@@ -621,7 +621,7 @@ export default function AttackMatrix() {
                                 parentId: cell.id, parentName: cell.name, tacticName: col.tactic.name,
                               })}
                               title={`${sub.id} · ${sub.name}`}
-                              className={`w-24 text-left pl-3 pr-1.5 py-0.5 rounded-sm text-xs transition-colors cursor-pointer border-l-2 border-slate-500/30 ${heatmapMode ? '' : CELL_COLORS[sub.status]} ${subRing} ${subDim}`}
+                              className={`matrix-cell w-24 text-left pl-3 pr-1.5 py-0.5 rounded-sm text-xs cursor-pointer border-l-2 border-slate-500/30 ${selected?.id === sub.id ? 'matrix-cell-selected' : ''} ${heatmapMode ? '' : CELL_COLORS[sub.status]} ${subRing} ${subDim}`}
                               style={heatmapMode ? densityStyle(statusDensity(sub.status)) : undefined}
                             >
                               <div className="font-mono text-xs opacity-75">{sub.id}</div>

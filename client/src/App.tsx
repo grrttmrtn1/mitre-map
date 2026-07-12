@@ -30,6 +30,7 @@ const SigmaLibrary = lazy(() => import('./pages/SigmaLibrary'));
 const Prioritization = lazy(() => import('./pages/Prioritization'));
 const Compliance = lazy(() => import('./pages/Compliance'));
 const Integrations = lazy(() => import('./pages/Integrations'));
+const Operations = lazy(() => import('./pages/Operations'));
 
 function AuthBanner({ onDismiss }: { onDismiss: () => void }) {
   const navigate = useNavigate();
@@ -108,6 +109,7 @@ function AnimatedRoutes() {
         <Route path="/taxii" element={<TaxiiIngest />} />
         <Route path="/sigma" element={<SigmaLibrary />} />
         <Route path="/integrations" element={<Integrations />} />
+        <Route path="/operations" element={<Operations />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/api" element={<ApiPlayground />} />
@@ -153,7 +155,7 @@ function AppShell() {
               </div>
               {authError && <AuthBanner onDismiss={() => setAuthError(false)} />}
               {isBootstrapMode && <BootstrapBanner tokenConfigured={bootstrapTokenConfigured} />}
-              <main id="main-content" tabIndex={-1} className="flex-1 overflow-hidden outline-none print:overflow-visible print:h-auto">
+              <main id="main-content" tabIndex={-1} className="app-main command-grid flex-1 overflow-hidden outline-none print:h-auto print:overflow-visible">
                 <AnimatedRoutes />
               </main>
             </div>

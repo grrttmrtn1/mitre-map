@@ -26,7 +26,9 @@ import {
   Moon,
   ClipboardCheck,
   Plug,
+  Activity,
   X,
+  ChevronDown,
 } from 'lucide-react';
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
@@ -72,6 +74,7 @@ const NAV: NavGroup[] = [
     section: 'System',
     items: [
       { to: '/reports',  label: 'Reports & Exports', icon: BarChart3 },
+      { to: '/operations', label: 'Operations', icon: Activity },
       { to: '/settings', label: 'Settings',          icon: Settings },
       { to: '/api',      label: 'API Playground',    icon: Zap },
     ],
@@ -120,6 +123,13 @@ export default function Sidebar({ open = false, onClose }: { open?: boolean; onC
   const { theme, toggle, density, setDensity } = useTheme();
   const navigate = useNavigate();
   const [version, setVersion] = useState('ATT&CK v14');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (section: string) => setCollapsedGroups(previous => {
+    const next = new Set(previous);
+    next.has(section) ? next.delete(section) : next.add(section);
+    return next;
+  });
 
   useEffect(() => {
     api.getAttackVersion().then(v => setVersion(`ATT&CK ${v.version}`)).catch(() => {});
@@ -133,7 +143,7 @@ export default function Sidebar({ open = false, onClose }: { open?: boolean; onC
   return (
     <>
     {open && <button aria-label="Close navigation" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm md:hidden print:hidden" />}
-    <aside aria-label="Primary navigation" className={`fixed inset-y-0 left-0 z-50 w-64 flex-shrink-0 bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col transition-transform duration-200 print:hidden md:static md:z-auto md:w-56 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside aria-label="Primary navigation" className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-shrink-0 flex-col border-r border-gray-200/80 bg-white/90 shadow-2xl shadow-slate-900/10 backdrop-blur-xl transition-transform duration-200 dark:border-slate-800/60 dark:bg-slate-950 dark:bg-gradient-to-b dark:from-slate-950 dark:to-slate-950 dark:shadow-black/20 print:hidden md:static md:z-auto md:w-60 md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Top gradient accent strip */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-600 opacity-80" />
 
@@ -154,11 +164,11 @@ export default function Sidebar({ open = false, onClose }: { open?: boolean; onC
         {NAV.map(({ section, items }) => (
           <div key={section ?? '__top'} className="mb-1">
             {section && (
-              <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-slate-600 select-none">
-                {section}
-              </div>
+              <button onClick={() => toggleGroup(section)} aria-expanded={!collapsedGroups.has(section)} className="group flex w-full items-center px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400 transition-colors hover:text-gray-700 dark:text-slate-500 dark:hover:text-slate-300">
+                <span>{section}</span><ChevronDown size={12} className={`ml-auto transition-transform ${collapsedGroups.has(section) ? '-rotate-90' : ''}`} />
+              </button>
             )}
-            <div className="space-y-0.5">
+            <div className={`grid transition-all duration-200 ${section && collapsedGroups.has(section) ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}><div className="min-h-0 space-y-0.5 overflow-hidden">
               {items.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -167,8 +177,8 @@ export default function Sidebar({ open = false, onClose }: { open?: boolean; onC
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150 relative ${
                       isActive
-                        ? 'bg-blue-500/10 text-blue-300 font-medium border-l-2 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.18)] pl-[10px]'
-                        : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100/70 dark:hover:bg-slate-800/70 border-l-2 border-transparent pl-[10px]'
+                        ? 'bg-blue-50 text-blue-800 dark:bg-slate-800/90 dark:text-white font-semibold border-l-2 border-blue-500 dark:border-cyan-400 shadow-sm dark:shadow-black/20 pl-[10px]'
+                        : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/70 dark:hover:bg-slate-900 border-l-2 border-transparent pl-[10px]'
                     }`
                   }
                 >
@@ -176,7 +186,7 @@ export default function Sidebar({ open = false, onClose }: { open?: boolean; onC
                   <span className="flex-1">{label}</span>
                 </NavLink>
               ))}
-            </div>
+            </div></div>
           </div>
         ))}
       </nav>
@@ -212,7 +222,7 @@ export default function Sidebar({ open = false, onClose }: { open?: boolean; onC
             <button
               onClick={toggle}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:text-slate-300 transition-colors p-1 rounded"
+                className="icon-button min-h-7 min-w-7 p-1"
             >
               {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             </button>

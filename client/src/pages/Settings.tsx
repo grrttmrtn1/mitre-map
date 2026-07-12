@@ -360,7 +360,7 @@ export default function Settings() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+      <div className="page-command-header">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Settings &amp; Administration</h1>
         <div className="flex gap-1 mt-4 flex-wrap">
@@ -883,15 +883,6 @@ export default function Settings() {
                 Purge All Data
               </button>
             </div>
-          </div>
-        )}
-
-        {/* ── Under Construction ── */}
-        {activeTab === 'sso' && (
-          <div className="max-w-lg flex flex-col items-center justify-center py-20 text-center">
-            <div className="text-4xl mb-4">🚧</div>
-            <h2 className="text-lg font-semibold text-gray-700 dark:text-slate-300 mb-2">Under Construction</h2>
-            <p className="text-sm text-gray-400 dark:text-slate-500">SSO / OIDC configuration is not yet available.</p>
           </div>
         )}
 

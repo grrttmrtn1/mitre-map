@@ -9,9 +9,9 @@ export default function ChartCard({ title, description, actions, summary, childr
   className?: string;
 }) {
   return (
-    <section aria-labelledby={`chart-${title.replace(/\W+/g, '-').toLowerCase()}`} className={`rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-900 ${className}`}>
+    <section aria-labelledby={`chart-${title.replace(/\W+/g, '-').toLowerCase()}`} className={`surface-card group p-5 transition-colors hover:border-blue-400/25 ${className}`}>
       <div className="flex items-start justify-between gap-3">
-        <div><h2 id={`chart-${title.replace(/\W+/g, '-').toLowerCase()}`} className="text-sm font-semibold text-gray-700 dark:text-slate-200">{title}</h2>{description && <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">{description}</p>}</div>
+        <div><h2 id={`chart-${title.replace(/\W+/g, '-').toLowerCase()}`} className="text-base font-semibold tracking-tight text-gray-800 dark:text-slate-100">{title}</h2>{description && <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">{description}</p>}</div>
         {actions}
       </div>
       <div className="mt-3">{children}</div>

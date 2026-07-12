@@ -1,20 +1,23 @@
 import { Router } from 'express';
 import { getKnex, rawAll, rawGet, rawRun, rawInsert, logAudit, computeCoverageSummary } from '../db/database';
 import { recordCoverageChangeDirect } from '../coverage/attribution';
+import { pageOptions, pageResult } from '../lib/pagination';
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   const db = getKnex();
-  const tools = await rawAll(db, 'SELECT * FROM tools ORDER BY category, name');
-  const withCoverage = await Promise.all(tools.map(async (tool: any) => {
-    const [d3, mit] = await Promise.all([
-      rawGet<{ c: number }>(db, 'SELECT COUNT(*) as c FROM tool_d3fend WHERE tool_id = ?', [tool.id]),
-      rawGet<{ c: number }>(db, 'SELECT COUNT(*) as c FROM tool_mitigations WHERE tool_id = ?', [tool.id]),
-    ]);
-    return { ...tool, d3fend_count: d3?.c ?? 0, mitigation_count: mit?.c ?? 0 };
-  }));
-  res.json(withCoverage);
+  const page = pageOptions(req);
+  const where = page.search ? "WHERE LOWER(t.name) LIKE ? OR LOWER(COALESCE(t.vendor,'')) LIKE ? OR LOWER(t.category) LIKE ?" : '';
+  const params = page.search ? Array(3).fill(`%${page.search.toLowerCase()}%`) : [];
+  const count = await rawGet<{ c: number }>(db, `SELECT COUNT(*) AS c FROM tools t ${where}`, params);
+  let sql = `SELECT t.*,
+    (SELECT COUNT(*) FROM tool_d3fend td WHERE td.tool_id=t.id) AS d3fend_count,
+    (SELECT COUNT(*) FROM tool_mitigations tm WHERE tm.tool_id=t.id) AS mitigation_count
+    FROM tools t ${where} ORDER BY t.category, t.name`;
+  if (page.paginated) { sql += ' LIMIT ? OFFSET ?'; params.push(page.limit, page.offset); }
+  const tools = await rawAll(db, sql, params);
+  res.json(page.paginated ? pageResult(tools, Number(count?.c ?? 0), page.limit, page.offset) : tools);
 });
 
 router.get('/:id', async (req, res) => {

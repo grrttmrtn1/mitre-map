@@ -533,7 +533,7 @@ export default function SigmaLibrary() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+      <div className="page-command-header">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-slate-100">SIGMA Rule Library</h1>

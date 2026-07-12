@@ -148,7 +148,7 @@ function AtomicTab({ tests, loading }: { tests: ArtTest[]; loading: boolean }) {
 
   return (
     <>
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+      <div className="page-command-header">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -502,7 +502,7 @@ function CustomTab({ tests, loading, onRefresh }: { tests: ArtTest[]; loading: b
         />
       )}
 
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-gradient-to-r from-gray-50 via-gray-50 to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 relative">
+      <div className="page-command-header">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500 dark:text-slate-400">

@@ -11,6 +11,53 @@ import { validateBody } from '../middleware/validation';
 const router = Router();
 const JWT_EXPIRY = '15m';
 const REFRESH_EXPIRY_DAYS = 30;
+const OIDC_FLOW_MAX_AGE = 10 * 60 * 1000;
+const OIDC_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const oidcCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: OIDC_FLOW_MAX_AGE,
+});
+
+function oidcRedirectUri(slug: string) {
+  return `${process.env.APP_URL ?? 'http://localhost:4000'}/api/auth/oidc/${encodeURIComponent(slug)}/callback`;
+}
+
+async function createOidcClient(provider: any) {
+  await validateBaseUrl(provider.issuer_url);
+  const issuer = await Issuer.discover(provider.issuer_url);
+  return new issuer.Client({
+    client_id: provider.client_id,
+    client_secret: decryptSecretValue(provider.client_secret) ?? provider.client_secret,
+    redirect_uris: [oidcRedirectUri(provider.slug)],
+    response_types: ['code'],
+  });
+}
+
+async function beginOidcFlow(res: any, provider: any, linkUserId?: number) {
+  const client = await createOidcClient(provider);
+  const state = generators.state();
+  const nonce = generators.nonce();
+  const codeVerifier = generators.codeVerifier();
+  const options = oidcCookieOptions();
+  res.cookie('oidc_state', state, options);
+  res.cookie('oidc_nonce', nonce, options);
+  res.cookie('oidc_code_verifier', codeVerifier, options);
+  if (linkUserId !== undefined) {
+    res.cookie('oidc_link', jwt.sign({ sub: linkUserId, provider: provider.slug, purpose: 'oidc-link' }, requireJwtSecret(), { expiresIn: '10m' }), options);
+  }
+  return client.authorizationUrl({
+    redirect_uri: oidcRedirectUri(provider.slug),
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    nonce,
+    code_challenge: generators.codeChallenge(codeVerifier),
+    code_challenge_method: 'S256',
+  });
+}
 
 function signToken(userId: number, email: string, role: string) {
   return jwt.sign({ sub: userId, email, role }, requireJwtSecret(), { expiresIn: JWT_EXPIRY });
@@ -168,6 +215,7 @@ router.post('/oidc/providers', validateBody({
   if (!name || !slug || !issuer_url || !client_id || !client_secret) {
     return res.status(400).json({ error: 'name, slug, issuer_url, client_id, client_secret are required' });
   }
+  if (!OIDC_SLUG_PATTERN.test(slug.trim())) return res.status(400).json({ error: 'slug must contain lowercase letters, numbers, and single hyphens only' });
   try { await validateBaseUrl(issuer_url.trim()); } catch (e: any) { return res.status(400).json({ error: e.message }); }
   const db = getKnex();
   try {
@@ -188,19 +236,28 @@ router.put('/oidc/providers/:id', async (req, res) => {
   const existing = await rawGet<any>(db, 'SELECT id FROM oidc_providers WHERE id=?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const { name, slug, issuer_url, client_id, client_secret, enabled } = req.body;
+  if (slug !== undefined && (typeof slug !== 'string' || !OIDC_SLUG_PATTERN.test(slug.trim()))) {
+    return res.status(400).json({ error: 'slug must contain lowercase letters, numbers, and single hyphens only' });
+  }
   if (issuer_url !== undefined) {
     try { await validateBaseUrl(issuer_url.trim()); } catch (e: any) { return res.status(400).json({ error: e.message }); }
   }
-  await rawRun(db, `UPDATE oidc_providers SET
+  try {
+    await rawRun(db, `UPDATE oidc_providers SET
     name=COALESCE(?,name), slug=COALESCE(?,slug), issuer_url=COALESCE(?,issuer_url),
     client_id=COALESCE(?,client_id),
     client_secret=CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE client_secret END,
     enabled=COALESCE(?,enabled)
     WHERE id=?`,
-    [name ?? null, slug ?? null, issuer_url ?? null, client_id ?? null,
+    [typeof name === 'string' ? name.trim() : null, typeof slug === 'string' ? slug.trim() : null,
+     typeof issuer_url === 'string' ? issuer_url.trim() : null, typeof client_id === 'string' ? client_id.trim() : null,
      client_secret, client_secret, client_secret ? encryptSecretValue(client_secret) : null,
      enabled !== undefined ? (enabled ? 1 : 0) : null,
      req.params.id]);
+  } catch (e: any) {
+    if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'A provider with this name or slug already exists' });
+    throw e;
+  }
   const provider = await rawGet<any>(db, 'SELECT id, name, slug, issuer_url, client_id, enabled FROM oidc_providers WHERE id=?', [req.params.id]);
   await logAudit(db, 'oidc_provider', req.params.id, 'update', (req as any).actor ?? 'user',
     { name, slug, issuer_url, client_id, enabled }, (req as any).sourceIp);
@@ -225,68 +282,48 @@ router.post('/oidc/:slug/link', async (req, res) => {
   const db = getKnex();
   const provider = await rawGet<any>(db, 'SELECT * FROM oidc_providers WHERE slug=? AND enabled=1', [req.params.slug]);
   if (!provider) return res.status(404).json({ error: 'Provider not found' });
-  try { await validateBaseUrl(provider.issuer_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
-
-  const state = crypto.randomBytes(16).toString('hex');
-  const nonce = generators.nonce();
-  const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, maxAge: 10 * 60 * 1000 };
-  res.cookie('oidc_state', state, cookieOptions);
-  res.cookie('oidc_nonce', nonce, cookieOptions);
-  res.cookie('oidc_link', jwt.sign({ sub: currentUser.id, provider: provider.slug, purpose: 'oidc-link' }, requireJwtSecret(), { expiresIn: '10m' }), cookieOptions);
-  const params = new URLSearchParams({
-    client_id: provider.client_id,
-    redirect_uri: `${process.env.APP_URL ?? 'http://localhost:4000'}/api/auth/oidc/${req.params.slug}/callback`,
-    response_type: 'code', scope: 'openid email profile', state, nonce,
-  });
-  res.json({ authorization_url: `${provider.issuer_url}/authorize?${params.toString()}` });
+  try {
+    res.json({ authorization_url: await beginOidcFlow(res, provider, currentUser.id) });
+  } catch (e) {
+    console.error('OIDC discovery error:', e);
+    res.status(502).json({ error: 'Unable to load identity provider configuration' });
+  }
 });
 
 router.get('/oidc/:slug', async (req, res) => {
   const db = getKnex();
   const provider = await rawGet<any>(db, 'SELECT * FROM oidc_providers WHERE slug=? AND enabled=1', [req.params.slug]);
   if (!provider) return res.status(404).json({ error: 'Provider not found' });
-  try { await validateBaseUrl(provider.issuer_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
-  const state = crypto.randomBytes(16).toString('hex');
-  const nonce = generators.nonce();
-  // Store state in short-lived httpOnly cookie for CSRF validation in the callback
-  res.cookie('oidc_state', state, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 10 * 60 * 1000,
-  });
-  res.cookie('oidc_nonce', nonce, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 10 * 60 * 1000,
-  });
-  const params = new URLSearchParams({
-    client_id: provider.client_id,
-    redirect_uri: `${process.env.APP_URL ?? 'http://localhost:4000'}/api/auth/oidc/${req.params.slug}/callback`,
-    response_type: 'code',
-    scope: 'openid email profile',
-    state,
-    nonce,
-  });
-  res.redirect(`${provider.issuer_url}/authorize?${params.toString()}`);
+  try {
+    res.redirect(await beginOidcFlow(res, provider));
+  } catch (e) {
+    console.error('OIDC discovery error:', e);
+    res.status(502).json({ error: 'Unable to load identity provider configuration' });
+  }
 });
 
 router.get('/oidc/:slug/callback', async (req, res) => {
-  const { code, state } = req.query;
+  const { code, state, error, error_description } = req.query;
+  if (error) return res.status(400).json({ error: String(error_description || error) });
   if (!code) return res.status(400).json({ error: 'Missing authorization code' });
 
   // Validate OIDC state to prevent CSRF
   const expectedState = req.cookies?.oidc_state;
   if (!state || !expectedState || state !== expectedState) {
+    res.clearCookie('oidc_state');
+    res.clearCookie('oidc_nonce');
+    res.clearCookie('oidc_code_verifier');
+    res.clearCookie('oidc_link');
     return res.status(400).json({ error: 'Invalid or missing state parameter' });
   }
   res.clearCookie('oidc_state');
   const expectedNonce = req.cookies?.oidc_nonce;
   res.clearCookie('oidc_nonce');
+  const codeVerifier = req.cookies?.oidc_code_verifier;
+  res.clearCookie('oidc_code_verifier');
   const linkToken = req.cookies?.oidc_link;
   res.clearCookie('oidc_link');
-  if (!expectedNonce) return res.status(400).json({ error: 'Invalid or missing nonce parameter' });
+  if (!expectedNonce || !codeVerifier) return res.status(400).json({ error: 'OIDC session expired or incomplete' });
 
   const db = getKnex();
   const provider = await rawGet<any>(db, 'SELECT * FROM oidc_providers WHERE slug=? AND enabled=1', [req.params.slug]);
@@ -294,16 +331,13 @@ router.get('/oidc/:slug/callback', async (req, res) => {
   try { await validateBaseUrl(provider.issuer_url); } catch (e: any) { return res.status(400).json({ error: e.message }); }
 
   try {
-    const issuer = await Issuer.discover(provider.issuer_url);
-    const client = new issuer.Client({
-      client_id: provider.client_id,
-      client_secret: decryptSecretValue(provider.client_secret) ?? provider.client_secret,
-    });
-    const redirectUri = `${process.env.APP_URL ?? 'http://localhost:4000'}/api/auth/oidc/${req.params.slug}/callback`;
+    const client = await createOidcClient(provider);
+    const redirectUri = oidcRedirectUri(provider.slug);
     const params = client.callbackParams(req);
-    const tokenSet = await client.callback(redirectUri, params, { state: String(state), nonce: expectedNonce });
+    const tokenSet = await client.callback(redirectUri, params, { state: String(state), nonce: expectedNonce, code_verifier: codeVerifier });
     const payload = tokenSet.claims() as any;
-    if (!payload?.email) return res.status(400).json({ error: 'No email in OIDC token' });
+    if (!payload?.sub || !payload?.email) return res.status(400).json({ error: 'OIDC token is missing required subject or email claims' });
+    if (payload.email_verified === false) return res.status(403).json({ error: 'The identity provider has not verified this email address' });
 
     const sourceIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? null;
     if (linkToken) {

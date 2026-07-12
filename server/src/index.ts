@@ -48,6 +48,7 @@ import { initReportScheduler } from './reporting/scheduler';
 import campaignsRouter from './routes/campaigns';
 import cvesRouter from './routes/cves';
 import indicatorsRouter from './routes/indicators';
+import operationsRouter from './routes/operations';
 import { initScheduler } from './taxii/scheduler';
 import { initAttackScheduler } from './attack/scheduler';
 import { requireApiKey } from './middleware/auth';
@@ -124,6 +125,7 @@ app.use('/api/integrations', integrationsRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/cves', cvesRouter);
 app.use('/api/indicators', indicatorsRouter);
+app.use('/api/operations', operationsRouter);
 
 // OpenAPI spec — machine-readable, no auth required
 app.get('/api/openapi.json', (_req, res) => {

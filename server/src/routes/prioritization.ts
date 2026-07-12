@@ -3,6 +3,43 @@ import { getKnex, rawAll, rawGet, buildTechniqueGraph, resolveToParent } from '.
 
 const router = Router();
 
+// Unified remediation history assembled from the records existing workflows already create.
+router.get('/techniques/:id/timeline', async (req, res) => {
+  const db = getKnex();
+  const technique = await rawGet<{ id: string; name: string }>(db, 'SELECT id, name FROM attack_techniques WHERE id=?', [req.params.id]);
+  if (!technique) return res.status(404).json({ error: 'Technique not found' });
+  const like = `%"${technique.id}"%`;
+  const [assignments, detections, findings, comments, audits] = await Promise.all([
+    rawAll<any>(db, "SELECT * FROM assignments WHERE entity_id=? AND entity_type IN ('gap','technique')", [technique.id]),
+    rawAll<any>(db, 'SELECT id,name,status,created_at,updated_at FROM detections WHERE technique_ids LIKE ?', [like]),
+    rawAll<any>(db, 'SELECT id,exercise_id,title,finding_type,severity,created_at,updated_at FROM exercise_findings WHERE technique_id=?', [technique.id]),
+    rawAll<any>(db, "SELECT * FROM comments WHERE entity_id=? AND entity_type IN ('gap','technique')", [technique.id]),
+    rawAll<any>(db, "SELECT * FROM audit_log WHERE entity_id=? AND entity_type IN ('gap','technique')", [technique.id]),
+  ]);
+  const events = [
+    ...assignments.map(a => ({ type: 'assignment', occurred_at: a.updated_at ?? a.created_at, title: `Assigned to ${a.assignee}`, status: a.status, data: a })),
+    ...detections.map(d => ({ type: 'detection', occurred_at: d.updated_at ?? d.created_at, title: `Detection: ${d.name}`, status: d.status, data: d })),
+    ...findings.map(f => ({ type: 'exercise_finding', occurred_at: f.updated_at ?? f.created_at, title: f.title, status: f.finding_type, data: f })),
+    ...comments.map(c => ({ type: 'comment', occurred_at: c.updated_at ?? c.created_at, title: `Comment by ${c.author}`, data: c })),
+    ...audits.map(a => ({ type: 'audit', occurred_at: a.created_at, title: `${a.action} by ${a.actor}`, status: a.action, data: a })),
+  ].sort((a, b) => String(b.occurred_at).localeCompare(String(a.occurred_at)));
+  const first = events.length ? new Date(events[events.length - 1].occurred_at).getTime() : null;
+  const activeDetection = detections.find(d => d.status === 'active');
+  const closedAssignment = assignments.find(a => ['completed', 'closed', 'done'].includes(a.status));
+  const resolvedAt = activeDetection?.updated_at ?? closedAssignment?.updated_at ?? null;
+  res.json({
+    technique,
+    state: activeDetection ? 'detected' : closedAssignment ? 'remediated' : assignments.length ? 'assigned' : 'identified',
+    metrics: {
+      event_count: events.length,
+      detection_count: detections.length,
+      finding_count: findings.length,
+      time_to_resolution_hours: first && resolvedAt ? Math.max(0, Math.round((new Date(resolvedAt).getTime() - first) / 3_600_000)) : null,
+    },
+    events,
+  });
+});
+
 router.get('/queue', async (_req, res) => {
   const db = getKnex();
   const { parentTechIds, subtechToParent } = await buildTechniqueGraph(db);
